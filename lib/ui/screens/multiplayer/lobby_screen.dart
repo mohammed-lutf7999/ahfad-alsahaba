@@ -1,0 +1,286 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+
+import '../../../core/app_theme.dart';
+import '../../../core/sound_service.dart';
+import '../../../data/services/multiplayer_service.dart';
+import 'versus_screen.dart';
+
+class LobbyScreen extends StatefulWidget {
+  const LobbyScreen({super.key});
+
+  @override
+  State<LobbyScreen> createState() => _LobbyScreenState();
+}
+
+class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _radarController;
+  String _statusText = 'جاري البحث عن خصم...';
+  bool _isSearching = true;
+  bool _showBotButton = false;
+  
+  StreamSubscription? _matchSubscription;
+  Timer? _lobbyTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _radarController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+    
+    _startMatchmaking();
+  }
+
+  @override
+  void dispose() {
+    _radarController.dispose();
+    _matchSubscription?.cancel();
+    _lobbyTimer?.cancel();
+    
+    // Cancel matchmaking if leaving screen without match
+    if (_isSearching) {
+       MultiplayerService.instance.cancelMatchmaking();
+    }
+    super.dispose();
+  }
+
+  Future<void> _startMatchmaking() async {
+    // Show Bot Button after 15 seconds
+    _lobbyTimer?.cancel();
+    _lobbyTimer = Timer(const Duration(seconds: 15), () {
+      if (mounted && _isSearching) {
+        setState(() => _showBotButton = true);
+        SoundService().playNotification(); // Subtle notification
+      }
+    });
+
+    // Get actual app version from package info
+    const appVersion = '1.0.0'; 
+    
+    final result = await MultiplayerService.instance.findMatch(appVersion: appVersion);
+    
+    if (!mounted) return;
+
+    if (result.error != null) {
+      setState(() {
+        _statusText = 'حدث خطأ: ${result.error}';
+        _isSearching = false;
+      });
+      return;
+    }
+
+    if (result.matchId != null && !result.isWaiting) {
+      // Match found immediately!
+      _goToVersusScreen(result.matchId!, result.opponentId!, result.seed!);
+    } else if (result.isWaiting) {
+      // Waiting in queue... listen for match
+      setState(() => _statusText = 'في انتظار خصم...');
+      
+      _matchSubscription = MultiplayerService.instance.listenForMatchFound().listen(
+        (matchData) {
+          if (!mounted) return;
+          
+          // Safe null checks before proceeding
+          final matchId = matchData['id'];
+          final seedValue = matchData['seed'];
+          
+          if (matchId == null || seedValue == null) {
+            print('Incomplete match data received, waiting...');
+            return;
+          }
+          
+          final seed = (seedValue is num) ? seedValue.toInt() : int.tryParse(seedValue.toString()) ?? 0;
+          
+          // Determine opponent using auth ID
+          final myId = MultiplayerService.instance.currentUserId;
+          final p1 = matchData['player1_id'];
+          final p2 = matchData['player2_id'];
+          
+          if (myId == null || p1 == null || p2 == null) {
+            print('Missing player IDs, waiting...');
+            return;
+          }
+          
+          final opponentId = (p1 == myId) ? p2 : p1;
+          
+          _goToVersusScreen(matchId, opponentId, seed);
+        },
+        onError: (error) {
+          if (mounted) {
+            setState(() {
+              _statusText = 'خطأ في الاتصال: $error';
+              _isSearching = false;
+            });
+          }
+        },
+      );
+    }
+  }
+
+  Future<void> _startBotMatch() async {
+    SoundService().playClick();
+    _lobbyTimer?.cancel();
+    _matchSubscription?.cancel();
+    setState(() => _isSearching = false);
+    
+    // Stop searching online
+    await MultiplayerService.instance.cancelMatchmaking();
+    
+    // Start local bot match
+    final result = await MultiplayerService.instance.createBotMatch();
+    _goToVersusScreen(
+       result.matchId!, 
+       result.opponentId!, 
+       result.seed!, 
+       isBot: true, 
+       questionIds: result.questionIds
+    );
+  }
+
+  void _goToVersusScreen(String matchId, String opponentId, int seed, {bool isBot = false, List<String>? questionIds}) {
+    // Cancel subscription and stop search
+    _matchSubscription?.cancel();
+    _lobbyTimer?.cancel();
+    
+    setState(() => _isSearching = false);
+    _radarController.stop();
+    SoundService().playPlayerJoin();
+    
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => VersusScreen(
+          matchId: matchId,
+          opponentId: opponentId,
+          seed: seed,
+          isBot: isBot,
+          questionIds: questionIds,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Header
+              const Text(
+                'تحدي مباشر',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Cairo',
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 50),
+              
+              // Radar Visual
+              SizedBox(
+                height: 300,
+                width: 300,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Ripples
+                    ...List.generate(3, (index) {
+                      return AnimatedBuilder(
+                        animation: _radarController,
+                        builder: (context, child) {
+                          final progress = (_radarController.value + (index * 0.33)) % 1.0;
+                          return Opacity(
+                            opacity: 1.0 - progress,
+                            child: Container(
+                              width: 300 * progress,
+                              height: 300 * progress,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.accentColor.withValues(alpha: 0.5),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                    
+                    // Center Icon
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.accentColor,
+                        boxShadow: [
+                           BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.5), blurRadius: 20, spreadRadius: 5)
+                        ],
+                      ),
+                      child: const Icon(Icons.search, size: 50, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 50),
+              
+              // Status Text
+              Text(
+                _statusText,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontFamily: 'Cairo',
+                  fontSize: 18,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 30),
+              
+              // Bot Button (appears after delay)
+              if (_showBotButton && _isSearching) ...[
+                 AnimatedOpacity(
+                   opacity: _showBotButton ? 1.0 : 0.0,
+                   duration: const Duration(seconds: 1),
+                   child: Container(
+                     width: double.infinity,
+                     margin: const EdgeInsets.symmetric(horizontal: 40),
+                     height: 50,
+                     child: ElevatedButton.icon(
+                       onPressed: _startBotMatch,
+                       icon: const Icon(Icons.smart_toy_rounded, color: AppTheme.primaryDark),
+                       label: const Text('  Bot تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark)),
+                       style: ElevatedButton.styleFrom(
+                         backgroundColor: AppTheme.accentColor,
+                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                       ),
+                     ),
+                   ),
+                 ),
+                 const SizedBox(height: 20),
+              ],
+              
+              // Cancel Button
+              if (_isSearching)
+                TextButton.icon(
+                  onPressed: () {
+                    SoundService().playClick();
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.close, color: Colors.redAccent),
+                  label: const Text('إلغاء', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
