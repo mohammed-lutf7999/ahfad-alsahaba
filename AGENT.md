@@ -8,7 +8,7 @@
 
 * **اسم المشروع البرمجي**: `ahfad_alsahaba` (سابقاً: `flutter_application_1`)
 * **الاسم التجاري للمتجر**: **معركة أحفاد الصحابة: مسابقات إسلامية** (Battle of Sahaba)
-* **معرف الحزمة (Package ID / Namespace)**: `com.ahfad.alsahaba`
+* **معرف الحزمة (Package ID / Namespace)**: `com.ahfad.alsahaba.battle`
 * **إطار العمل (Framework)**: Flutter SDK `3.32.8+` (قناة Stable)
 * **لغة البرمجة (Language)**: Dart SDK `^3.8.1` (Strict Null Safety)
 * **الحدود الدنيا لنظام Android**: `minSdk = 21` (Android 5.0) • `targetSdk = 35` (Android 15) • `compileSdk = 35`
@@ -130,3 +130,4 @@ d:/newcuzeapp/flutter_application_1/
 | **مفتاح التوقيع الإنتاجي (Production Keystore)** | ⚠️ يحتاج توليد | توليد ملف `upload-keystore.jks` وربطه في `key.properties` |
 | **رابط سياسة الخصوصية الخارجي** | ⚠️ يحتاج نشر ويب | نشر نص سياسة الخصوصية الموجودة في الإعدادات على GitHub Pages |
 | **الأصول الرسومية للمتجر** | ⚠️ يحتاج تجهيز | لقطات الشاشة (Screenshots)، أيقونة 512x512، وبانر 1024x500 |
+

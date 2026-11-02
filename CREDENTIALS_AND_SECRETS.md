@@ -45,7 +45,7 @@
 
 | البيان | القيمة | الاستخدام |
 | :--- | :--- | :--- |
-| **معرف التطبيق (Package Name / App ID)** | `com.ahfad.alsahaba` | المعرف غير القابل للتغيير في Google Play |
+| **معرف التطبيق (Package Name / App ID)** | `com.ahfad.alsahaba.battle` | المعرف غير القابل للتغيير في Google Play |
 | **الاسم الظاهر على شاشة الهاتف** | `معركة أحفاد الصحابة` | الاسم المعروض أسفل أيقونة اللعبة |
 | **إصدار التطبيق (Version)** | `1.0.0+1` (`versionName = 1.0.0`, `versionCode = 1`) | رقم الإصدار الأول للنشر |
 | **معرف عميل جوجل (Google Web Client ID)** | `187480947340-gj2h3t8qu1kl9vcov6j8hu0spknck699.apps.googleusercontent.com` | لتسجيل الدخول بـ Google Auth |
@@ -59,3 +59,4 @@
 > 1. لا تقم برفع كلمات المرور الشخصية أو ملفات Keystore في أي مستودع عام على GitHub.
 > 2. المفتاح العام `sb_publishable_...` آمن للاستخدام داخل التطبيق ومحمي بقواعد الأمان (Row Level Security - RLS).
 > 3. كلمة مرور تطبيقات جوجل `krxpaqtdwwhvjsqd` محفوظة داخل خوادم Supabase فقط وتعمل بمعزل تام عن الأجهزة.
+
