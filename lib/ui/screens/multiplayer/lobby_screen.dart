@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../core/app_constants.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
@@ -18,6 +19,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
   String _statusText = 'جاري البحث عن خصم...';
   bool _isSearching = true;
   bool _showBotButton = false;
+  bool _hasError = false;
   
   StreamSubscription? _matchSubscription;
   Timer? _lobbyTimer;
@@ -46,6 +48,22 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
+  String _formatErrorMessage(String rawError) {
+    if (rawError.contains('SocketException') || 
+        rawError.contains('Failed host lookup') || 
+        rawError.contains('errno = 7') ||
+        rawError.contains('ClientException')) {
+      return 'تعذر الاتصال بالخادم السحابي.\nيرجى التحقق من اتصال الإنترنت.';
+    }
+    if (rawError.contains('timedOut') || rawError.contains('Timeout') || rawError.contains('RealtimeSubscribeException')) {
+      return 'انتهت مهلة انتظار الخادم بسبب بطء الشبكة.\nيمكنك المحاولة مجدداً أو اللعب ضد الذكاء الاصطناعي.';
+    }
+    if (rawError.contains('User not logged in')) {
+      return 'يجب تسجيل الدخول أولاً لتحدي اللاعبين.';
+    }
+    return 'تعذر الاتصال المباشر حالياً.\nيمكنك التحدي ضد الذكاء الاصطناعي.';
+  }
+
   Future<void> _startMatchmaking() async {
     // Show Bot Button after 15 seconds
     _lobbyTimer?.cancel();
@@ -57,17 +75,20 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     });
 
     // Get actual app version from package info
-    const appVersion = '1.0.0'; 
+    final appVersion = AppConstants.appVersion; 
     
     final result = await MultiplayerService.instance.findMatch(appVersion: appVersion);
     
     if (!mounted) return;
 
     if (result.error != null) {
+      if (!mounted) return;
       setState(() {
-        _statusText = 'حدث خطأ: ${result.error}';
+        _statusText = _formatErrorMessage(result.error!);
         _isSearching = false;
+        _hasError = true;
       });
+      _radarController.stop();
       return;
     }
 
@@ -110,9 +131,11 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
         onError: (error) {
           if (mounted) {
             setState(() {
-              _statusText = 'خطأ في الاتصال: $error';
+              _statusText = _formatErrorMessage(error.toString());
               _isSearching = false;
+              _hasError = true;
             });
+            _radarController.stop();
           }
         },
       );
@@ -244,8 +267,62 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
               
               const SizedBox(height: 30),
               
-              // Bot Button (appears after delay)
-              if (_showBotButton && _isSearching) ...[
+              // Action buttons when error occurs
+              if (_hasError) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            SoundService().playClick();
+                            setState(() {
+                              _statusText = 'جاري البحث عن خصم...';
+                              _isSearching = true;
+                              _hasError = false;
+                              _showBotButton = false;
+                            });
+                            _radarController.repeat();
+                            _startMatchmaking();
+                          },
+                          icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryDark),
+                          label: const Text('إعادة المحاولة', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark, fontFamily: 'Cairo')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accentColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: _startBotMatch,
+                          icon: const Icon(Icons.smart_toy_rounded, color: Colors.white),
+                          label: const Text('تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Cairo')),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.accentColor),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton.icon(
+                        onPressed: () {
+                          SoundService().playClick();
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70),
+                        label: const Text('العودة للرئيسية', style: TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'Cairo')),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (_showBotButton && _isSearching) ...[
                  AnimatedOpacity(
                    opacity: _showBotButton ? 1.0 : 0.0,
                    duration: const Duration(seconds: 1),
@@ -256,7 +333,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                      child: ElevatedButton.icon(
                        onPressed: _startBotMatch,
                        icon: const Icon(Icons.smart_toy_rounded, color: AppTheme.primaryDark),
-                       label: const Text('  Bot تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark)),
+                       label: const Text('  تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark, fontFamily: 'Cairo')),
                        style: ElevatedButton.styleFrom(
                          backgroundColor: AppTheme.accentColor,
                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),

@@ -9,5 +9,5 @@ class SupabaseConfig {
   static const String supabaseAnonKey = 'sb_publishable_Zp9URQMtw71oyhZztDGsmg_hT9FfyIv';
 
   /// Google Web Client ID (used for authentication)
-  static const String googleWebClientId = '187480947340-gj2h3t8qu1kl9vcov6j8hu0spknck699.apps.googleusercontent.com';
+  static const String googleWebClientId = '261379953599-mgkf7vvaloobb37ev0bgr88obr7oodcf.apps.googleusercontent.com';
 }

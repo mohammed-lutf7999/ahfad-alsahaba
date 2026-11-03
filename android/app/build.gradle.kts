@@ -35,8 +35,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "1.0.3"
         multiDexEnabled = true
     }
 
@@ -52,7 +52,7 @@ android {
     buildTypes {
         release {
             ndk {
-                debugSymbolLevel = "none"
+                debugSymbolLevel = "symbol_table"
             }
             // Enable R8 code shrinking and resource shrinking
             isMinifyEnabled = true
