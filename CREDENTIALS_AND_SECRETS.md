@@ -26,6 +26,7 @@
 | **كلمة مرور التطبيقات (App Password)** | `krxpaqtdwwhvjsqd` | الرمز السري المكون من 16 حرفاً من Google |
 | **موقع حفظ السر في Supabase** | `Project Settings > Edge Functions > Secrets` | محفوظ باسم `GMAIL_USER` و `GMAIL_APP_PASSWORD` |
 | **دالة الإرسال السحابية (Edge Function)** | `welcome-email` | الدالة المنشورة على الخادم بلغة TypeScript |
+| **دالة سياسة الخصوصية (Privacy Policy URL)** | `https://khatzzpqxaiwuoodgcst.supabase.co/functions/v1/privacy-policy` | صفحة الويب العامة لسياسة الخصوصية وحذف البيانات |
 | **رابط استدعاء الدالة** | `https://khatzzpqxaiwuoodgcst.supabase.co/functions/v1/welcome-email` | يتم استدعاؤها تلقائياً بعد نجاح تسجيل الدخول |
 
 ---
