@@ -62,7 +62,6 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   late Animation<Offset> _emojiSlideAnim;
   late Animation<double> _emojiFadeAnim;
   String? _incomingReactionEmoji;
-  bool _showReactionMenu = false;
   
   StreamSubscription? _opponentSubscription;
   StreamSubscription? _reactionSubscription;
@@ -216,7 +215,6 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   }
 
   Future<void> _sendReaction(String emoji) async {
-    setState(() => _showReactionMenu = false);
     await MultiplayerService.instance.sendReaction(widget.matchId, emoji);
   }
 
