@@ -44,6 +44,12 @@ WHERE status IN ('matched', 'ready', 'playing')
 DELETE FROM public.matchmaking_queue 
 WHERE updated_at < NOW() - INTERVAL '30 seconds';
 
+-- 3.5 DROP EXISTING FUNCTIONS TO ALLOW NEW RETURN TYPES
+DROP FUNCTION IF EXISTS public.find_or_create_match(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.find_or_create_match(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.confirm_ready(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.finish_match(UUID, UUID) CASCADE;
+
 -- 4. FUNCTION: find_or_create_match (Rock-Solid Queue & Active Opponents Only)
 CREATE OR REPLACE FUNCTION public.find_or_create_match(
   p_user_id UUID, 
@@ -297,3 +303,4 @@ $$;
 GRANT EXECUTE ON FUNCTION public.find_or_create_match(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.confirm_ready(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.finish_match(UUID, UUID) TO authenticated;
+
