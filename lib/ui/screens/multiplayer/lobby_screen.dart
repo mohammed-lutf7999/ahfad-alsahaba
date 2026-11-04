@@ -40,6 +40,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     _radarController.dispose();
     _matchSubscription?.cancel();
     _lobbyTimer?.cancel();
+    MultiplayerService.instance.stopHeartbeat();
     
     // Cancel matchmaking if leaving screen without match
     if (_isSearching) {
@@ -67,6 +68,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
   Future<void> _startMatchmaking() async {
     // Show Bot Button after 15 seconds
     _lobbyTimer?.cancel();
+    MultiplayerService.instance.stopHeartbeat();
     _lobbyTimer = Timer(const Duration(seconds: 15), () {
       if (mounted && _isSearching) {
         setState(() => _showBotButton = true);
@@ -94,7 +96,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
 
     if (result.matchId != null && !result.isWaiting) {
       // Match found immediately!
-      _goToVersusScreen(result.matchId!, result.opponentId!, result.seed!);
+      _goToVersusScreen(result.matchId!, result.opponentId!, result.seed!, questionIds: result.questionIds);
     } else if (result.isWaiting) {
       // Waiting in queue... listen for match
       setState(() => _statusText = 'في انتظار خصم...');
@@ -126,7 +128,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
           
           final opponentId = (p1 == myId) ? p2 : p1;
           
-          _goToVersusScreen(matchId, opponentId, seed);
+          _goToVersusScreen(matchId, opponentId, seed, questionIds: matchData['question_ids'] != null ? List<String>.from(matchData['question_ids']) : null);
         },
         onError: (error) {
           if (mounted) {
@@ -145,6 +147,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
   Future<void> _startBotMatch() async {
     SoundService().playClick();
     _lobbyTimer?.cancel();
+    MultiplayerService.instance.stopHeartbeat();
     _matchSubscription?.cancel();
     setState(() => _isSearching = false);
     
@@ -166,6 +169,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     // Cancel subscription and stop search
     _matchSubscription?.cancel();
     _lobbyTimer?.cancel();
+    MultiplayerService.instance.stopHeartbeat();
     
     setState(() => _isSearching = false);
     _radarController.stop();

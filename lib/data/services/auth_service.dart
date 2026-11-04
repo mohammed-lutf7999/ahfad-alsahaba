@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_config.dart';
 import 'profile_service.dart';
+import 'multiplayer_service.dart';
 
 /// Result of an authentication operation.
 class AuthResult {
@@ -251,6 +252,14 @@ class AuthService extends ChangeNotifier {
     try {
       // CRITICAL: Sync and then clear local profile data
       // This ensures data is saved to cloud before sign-out
+      // CRITICAL: Remove user from matchmaking queue and stop heartbeats before signing out
+      try {
+        await MultiplayerService.instance.cancelMatchmaking();
+        MultiplayerService.instance.dispose();
+      } catch (e) {
+        debugPrint('Multiplayer cleanup on sign-out error: $e');
+      }
+
       await ProfileService.instance.syncAndClearProfile();
       
       // Sign out from Google

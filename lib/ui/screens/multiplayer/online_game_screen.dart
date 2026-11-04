@@ -335,12 +335,16 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
         questionIndex: _currentQuestionIndex,
         isCorrect: isCorrect,
         timeLeft: _timeLeft,
+        currentLocalScore: _myScore,
       );
       
       if (mounted) {
         setState(() {
           _myScore = scores['myScore'] ?? _myScore;
-          // Don't override opponent score here, let the realtime listener handle it
+          final oppScore = scores['opponentScore'] ?? 0;
+          if (oppScore > _opponentScore) {
+            _opponentScore = oppScore;
+          }
         });
       }
     }
@@ -365,6 +369,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     _botTimer?.cancel(); // Stop bot if running
     
     String? winnerId;
+    int? trophiesDelta;
+    int? totalTrophies;
 
     if (widget.isBot) {
        // Determine winner locally
@@ -387,15 +393,18 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
         });
       }
       winnerId = result['winnerId'];
+      trophiesDelta = result['trophiesDelta'] as int?;
+      totalTrophies = result['totalTrophies'] as int?;
     }
     
-    _showResultDialog(winnerId);
+    _showResultDialog(winnerId, trophiesDelta: trophiesDelta, totalTrophies: totalTrophies);
   }
 
-  void _showResultDialog(String? winnerId) {
+  void _showResultDialog(String? winnerId, {int? trophiesDelta, int? totalTrophies}) {
     final myId = MultiplayerService.instance.currentUserId;
     final isWinner = winnerId != null ? (winnerId == myId) : (_myScore > _opponentScore);
     final isDraw = (winnerId == null && _myScore == _opponentScore) || (!isWinner && _myScore == _opponentScore);
+    final effectiveDelta = trophiesDelta ?? (isDraw ? 5 : (isWinner ? 25 : -12));
     
     showDialog(
       context: context,
@@ -425,7 +434,28 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                 fontFamily: 'Cairo',
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            if (!widget.isBot)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withOpacity(0.5),
+                  ),
+                ),
+                child: Text(
+                  '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} 🏆 الكؤوس${totalTrophies != null ? " ($totalTrophies)" : ""}',
+                  style: TextStyle(
+                    color: effectiveDelta >= 0 ? Colors.amberAccent : Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
             
             // Scores comparison
             Container(

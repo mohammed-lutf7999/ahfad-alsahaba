@@ -61,6 +61,7 @@ class MultiplayerService {
   
   // Subscriptions management
   RealtimeChannel? _matchChannel;
+  RealtimeChannel? _reactionChannel;
   StreamController<MatchState>? _matchStateController;
 
   MultiplayerService._internal();
@@ -83,10 +84,14 @@ class MultiplayerService {
         _startHeartbeat(); // Keep alive
         return MatchmakingResult(success: true, isWaiting: true);
       } else {
-        // Match found immediately!
+        // Match found immediately! Stop any heartbeat
+        stopHeartbeat();
         final data = (response as List).first as Map<String, dynamic>;
         final matchId = data['match_id'] as String;
         final seed = (data['seed'] as num).toInt();
+        final questionIds = data['question_ids'] != null
+            ? List<String>.from(data['question_ids'])
+            : null;
         
         // Determine opponent ID
         final p1 = data['player1_id'] as String;
@@ -99,6 +104,7 @@ class MultiplayerService {
           matchId: matchId,
           opponentId: opponentId,
           seed: seed,
+          questionIds: questionIds,
         );
       }
     } catch (e) {
@@ -108,24 +114,46 @@ class MultiplayerService {
 
   Timer? _heartbeatTimer;
 
-  /// Cancels matchmaking by removing the user from the queue.
-  Future<void> cancelMatchmaking() async {
+  /// Stops the queue heartbeat timer immediately
+  void stopHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+  }
+
+  /// Cancels matchmaking by removing the user from the queue.
+  Future<void> cancelMatchmaking() async {
+    stopHeartbeat();
     
     final userId = currentUserId;
     if (userId == null) return;
 
-    await _client
-        .from('matchmaking_queue')
-        .delete()
-        .eq('user_id', userId);
+    try {
+      await _client
+          .from('matchmaking_queue')
+          .delete()
+          .eq('user_id', userId);
+    } catch (e) {
+      debugPrint('Error deleting from matchmaking_queue: $e');
+    }
+  }
+
+  /// Cancels/closes a specific match if opponent disconnected or user left VS screen
+  Future<void> cancelMatch(String matchId) async {
+    stopHeartbeat();
+    try {
+      await _client
+          .from('matches')
+          .update({'status': 'finished'})
+          .eq('id', matchId);
+    } catch (e) {
+      debugPrint('Error cancelling match: $e');
+    }
   }
   
   /// Start sending heartbeats to keep the user "active" in the queue
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 8), (timer) async {
        final userId = currentUserId;
        if (userId == null) {
          timer.cancel();
@@ -135,7 +163,7 @@ class MultiplayerService {
        try {
          await _client
           .from('matchmaking_queue')
-          .update({'updated_at': DateTime.now().toIso8601String()})
+          .update({'updated_at': DateTime.now().toUtc().toIso8601String()})
           .eq('user_id', userId);
        } catch (e) {
          debugPrint('Heartbeat error: $e');
@@ -148,32 +176,34 @@ class MultiplayerService {
     final userId = currentUserId;
     if (userId == null) return const Stream.empty();
 
-    final now = DateTime.now();
+    // Only accept matches created around or after this search session started
+    final searchStartCutoff = DateTime.now().toUtc().subtract(const Duration(seconds: 15));
 
     return _client
         .from('matches')
         .stream(primaryKey: ['id'])
         .map((event) {
-          // Find the match that involves me (strictly within last 2 minutes, not stale)
           final myMatch = event.firstWhere(
             (row) {
               final isMe = (row['player1_id'] == userId || row['player2_id'] == userId);
               final status = row['status'] as String? ?? '';
-              final isNotDone = status != 'finished' && status != 'expired' && status != 'cancelled';
+              final isFreshMatch = status == 'matched' || status == 'ready';
               
-              // Filter out stale zombie matches (> 2 minutes old)
               final createdAtStr = row['created_at'] as String?;
-              bool isRecent = true;
+              bool isFromCurrentSearch = true;
               if (createdAtStr != null) {
-                final createdAt = DateTime.tryParse(createdAtStr);
+                final createdAt = DateTime.tryParse(createdAtStr)?.toUtc();
                 if (createdAt != null) {
-                  isRecent = now.difference(createdAt).inMinutes < 2;
+                  isFromCurrentSearch = createdAt.isAfter(searchStartCutoff);
                 }
               }
-              return isMe && isNotDone && isRecent;
+              return isMe && isFreshMatch && isFromCurrentSearch;
             },
             orElse: () => <String, dynamic>{},
           );
+          if (myMatch.isNotEmpty) {
+            stopHeartbeat();
+          }
           return myMatch;
         })
         .where((match) => 
@@ -275,9 +305,13 @@ class MultiplayerService {
     required int questionIndex,
     required bool isCorrect,
     required int timeLeft,
+    int currentLocalScore = 0,
   }) async {
     final userId = currentUserId;
-    if (userId == null) return {'myScore': 0, 'opponentScore': 0};
+    final fallbackPoints = isCorrect ? (10 + timeLeft.clamp(0, 15)) : 0;
+    final fallbackScore = currentLocalScore + fallbackPoints;
+
+    if (userId == null) return {'myScore': fallbackScore, 'opponentScore': 0};
 
     try {
       final response = await _client.rpc('submit_answer', params: {
@@ -291,14 +325,21 @@ class MultiplayerService {
       if (response != null && response is List && response.isNotEmpty) {
         final data = response.first as Map<String, dynamic>;
         return {
-          'myScore': (data['new_score'] as num?)?.toInt() ?? 0,
+          'myScore': (data['new_score'] as num?)?.toInt() ?? fallbackScore,
           'opponentScore': (data['opponent_score'] as num?)?.toInt() ?? 0,
         };
       }
     } catch (e) {
-      print('Error submitting answer: $e');
+      debugPrint('Error submitting answer via RPC, using fallback update: $e');
+      try {
+        await updateProgress(
+          matchId: matchId,
+          score: fallbackScore,
+          questionIndex: questionIndex + 1,
+        );
+      } catch (_) {}
     }
-    return {'myScore': 0, 'opponentScore': 0};
+    return {'myScore': fallbackScore, 'opponentScore': 0};
   }
 
   /// Finishes the match and determines winner
@@ -379,22 +420,27 @@ class MultiplayerService {
   /// Sends a reaction (emoji) to the opponent via Broadcast
   Future<void> sendReaction(String matchId, String emoji) async {
     try {
-      await _client.channel('match_$matchId').sendBroadcastMessage(
+      final channel = _reactionChannel ?? _client.channel('reactions_$matchId');
+      await channel.sendBroadcastMessage(
         event: 'reaction',
         payload: {'emoji': emoji, 'senderId': currentUserId},
       );
     } catch (e) {
-      print('Error sending reaction: $e');
+      debugPrint('Error sending reaction: $e');
     }
   }
 
   /// Listens to reactions from the opponent
   Stream<String> listenToReactions(String matchId) {
+    _reactionChannel?.unsubscribe();
     final controller = StreamController<String>.broadcast();
     
-    _client.channel('match_$matchId').onBroadcast(
+    _reactionChannel = _client.channel('reactions_$matchId');
+    _reactionChannel!.onBroadcast(
       event: 'reaction',
       callback: (payload) {
+        final senderId = payload['senderId'] as String?;
+        if (senderId != null && senderId == currentUserId) return;
         final emoji = payload['emoji'] as String? ?? '';
         if (emoji.isNotEmpty) {
           controller.add(emoji);
@@ -506,7 +552,12 @@ class MultiplayerService {
 
   /// Clean up subscriptions
   void dispose() {
+    stopHeartbeat();
     _matchChannel?.unsubscribe();
+    _matchChannel = null;
+    _reactionChannel?.unsubscribe();
+    _reactionChannel = null;
     _matchStateController?.close();
+    _matchStateController = null;
   }
 }

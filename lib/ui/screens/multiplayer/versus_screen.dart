@@ -97,40 +97,123 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
        // Bot is always ready after a short delay
        await Future.delayed(const Duration(seconds: 1));
        if (mounted) {
-         setState(() {
-           _bothReady = true;
-           _waitingForOpponent = false;
-         });
-         _startCountdown();
+         _onBothPlayersReady();
        }
     } else {
-      // Online Match Logic
+      // Online Match Logic: Dual-Trigger (Realtime Stream + Active Polling + 15s Safety Timeout)
       _matchStateSubscription = MultiplayerService.instance
           .listenToMatchState(widget.matchId)
           .listen((state) {
             if (!mounted) return;
-            
-            if (state.status == 'ready' && !_bothReady) {
-              setState(() {
-                _bothReady = true;
-                _waitingForOpponent = false;
-              });
-              _startCountdown();
+            if ((state.status == 'ready' || state.status == 'playing') && !_bothReady) {
+              _onBothPlayersReady();
             }
           });
+
+      // Active fallback polling every 1.5s in case WebSocket packet is dropped
+      _pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+        if (!mounted || _bothReady) {
+          timer.cancel();
+          return;
+        }
+        final matchData = await MultiplayerService.instance.getMatchData(widget.matchId);
+        if (!mounted || _bothReady) return;
+        final status = matchData?['status'] as String?;
+        if (status == 'ready' || status == 'playing') {
+          if (_questionIds == null || _questionIds!.isEmpty) {
+            if (matchData?['question_ids'] != null) {
+              _questionIds = List<String>.from(matchData!['question_ids']);
+            }
+          }
+          _onBothPlayersReady();
+        }
+      });
+
+      // 15-second safety timeout so player NEVER hangs forever on VS screen if opponent left
+      _safetyTimeoutTimer = Timer(const Duration(seconds: 15), () async {
+        if (!mounted || _bothReady) return;
+        _pollTimer?.cancel();
+        _matchStateSubscription?.cancel();
+        await MultiplayerService.instance.cancelMatch(widget.matchId);
+        if (!mounted) return;
+        _showOpponentTimeoutDialog();
+      });
       
       // 5. Confirm this player is ready
       setState(() => _waitingForOpponent = true);
       final bothReady = await MultiplayerService.instance.confirmReady(widget.matchId);
       
       if (bothReady && mounted) {
-        setState(() {
-          _bothReady = true;
-          _waitingForOpponent = false;
-        });
-        _startCountdown();
+        _onBothPlayersReady();
       }
     }
+  }
+
+  void _onBothPlayersReady() {
+    if (_bothReady || !mounted) return;
+    _pollTimer?.cancel();
+    _safetyTimeoutTimer?.cancel();
+    setState(() {
+      _bothReady = true;
+      _waitingForOpponent = false;
+    });
+    _startCountdown();
+  }
+
+  void _showOpponentTimeoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.primaryDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'الخصم غير متصل',
+          style: TextStyle(color: Colors.white, fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'يبدو أن الخصم غادر الغرفة أو فقد الاتصال بالإنترنت.\nهل ترغب في بدء جولة فورية ضد الذكاء الاصطناعي؟',
+          style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop();
+            },
+            child: const Text('العودة', style: TextStyle(color: Colors.white60, fontFamily: 'Cairo')),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              foregroundColor: AppTheme.primaryDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final botResult = await MultiplayerService.instance.createBotMatch();
+              if (!mounted) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => VersusScreen(
+                    matchId: botResult.matchId!,
+                    opponentId: botResult.opponentId!,
+                    seed: botResult.seed!,
+                    isBot: true,
+                    questionIds: botResult.questionIds,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.smart_toy_rounded),
+            label: const Text('تحدي الذكاء الاصطناعي', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
   
   void _startCountdown() {
@@ -178,57 +261,125 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    // Top Half (Me)
                    Expanded(
                      child: Container(
-                       color: Colors.blue.withOpacity(0.1),
-                       child: Center(
-                         child: Column(
-                           mainAxisAlignment: MainAxisAlignment.center,
-                           children: [
-                             ProfileAvatar(
-                               avatarIndex: myProfile?.avatarIndex ?? 0, 
-                               size: 100,
-                             ),
-                             const SizedBox(height: 16),
-                             Text(
+                       width: double.infinity,
+                       color: Colors.blue.withOpacity(0.08),
+                       child: Column(
+                         mainAxisAlignment: MainAxisAlignment.center,
+                         children: [
+                           ProfileAvatar(
+                             avatarIndex: myProfile?.avatarIndex ?? 0, 
+                             size: 84,
+                           ),
+                           const SizedBox(height: 10),
+                           Padding(
+                             padding: const EdgeInsets.symmetric(horizontal: 24),
+                             child: Text(
                                myProfile?.name ?? 'أنا',
                                style: const TextStyle(
                                  color: Colors.white,
-                                 fontSize: 24,
+                                 fontSize: 22,
                                  fontWeight: FontWeight.bold,
                                  fontFamily: 'Cairo',
                                ),
+                               maxLines: 1,
+                               overflow: TextOverflow.ellipsis,
                              ),
-                             Text(
-                               'النقاط: ${myProfile?.totalScore ?? 0}',
-                               style: const TextStyle(color: Colors.white70),
+                           ),
+                           Text(
+                             'النقاط: ${myProfile?.totalScore ?? 0}',
+                             style: const TextStyle(color: Colors.white70, fontSize: 13),
+                           ),
+                           const SizedBox(height: 8),
+                           // Ready indicator
+                           Container(
+                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                             decoration: BoxDecoration(
+                               color: Colors.green.withOpacity(0.3),
+                               borderRadius: BorderRadius.circular(12),
+                               border: Border.all(color: Colors.green),
                              ),
-                             const SizedBox(height: 10),
-                             // Ready indicator
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                               decoration: BoxDecoration(
-                                 color: Colors.green.withOpacity(0.3),
-                                 borderRadius: BorderRadius.circular(12),
-                                 border: Border.all(color: Colors.green),
-                               ),
-                               child: const Row(
-                                 mainAxisSize: MainAxisSize.min,
-                                 children: [
-                                   Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                   SizedBox(width: 4),
-                                   Text('جاهز', style: TextStyle(color: Colors.green)),
-                                 ],
-                               ),
+                             child: const Row(
+                               mainAxisSize: MainAxisSize.min,
+                               children: [
+                                 Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                 SizedBox(width: 4),
+                                 Text('جاهز', style: TextStyle(color: Colors.green, fontFamily: 'Cairo')),
+                               ],
                              ),
-                           ],
-                         ),
+                           ),
+                         ],
                        ),
+                     ),
+                   ),
+
+                   // Dedicated Central VS & Countdown Band (Zero Overlap!)
+                   Container(
+                     width: double.infinity,
+                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                     decoration: BoxDecoration(
+                       color: Colors.black.withOpacity(0.25),
+                       border: const Border.symmetric(
+                         horizontal: BorderSide(color: Colors.white12, width: 1),
+                       ),
+                     ),
+                     child: Row(
+                       mainAxisAlignment: MainAxisAlignment.center,
+                       children: [
+                         ScaleTransition(
+                           scale: _vsScale,
+                           child: Container(
+                             padding: const EdgeInsets.all(14),
+                             decoration: BoxDecoration(
+                               shape: BoxShape.circle,
+                               gradient: AppTheme.goldGradient,
+                               boxShadow: [
+                                 BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15)
+                               ],
+                             ),
+                             child: const Text(
+                               'VS',
+                               style: TextStyle(
+                                 color: AppTheme.primaryDark,
+                                 fontSize: 28,
+                                 fontWeight: FontWeight.w900,
+                                 fontStyle: FontStyle.italic,
+                               ),
+                             ),
+                           ),
+                         ),
+                         const SizedBox(width: 16),
+                         if (_bothReady)
+                           Text(
+                             '$_countdown',
+                             style: const TextStyle(
+                               color: AppTheme.accentColor,
+                               fontSize: 44,
+                               fontWeight: FontWeight.bold,
+                               shadows: [
+                                 Shadow(color: Colors.black, blurRadius: 10),
+                               ],
+                             ),
+                           )
+                         else if (_waitingForOpponent)
+                           const Flexible(
+                             child: Text(
+                               'في انتظار تأكيد الخصم...',
+                               style: TextStyle(
+                                 color: Colors.white70,
+                                 fontSize: 16,
+                                 fontFamily: 'Cairo',
+                               ),
+                             ),
+                           ),
+                       ],
                      ),
                    ),
                    
                    // Bottom Half (Opponent)
                    Expanded(
                      child: Container(
-                       color: Colors.red.withOpacity(0.1),
+                       width: double.infinity,
+                       color: Colors.red.withOpacity(0.08),
                        child: Center(
                          child: _isLoading 
                            ? const CircularProgressIndicator(color: Colors.white)
@@ -237,23 +388,28 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                children: [
                                  ProfileAvatar(
                                    avatarIndex: (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0, 
-                                   size: 100,
+                                   size: 84,
                                  ),
-                                 const SizedBox(height: 16),
-                                 Text(
-                                   _opponentData?['display_name'] ?? 'الخصم',
-                                   style: const TextStyle(
-                                     color: Colors.white,
-                                     fontSize: 24,
-                                     fontWeight: FontWeight.bold,
-                                     fontFamily: 'Cairo',
+                                 const SizedBox(height: 10),
+                                 Padding(
+                                   padding: const EdgeInsets.symmetric(horizontal: 24),
+                                   child: Text(
+                                     _opponentData?['display_name'] ?? 'الخصم',
+                                     style: const TextStyle(
+                                       color: Colors.white,
+                                       fontSize: 22,
+                                       fontWeight: FontWeight.bold,
+                                       fontFamily: 'Cairo',
+                                     ),
+                                     maxLines: 1,
+                                     overflow: TextOverflow.ellipsis,
                                    ),
                                  ),
                                  Text(
                                    'النقاط: ${_opponentData?['score'] ?? 0}',
-                                   style: const TextStyle(color: Colors.white70),
+                                   style: const TextStyle(color: Colors.white70, fontSize: 13),
                                  ),
-                                 const SizedBox(height: 10),
+                                 const SizedBox(height: 8),
                                  // Opponent ready indicator
                                  if (_waitingForOpponent && !_bothReady)
                                    Container(
@@ -275,7 +431,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                            ),
                                          ),
                                          SizedBox(width: 6),
-                                         Text('في الانتظار...', style: TextStyle(color: Colors.orange)),
+                                         Text('في الانتظار...', style: TextStyle(color: Colors.orange, fontFamily: 'Cairo')),
                                        ],
                                      ),
                                    )
@@ -292,7 +448,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                        children: [
                                          Icon(Icons.check_circle, color: Colors.green, size: 16),
                                          SizedBox(width: 4),
-                                         Text('جاهز', style: TextStyle(color: Colors.green)),
+                                         Text('جاهز', style: TextStyle(color: Colors.green, fontFamily: 'Cairo')),
                                        ],
                                      ),
                                    ),
@@ -303,59 +459,24 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    ),
                  ],
                ),
-               
-               // VS Badge & Countdown (Center)
-               Center(
-                 child: Column(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     ScaleTransition(
-                       scale: _vsScale,
-                       child: Container(
-                         padding: const EdgeInsets.all(20),
-                         decoration: BoxDecoration(
-                           shape: BoxShape.circle,
-                           gradient: AppTheme.goldGradient,
-                           boxShadow: [
-                             BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)
-                           ],
-                         ),
-                         child: const Text(
-                           'VS',
-                           style: TextStyle(
-                             color: AppTheme.primaryDark,
-                             fontSize: 40,
-                             fontWeight: FontWeight.w900,
-                             fontStyle: FontStyle.italic,
-                           ),
-                         ),
-                       ),
-                     ),
-                     const SizedBox(height: 20),
-                     if (_bothReady)
-                       Text(
-                         '$_countdown',
-                         style: const TextStyle(
-                           color: Colors.white,
-                           fontSize: 60,
-                           fontWeight: FontWeight.bold,
-                           shadows: [
-                             Shadow(color: Colors.black, blurRadius: 10),
-                           ],
-                         ),
-                       )
-                     else if (_waitingForOpponent)
-                       const Text(
-                         'في انتظار الخصم...',
-                         style: TextStyle(
-                           color: Colors.white70,
-                           fontSize: 18,
-                           fontFamily: 'Cairo',
-                         ),
-                       ),
-                   ],
+
+               // Top Bar Cancel Button (in case user wants to leave before match starts)
+               if (!_bothReady)
+                 Positioned(
+                   top: 8,
+                   left: 8,
+                   child: TextButton.icon(
+                     onPressed: () async {
+                       SoundService().playClick();
+                       if (!widget.isBot) {
+                         await MultiplayerService.instance.cancelMatch(widget.matchId);
+                       }
+                       if (mounted) Navigator.of(context).pop();
+                     },
+                     icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                     label: const Text('إلغاء', style: TextStyle(color: Colors.white70, fontFamily: 'Cairo')),
+                   ),
                  ),
-               ),
              ],
            ),
         ),
