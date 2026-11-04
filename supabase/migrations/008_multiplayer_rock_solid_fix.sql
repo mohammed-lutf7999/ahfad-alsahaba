@@ -65,6 +65,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+#variable_conflict use_column
 DECLARE
   v_opponent_id UUID;
   v_match_id UUID;
@@ -76,11 +77,11 @@ BEGIN
   WHERE updated_at < NOW() - INTERVAL '30 seconds';
 
   -- B. Auto-cancel any old active matches for this user older than 3 minutes
-  UPDATE public.matches
+  UPDATE public.matches AS m
   SET status = 'finished'
-  WHERE (player1_id = p_user_id OR player2_id = p_user_id)
-    AND status IN ('matched', 'ready', 'playing')
-    AND created_at < NOW() - INTERVAL '3 minutes';
+  WHERE (m.player1_id = p_user_id OR m.player2_id = p_user_id)
+    AND m.status IN ('matched', 'ready', 'playing')
+    AND m.created_at < NOW() - INTERVAL '3 minutes';
 
   -- C. Search for an ACTIVE opponent in the queue (strictly updated in last 25 seconds)
   DELETE FROM public.matchmaking_queue
