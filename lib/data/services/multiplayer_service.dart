@@ -148,15 +148,31 @@ class MultiplayerService {
     final userId = currentUserId;
     if (userId == null) return const Stream.empty();
 
+    final now = DateTime.now();
+
     return _client
         .from('matches')
         .stream(primaryKey: ['id'])
         .map((event) {
-          // Find the match that involves me
+          // Find the match that involves me (strictly within last 2 minutes, not stale)
           final myMatch = event.firstWhere(
-            (row) => (row['player1_id'] == userId || row['player2_id'] == userId)
-                && row['status'] != 'finished',
-            orElse: () => <String, dynamic>{}, // Return empty Map instead of {}
+            (row) {
+              final isMe = (row['player1_id'] == userId || row['player2_id'] == userId);
+              final status = row['status'] as String? ?? '';
+              final isNotDone = status != 'finished' && status != 'expired' && status != 'cancelled';
+              
+              // Filter out stale zombie matches (> 2 minutes old)
+              final createdAtStr = row['created_at'] as String?;
+              bool isRecent = true;
+              if (createdAtStr != null) {
+                final createdAt = DateTime.tryParse(createdAtStr);
+                if (createdAt != null) {
+                  isRecent = now.difference(createdAt).inMinutes < 2;
+                }
+              }
+              return isMe && isNotDone && isRecent;
+            },
+            orElse: () => <String, dynamic>{},
           );
           return myMatch;
         })
@@ -298,10 +314,27 @@ class MultiplayerService {
 
       if (response != null && response is List && response.isNotEmpty) {
         final data = response.first as Map<String, dynamic>;
+        final winnerId = data['winner_user_id'];
+        final myScore = (data['my_final_score'] as num?)?.toInt() ?? 0;
+        final opponentScore = (data['opponent_final_score'] as num?)?.toInt() ?? 0;
+        final trophiesDelta = (data['trophies_delta'] as num?)?.toInt() ?? 0;
+        final totalTrophies = (data['my_total_trophies'] as num?)?.toInt() ?? 1000;
+
+        // Immediately update local profile score and sync
+        final profile = ProfileService.instance.activeProfile;
+        if (profile != null && myScore > 0) {
+          final newProfile = profile.copyWith(
+            totalScore: profile.totalScore + myScore,
+          );
+          await ProfileService.instance.updateProfile(newProfile);
+        }
+
         return {
-          'winnerId': data['winner_user_id'],
-          'myScore': (data['my_final_score'] as num?)?.toInt() ?? 0,
-          'opponentScore': (data['opponent_final_score'] as num?)?.toInt() ?? 0,
+          'winnerId': winnerId,
+          'myScore': myScore,
+          'opponentScore': opponentScore,
+          'trophiesDelta': trophiesDelta,
+          'totalTrophies': totalTrophies,
         };
       }
     } catch (e) {
@@ -357,7 +390,7 @@ class MultiplayerService {
 
   /// Listens to reactions from the opponent
   Stream<String> listenToReactions(String matchId) {
-    final controller = StreamController<String>();
+    final controller = StreamController<String>.broadcast();
     
     _client.channel('match_$matchId').onBroadcast(
       event: 'reaction',
@@ -367,7 +400,7 @@ class MultiplayerService {
           controller.add(emoji);
         }
       },
-    );
+    ).subscribe();
     
     return controller.stream;
   }

@@ -396,8 +396,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   void _showResultDialog(String? winnerId) {
     final myId = MultiplayerService.instance.currentUserId;
-    final isWinner = winnerId == myId;
-    final isDraw = winnerId == null && _myScore == _opponentScore;
+    final isWinner = winnerId != null ? (winnerId == myId) : (_myScore > _opponentScore);
+    final isDraw = (winnerId == null && _myScore == _opponentScore) || (!isWinner && _myScore == _opponentScore);
     
     showDialog(
       context: context,
@@ -558,7 +558,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     final myProfile = ProfileService.instance.activeProfile;
 
     return Scaffold(
-      floatingActionButton: _gameFinished ? null : _buildReactionFab(),
+      floatingActionButton: null,
       body: Container(
         decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
         child: SafeArea(
@@ -567,91 +567,110 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
               // Main Game Content
               Column(
                 children: [
-                  // --- Header (Scores) ---
+                  // --- Header (Scores & Timer) - Responsive & Overflow Protected ---
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    color: Colors.black12,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    color: Colors.black26,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                          // Me
-                         Row(
-                           children: [
-                             ProfileAvatar(avatarIndex: myProfile?.avatarIndex ?? 0, size: 40),
-                             const SizedBox(width: 8),
-                             Column(
-                               crossAxisAlignment: CrossAxisAlignment.start,
-                               children: [
-                                 Text(
-                                   myProfile?.name ?? 'أنا',
-                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                         Expanded(
+                           child: Row(
+                             children: [
+                               ProfileAvatar(avatarIndex: myProfile?.avatarIndex ?? 0, size: 36),
+                               const SizedBox(width: 6),
+                               Expanded(
+                                 child: Column(
+                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                     Text(
+                                       myProfile?.name ?? 'أنا',
+                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Cairo'),
+                                       maxLines: 1,
+                                       overflow: TextOverflow.ellipsis,
+                                     ),
+                                     Text(
+                                       '$_myScore',
+                                       style: const TextStyle(color: AppTheme.accentColor, fontSize: 16, fontWeight: FontWeight.bold),
+                                     ),
+                                   ],
                                  ),
-                                 Text(
-                                   '$_myScore',
-                                   style: const TextStyle(color: AppTheme.accentColor, fontSize: 18, fontWeight: FontWeight.bold),
-                                 ),
-                               ],
-                             )
-                           ],
+                               ),
+                             ],
+                           ),
                          ),
                          
-                         // VS / Timer
-                         Column(
-                           children: [
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                               decoration: BoxDecoration(
-                                 color: _timeLeft <= 5 ? Colors.red.withOpacity(0.3) : Colors.white.withOpacity(0.1),
-                                 borderRadius: BorderRadius.circular(20),
-                                 border: Border.all(
-                                   color: _timeLeft <= 5 ? Colors.red : Colors.white30,
+                         // VS / Central Timer
+                         Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 10),
+                           child: Column(
+                             mainAxisSize: MainAxisSize.min,
+                             children: [
+                               Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                 decoration: BoxDecoration(
+                                   color: _timeLeft <= 5 ? Colors.red.withOpacity(0.3) : Colors.white.withOpacity(0.12),
+                                   borderRadius: BorderRadius.circular(16),
+                                   border: Border.all(
+                                     color: _timeLeft <= 5 ? Colors.red : Colors.white30,
+                                   ),
+                                 ),
+                                 child: Text(
+                                   '$_timeLeft',
+                                   style: TextStyle(
+                                     color: _timeLeft <= 5 ? Colors.red : Colors.white,
+                                     fontSize: 20,
+                                     fontWeight: FontWeight.bold,
+                                   ),
                                  ),
                                ),
-                               child: Text(
-                                 '$_timeLeft',
-                                 style: TextStyle(
-                                   color: _timeLeft <= 5 ? Colors.red : Colors.white,
-                                   fontSize: 24,
-                                   fontWeight: FontWeight.bold,
-                                 ),
+                               const SizedBox(height: 2),
+                               Text(
+                                 'سؤال ${_currentQuestionIndex + 1}/${_questions.length}',
+                                 style: const TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'Cairo'),
                                ),
-                             ),
-                             const SizedBox(height: 4),
-                             Text(
-                               'سؤال ${_currentQuestionIndex + 1}/${_questions.length}',
-                               style: const TextStyle(color: Colors.white54, fontSize: 12),
-                             ),
-                           ],
+                             ],
+                           ),
                          ),
 
                          // Opponent
-                         Row(
-                           children: [
-                             Column(
-                               crossAxisAlignment: CrossAxisAlignment.end,
-                               children: [
-                                 Text(
-                                   widget.opponentName,
-                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                         Expanded(
+                           child: Row(
+                             mainAxisAlignment: MainAxisAlignment.end,
+                             children: [
+                               Expanded(
+                                 child: Column(
+                                   crossAxisAlignment: CrossAxisAlignment.end,
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                     Text(
+                                       widget.opponentName,
+                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Cairo'),
+                                       maxLines: 1,
+                                       overflow: TextOverflow.ellipsis,
+                                       textAlign: TextAlign.end,
+                                     ),
+                                     Text(
+                                       '$_opponentScore',
+                                       style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
+                                     ),
+                                     SizedBox(
+                                       width: 50,
+                                       height: 3,
+                                       child: LinearProgressIndicator(
+                                         value: _questions.isNotEmpty ? (_opponentQuestionIndex / _questions.length) : 0,
+                                         backgroundColor: Colors.white10,
+                                         color: Colors.redAccent,
+                                       ),
+                                     ),
+                                   ],
                                  ),
-                                 Text(
-                                   '$_opponentScore',
-                                   style: const TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
-                                 ),
-                                 SizedBox(
-                                   width: 60,
-                                   height: 4,
-                                   child: LinearProgressIndicator(
-                                     value: _opponentQuestionIndex / _questions.length,
-                                     backgroundColor: Colors.white10,
-                                     color: Colors.redAccent,
-                                   ),
-                                 )
-                               ],
-                             ),
-                             const SizedBox(width: 8),
-                             ProfileAvatar(avatarIndex: widget.opponentAvatarIndex, size: 40),
-                           ],
+                               ),
+                               const SizedBox(width: 6),
+                               ProfileAvatar(avatarIndex: widget.opponentAvatarIndex, size: 36),
+                             ],
+                           ),
                          ),
                       ],
                     ),
@@ -672,14 +691,16 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                     },
                   ),
 
-                  // --- Question ---
+                  // --- Question & Options with Clean Reaction Ribbon ---
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       child: Column(
                         children: [
                           _buildQuestionCard(question.questionText),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 10),
+                          if (!widget.isBot) _buildHorizontalReactionRibbon(),
+                          const SizedBox(height: 10),
                           ...List.generate(question.options.length, (i) {
                              return _buildOptionButton(i, question.options[i], question.correctAnswerIndex);
                           }),
@@ -690,18 +711,26 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                 ],
               ),
               
-              // Reaction Animation Layer
+              // Reaction Animation Layer (positioned right near opponent avatar)
               if (_incomingReactionEmoji != null)
                 Positioned(
-                  top: 100, // Near opponent avatar
+                  top: 65,
                   right: 20,
                   child: SlideTransition(
                     position: _emojiSlideAnim,
                     child: FadeTransition(
                       opacity: _emojiFadeAnim,
-                      child: Text(
-                        _incomingReactionEmoji!,
-                        style: const TextStyle(fontSize: 60),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          _incomingReactionEmoji!,
+                          style: const TextStyle(fontSize: 32),
+                        ),
                       ),
                     ),
                   ),
@@ -713,45 +742,27 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     );
   }
   
-  Widget _buildReactionFab() {
-     return Column(
-       mainAxisSize: MainAxisSize.min,
-       crossAxisAlignment: CrossAxisAlignment.end,
-       children: [
-         if (_showReactionMenu)
-           Container(
-             margin: const EdgeInsets.only(bottom: 10),
-             padding: const EdgeInsets.all(8),
-             decoration: BoxDecoration(
-               color: Colors.white,
-               borderRadius: BorderRadius.circular(30),
-               boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
-             ),
-             child: Column(
-               children: [
-                 _reactionLink('😂'),
-                 _reactionLink('👏'),
-                 _reactionLink('😡'),
-                 _reactionLink('👍'),
-                 _reactionLink('😮'),
-               ],
-             ),
-           ),
-         FloatingActionButton(
-           onPressed: () => setState(() => _showReactionMenu = !_showReactionMenu),
-           backgroundColor: AppTheme.accentColor,
-           child: Icon(_showReactionMenu ? Icons.close : Icons.emoji_emotions_outlined, color: AppTheme.primaryDark),
-         ),
-       ],
-     );
-  }
-  
-  Widget _reactionLink(String emoji) {
-    return GestureDetector(
-      onTap: () => _sendReaction(emoji),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-        child: Text(emoji, style: const TextStyle(fontSize: 28)),
+  Widget _buildHorizontalReactionRibbon() {
+    final emojis = ['🔥', '👏', '🎯', '🤝', '😂'];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: emojis.map((emoji) {
+          return InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _sendReaction(emoji),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Text(emoji, style: const TextStyle(fontSize: 22)),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

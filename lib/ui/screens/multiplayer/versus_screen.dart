@@ -39,6 +39,8 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   
   int _countdown = 3;
   Timer? _countdownTimer;
+  Timer? _pollTimer;
+  Timer? _safetyTimeoutTimer;
   StreamSubscription? _matchStateSubscription;
 
   @override
@@ -57,6 +59,8 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   void dispose() {
      _vsController.dispose();
      _countdownTimer?.cancel();
+     _pollTimer?.cancel();
+     _safetyTimeoutTimer?.cancel();
      _matchStateSubscription?.cancel();
      super.dispose();
   }

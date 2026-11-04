@@ -207,7 +207,6 @@ class GameController extends ChangeNotifier {
       if (selectedIndex == currentQuestion!.correctAnswerIndex) {
         _correctAnswers++;
         _score += AppConstants.correctAnswerPoints;
-        _score += AppConstants.correctAnswerPoints;
       } else {
         _lives--;
       }
