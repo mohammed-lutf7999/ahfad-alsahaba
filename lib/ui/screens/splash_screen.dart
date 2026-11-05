@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
 import '../../data/local/shared_prefs_service.dart';
 import '../../data/services/profile_service.dart';
@@ -127,24 +128,22 @@ class _SplashScreenState extends State<SplashScreen>
       if (!SharedPrefsService.isOnboardingSeen()) {
         Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
       } else if (isLoggedIn) {
-        // User is logged in - CRITICAL: Ensure profile is loaded!
-        // If app restarted, ProfileService might be empty even if Session exists
-        if (ProfileService.instance.activeProfile == null) {
-            try {
-              final user = Supabase.instance.client.auth.currentUser;
-              if (user != null) {
-                 final displayName = user.userMetadata?['full_name'] ?? 
-                                   user.userMetadata?['name'] ?? 
-                                   'لاعب';
-                                   
-                 await ProfileService.instance.createOrLoadProfileForUser(
-                   userId: user.id,
-                   displayName: displayName,
-                 );
-              }
-            } catch (e) {
-               debugPrint('Error loading profile in splash: $e');
-            }
+        // User is logged in - ALWAYS synchronize & merge cloud/local profile
+        // so that points and unlocked levels are never lost or stale on HomeScreen.
+        try {
+          final user = Supabase.instance.client.auth.currentUser;
+          if (user != null) {
+            final displayName = user.userMetadata?['full_name'] ?? 
+                              user.userMetadata?['name'] ?? 
+                              'لاعب';
+                              
+            await ProfileService.instance.createOrLoadProfileForUser(
+              userId: user.id,
+              displayName: displayName,
+            ).timeout(const Duration(seconds: 5));
+          }
+        } catch (e) {
+          debugPrint('Error loading/merging profile in splash: $e');
         }
         
         if (mounted) {
@@ -351,7 +350,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'الإصدار 1.0.0',
+                      'الإصدار ${AppConstants.appVersion}',
                       style: TextStyle(
                         color: imperialGold.withAlpha(120),
                         fontSize: 12,

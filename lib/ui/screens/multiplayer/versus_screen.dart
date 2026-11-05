@@ -130,12 +130,11 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
       });
 
       // 15-second safety timeout so player NEVER hangs forever on VS screen if opponent left
-      _safetyTimeoutTimer = Timer(const Duration(seconds: 15), () async {
+      _safetyTimeoutTimer = Timer(const Duration(seconds: 15), () {
         if (!mounted || _bothReady) return;
         _pollTimer?.cancel();
         _matchStateSubscription?.cancel();
-        await MultiplayerService.instance.cancelMatch(widget.matchId);
-        if (!mounted) return;
+        unawaited(MultiplayerService.instance.cancelMatch(widget.matchId));
         _showOpponentTimeoutDialog();
       });
       
@@ -190,6 +189,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor,
               foregroundColor: AppTheme.primaryDark,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () async {
@@ -466,10 +466,10 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    top: 8,
                    left: 8,
                    child: TextButton.icon(
-                     onPressed: () async {
+                     onPressed: () {
                        SoundService().playClick();
                        if (!widget.isBot) {
-                         await MultiplayerService.instance.cancelMatch(widget.matchId);
+                         unawaited(MultiplayerService.instance.cancelMatch(widget.matchId));
                        }
                        if (mounted) Navigator.of(context).pop();
                      },

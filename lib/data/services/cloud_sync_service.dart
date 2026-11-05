@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/achievement_model.dart';
 import '../models/player_profile_model.dart';
 
 /// Service for syncing user progress to/from Supabase cloud storage.
@@ -56,7 +57,7 @@ class CloudSyncService {
 
       if (existing != null) {
         // Update existing record - keep higher score
-        final cloudScore = existing['total_score'] as int? ?? 0;
+        final cloudScore = (existing['total_score'] as num?)?.toInt() ?? 0;
         if (profile.totalScore >= cloudScore) {
           // Local has higher or equal score, update cloud
           await _supabase
@@ -65,14 +66,18 @@ class CloudSyncService {
               .eq('user_id', _userId!);
           debugPrint('CloudSync: Updated cloud progress with score ${profile.totalScore}');
         } else {
-          // Cloud has higher score - only update non-score fields
+          // Cloud has higher score - keep higher cloud score and also update local profile!
+          profile.totalScore = cloudScore;
+          if (cloudScore > profile.highScore) {
+            profile.highScore = cloudScore;
+          }
           data['total_score'] = cloudScore;
-          data['high_score'] = cloudScore > profile.highScore ? cloudScore : profile.highScore;
+          data['high_score'] = profile.highScore;
           await _supabase
               .from('user_progress')
               .update(data)
               .eq('user_id', _userId!);
-          debugPrint('CloudSync: Updated cloud but kept higher cloud score $cloudScore');
+          debugPrint('CloudSync: Updated cloud and kept higher cloud score $cloudScore');
         }
       } else {
         // Insert new record
@@ -106,8 +111,11 @@ class CloudSyncService {
 
       if (existing != null) {
         // Update existing record - keep higher score
-        final currentScore = existing['score'] as int? ?? 0;
+        final currentScore = (existing['score'] as num?)?.toInt() ?? 0;
         final newScore = profile.totalScore > currentScore ? profile.totalScore : currentScore;
+        if (newScore > profile.totalScore) {
+          profile.totalScore = newScore;
+        }
         
         await _supabase
             .from('leaderboard')
@@ -139,7 +147,7 @@ class CloudSyncService {
   }
 
   /// Fetch complete profile data from cloud
-  /// Call this when user signs in
+  /// Reconciles both `user_progress` and `leaderboard` so no points are ever lost.
   Future<PlayerProfile?> fetchProfileFromCloud() async {
     if (!_isAuthenticated || _userId == null) {
       debugPrint('CloudSync: Not authenticated, cannot fetch');
@@ -155,54 +163,106 @@ class CloudSyncService {
           .eq('user_id', _userId!)
           .maybeSingle();
 
-      if (data == null) {
+      Map<String, dynamic>? lbData;
+      try {
+        lbData = await _supabase
+            .from('leaderboard')
+            .select('display_name, score')
+            .eq('user_id', _userId!)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('CloudSync: Leaderboard fetch warning: $e');
+      }
+
+      if (data == null && lbData == null) {
         debugPrint('CloudSync: No cloud data found for user');
         return null;
       }
 
-      // Parse JSON fields
+      final lbScore = (lbData?['score'] as num?)?.toInt() ?? 0;
+      final lbName = lbData?['display_name']?.toString();
+
+      if (data == null && lbData != null) {
+        return PlayerProfile(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: (lbName != null && lbName.isNotEmpty) ? lbName : 'لاعب',
+          avatarIndex: 0,
+          linkedUserId: _userId,
+          totalScore: lbScore,
+          highScore: lbScore,
+        );
+      }
+
+      // Parse JSON fields from user_progress
       Map<String, int> categoryProgress = {};
       Map<String, int> levelStars = {};
       Map<String, int> levelScores = {};
+      Map<String, AchievementProgress> achievementProgress = {};
       
       try {
-        if (data['category_progress'] != null) {
+        if (data!['category_progress'] != null) {
           final decoded = data['category_progress'] is String 
               ? jsonDecode(data['category_progress']) 
               : data['category_progress'];
-          categoryProgress = Map<String, int>.from(decoded);
+          if (decoded is Map) {
+            categoryProgress = decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+          }
         }
         
         if (data['level_stars'] != null) {
           final decoded = data['level_stars'] is String 
               ? jsonDecode(data['level_stars']) 
               : data['level_stars'];
-          levelStars = Map<String, int>.from(decoded);
+          if (decoded is Map) {
+            levelStars = decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+          }
         }
         
         if (data['level_scores'] != null) {
           final decoded = data['level_scores'] is String 
               ? jsonDecode(data['level_scores']) 
               : data['level_scores'];
-          levelScores = Map<String, int>.from(decoded);
+          if (decoded is Map) {
+            levelScores = decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+          }
+        }
+
+        if (data['achievement_progress'] != null) {
+          final decoded = data['achievement_progress'] is String
+              ? jsonDecode(data['achievement_progress'])
+              : data['achievement_progress'];
+          if (decoded is Map) {
+            achievementProgress = decoded.map(
+              (k, v) => MapEntry(
+                k.toString(),
+                AchievementProgress.fromJson(Map<String, dynamic>.from(v as Map)),
+              ),
+            );
+          }
         }
       } catch (e) {
         debugPrint('CloudSync: Error parsing JSON data: $e');
       }
 
+      final upScore = (data!['total_score'] as num?)?.toInt() ?? 0;
+      final upHighScore = (data['high_score'] as num?)?.toInt() ?? 0;
+      final bestTotalScore = upScore >= lbScore ? upScore : lbScore;
+      final bestHighScore = upHighScore >= bestTotalScore ? upHighScore : bestTotalScore;
+
       // Create profile from cloud data
       final profile = PlayerProfile(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: data['display_name'] ?? 'لاعب',
-        avatarIndex: data['avatar_index'] ?? 0,
+        name: data['display_name'] ?? lbName ?? 'لاعب',
+        avatarIndex: (data['avatar_index'] as num?)?.toInt() ?? 0,
         linkedUserId: _userId,
-        totalScore: data['total_score'] ?? 0,
-        highScore: data['high_score'] ?? 0,
+        totalScore: bestTotalScore,
+        highScore: bestHighScore,
         categoryProgress: categoryProgress,
         levelStars: levelStars,
         levelScores: levelScores,
-        currentStreak: data['current_streak'] ?? 0,
-        totalDaysPlayed: data['total_days_played'] ?? 0,
+        achievementProgress: achievementProgress,
+        currentStreak: (data['current_streak'] as num?)?.toInt() ?? 0,
+        totalDaysPlayed: (data['total_days_played'] as num?)?.toInt() ?? 0,
       );
 
       debugPrint('CloudSync: Fetched profile - score: ${profile.totalScore}, levels: ${levelStars.length}');

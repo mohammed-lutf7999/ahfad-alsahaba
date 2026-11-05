@@ -5,7 +5,7 @@ import '../local/shared_prefs_service.dart';
 import 'cloud_sync_service.dart';
 
 /// Service for managing player profiles with cloud sync support.
-/// Ensures data persists across sign-in/sign-out cycles.
+/// Ensures data persists across sign-in/sign-out cycles and app updates.
 class ProfileService extends ChangeNotifier {
   static ProfileService? _instance;
   static ProfileService get instance {
@@ -25,7 +25,9 @@ class ProfileService extends ChangeNotifier {
   
   /// Get active profile
   PlayerProfile? get activeProfile {
-    if (_activeProfileId == null) return null;
+    if (_activeProfileId == null) {
+      return _profiles.isNotEmpty ? _profiles.first : null;
+    }
     try {
       return _profiles.firstWhere((p) => p.id == _activeProfileId);
     } catch (e) {
@@ -48,9 +50,18 @@ class ProfileService extends ChangeNotifier {
     _activeProfileId = SharedPrefsService.getActiveProfileId();
     
     // If no active profile set but profiles exist, use first one
-    if (_activeProfileId == null && _profiles.isNotEmpty) {
+    if ((_activeProfileId == null || _activeProfileId!.isEmpty) && _profiles.isNotEmpty) {
       _activeProfileId = _profiles.first.id;
       await SharedPrefsService.setActiveProfileId(_activeProfileId!);
+    }
+
+    // Rescue any legacy SharedPreferences progress into activeProfile if higher
+    final current = activeProfile;
+    if (current != null) {
+      final didRescue = _mergeLegacySharedPrefsInto(current);
+      if (didRescue) {
+        await _saveProfiles();
+      }
     }
     
     debugPrint('ProfileService initialized: ${_profiles.length} profiles, active: $_activeProfileId');
@@ -59,17 +70,60 @@ class ProfileService extends ChangeNotifier {
   /// Load profiles from SharedPreferences
   Future<void> _loadProfiles() async {
     final jsonString = SharedPrefsService.getProfilesJson();
-    if (jsonString != null && jsonString.isNotEmpty) {
+    if (jsonString != null && jsonString.isNotEmpty && jsonString != '[]') {
       try {
         _profiles = PlayerProfile.profilesFromJson(jsonString);
       } catch (e) {
         debugPrint('Error loading profiles: $e');
         _profiles = [];
       }
-    } else {
+    }
+    if (_profiles.isEmpty) {
       // Check if we need to migrate existing progress to a new profile
       await _migrateExistingProgress();
     }
+  }
+
+  /// Merge any legacy SharedPreferences keys into [profile] if legacy values are higher.
+  /// Returns true if any field was upgraded.
+  bool _mergeLegacySharedPrefsInto(PlayerProfile profile) {
+    bool changed = false;
+    final existingScore = SharedPrefsService.getTotalScore();
+    final existingHighScore = SharedPrefsService.getHighScore();
+
+    if (existingScore > profile.totalScore) {
+      profile.totalScore = existingScore;
+      changed = true;
+    }
+    if (existingHighScore > profile.highScore) {
+      profile.highScore = existingHighScore;
+      changed = true;
+    }
+
+    const categories = ['quran', 'hadith', 'fiqh', 'seerah', 'history', 'aqeedah'];
+    for (final cat in categories) {
+      final unlocked = SharedPrefsService.getCategoryProgress(cat);
+      final currentUnlocked = profile.categoryProgress[cat] ?? 1;
+      if (unlocked > currentUnlocked) {
+        profile.categoryProgress[cat] = unlocked;
+        changed = true;
+      }
+
+      for (int level = 1; level <= 10; level++) {
+        final stars = SharedPrefsService.getLevelStars(cat, level);
+        final score = SharedPrefsService.getLevelScore(cat, level);
+        final key = '${cat}_$level';
+        if (stars > (profile.levelStars[key] ?? 0)) {
+          profile.levelStars[key] = stars;
+          changed = true;
+        }
+        if (score > (profile.levelScores[key] ?? 0)) {
+          profile.levelScores[key] = score;
+          changed = true;
+        }
+      }
+    }
+    return changed;
   }
   
   /// Migrate existing game progress to first profile (for app update)
@@ -84,28 +138,7 @@ class ProfileService extends ChangeNotifier {
         name: 'لاعب 1',
         avatarIndex: 0,
       );
-      profile.totalScore = existingScore;
-      profile.highScore = existingHighScore;
-      
-      // Migrate category progress
-      final categories = ['quran', 'hadith', 'fiqh', 'seerah', 'history', 'aqeedah'];
-      for (final cat in categories) {
-        final unlocked = SharedPrefsService.getCategoryProgress(cat);
-        if (unlocked > 1) {
-          profile.categoryProgress[cat] = unlocked;
-        }
-        
-        for (int level = 1; level <= 10; level++) {
-          final stars = SharedPrefsService.getLevelStars(cat, level);
-          final score = SharedPrefsService.getLevelScore(cat, level);
-          if (stars > 0) {
-            profile.levelStars['${cat}_$level'] = stars;
-          }
-          if (score > 0) {
-            profile.levelScores['${cat}_$level'] = score;
-          }
-        }
-      }
+      _mergeLegacySharedPrefsInto(profile);
       
       _profiles = [profile];
       _activeProfileId = profile.id;
@@ -133,14 +166,16 @@ class ProfileService extends ChangeNotifier {
       avatarIndex: avatarIndex,
       linkedUserId: linkedUserId,
     );
+    _mergeLegacySharedPrefsInto(profile);
     _profiles.add(profile);
     await _saveProfiles();
     notifyListeners();
     return profile;
   }
   
-  /// Create or load profile for authenticated user
-  /// This fetches full progress from cloud if available
+  /// Create or load profile for authenticated user.
+  /// Preserves and merges any existing local profile (even if previously unlinked)
+  /// with cloud progress so players NEVER lose their points or unlocked levels.
   Future<PlayerProfile> createOrLoadProfileForUser({
     required String userId,
     required String displayName,
@@ -150,19 +185,45 @@ class ProfileService extends ChangeNotifier {
     notifyListeners();
     
     try {
+      // Find local candidate profile: either already linked to this userId,
+      // or an unlinked local profile the player was playing on before signing in.
+      int localIndex = _profiles.indexWhere((p) => p.linkedUserId == userId);
+      if (localIndex < 0) {
+        // Check activeProfile if unlinked
+        final currentActive = activeProfile;
+        if (currentActive != null && (currentActive.linkedUserId == null || currentActive.linkedUserId!.isEmpty)) {
+          localIndex = _profiles.indexWhere((p) => p.id == currentActive.id);
+        }
+      }
+      if (localIndex < 0) {
+        // Check any unlinked profile
+        localIndex = _profiles.indexWhere((p) => p.linkedUserId == null || p.linkedUserId!.isEmpty);
+      }
+
       // First, try to fetch profile from cloud
       final cloudProfile = await _cloudSync.fetchProfileFromCloud();
       
       if (cloudProfile != null) {
-        // Cloud data exists - use it
         cloudProfile.linkedUserId = userId;
+        if (cloudProfile.name.isEmpty || cloudProfile.name == 'لاعب') {
+          cloudProfile.name = displayName;
+        }
         
-        // Check if we have a local profile for this user
-        final localIndex = _profiles.indexWhere((p) => p.linkedUserId == userId);
+        // Merge legacy SharedPrefs if any
+        _mergeLegacySharedPrefsInto(cloudProfile);
+
         if (localIndex >= 0) {
-          // Merge: take higher scores and more progress
-          _mergeProfiles(_profiles[localIndex], cloudProfile);
+          final localProfile = _profiles[localIndex];
+          // Preserve local ID and custom name if user customized it
+          final scoreBeforeMerge = cloudProfile.totalScore;
+          final starsBeforeMerge = cloudProfile.levelStars.length;
+          _mergeProfiles(localProfile, cloudProfile);
           _profiles[localIndex] = cloudProfile;
+
+          // If local profile had higher score or more progress than cloud, sync back to cloud!
+          if (cloudProfile.totalScore > scoreBeforeMerge || cloudProfile.levelStars.length > starsBeforeMerge) {
+            await _cloudSync.syncProfileToCloud(cloudProfile);
+          }
         } else {
           _profiles.add(cloudProfile);
         }
@@ -171,24 +232,27 @@ class ProfileService extends ChangeNotifier {
         await _saveProfiles();
         await SharedPrefsService.setActiveProfileId(cloudProfile.id);
         
-        debugPrint('Loaded profile from cloud: ${cloudProfile.name}, score: ${cloudProfile.totalScore}');
+        debugPrint('Loaded & merged profile from cloud: ${cloudProfile.name}, score: ${cloudProfile.totalScore}');
         
         _isSyncing = false;
         notifyListeners();
         return cloudProfile;
       }
       
-      // No cloud data - check for existing local profile
-      final existingLocal = _profiles.firstWhere(
-        (p) => p.linkedUserId == userId,
-        orElse: () => PlayerProfile(id: '', name: ''),
-      );
-      
-      if (existingLocal.id.isNotEmpty) {
+      // No cloud data - check if we have a local profile (linked or unlinked)
+      if (localIndex >= 0) {
+        final existingLocal = _profiles[localIndex];
+        existingLocal.linkedUserId = userId;
+        if (existingLocal.name.isEmpty || existingLocal.name == 'لاعب' || existingLocal.name == 'لاعب 1') {
+          existingLocal.name = displayName;
+        }
+        _mergeLegacySharedPrefsInto(existingLocal);
+
         _activeProfileId = existingLocal.id;
+        await _saveProfiles();
         await SharedPrefsService.setActiveProfileId(existingLocal.id);
         
-        // Sync local to cloud
+        // Sync local progress to cloud
         await _cloudSync.syncProfileToCloud(existingLocal);
         
         _isSyncing = false;
@@ -202,6 +266,7 @@ class ProfileService extends ChangeNotifier {
         avatarIndex: avatarIndex,
         linkedUserId: userId,
       );
+      _mergeLegacySharedPrefsInto(newProfile);
       
       _profiles.add(newProfile);
       _activeProfileId = newProfile.id;
@@ -221,15 +286,23 @@ class ProfileService extends ChangeNotifier {
       _isSyncing = false;
       notifyListeners();
       
-      // Fallback: create local profile
+      // Fallback: if a local profile already exists, keep using it instead of overwriting with 0!
+      if (activeProfile != null) {
+        activeProfile!.linkedUserId = userId;
+        await _saveProfiles();
+        return activeProfile!;
+      }
+
       final fallbackProfile = PlayerProfile.create(
         name: displayName,
         avatarIndex: avatarIndex,
         linkedUserId: userId,
       );
+      _mergeLegacySharedPrefsInto(fallbackProfile);
       _profiles.add(fallbackProfile);
       _activeProfileId = fallbackProfile.id;
       await _saveProfiles();
+      await SharedPrefsService.setActiveProfileId(fallbackProfile.id);
       return fallbackProfile;
     }
   }
@@ -242,6 +315,20 @@ class ProfileService extends ChangeNotifier {
     }
     if (local.highScore > cloud.highScore) {
       cloud.highScore = local.highScore;
+    }
+    if (local.currentStreak > cloud.currentStreak) {
+      cloud.currentStreak = local.currentStreak;
+    }
+    if (local.totalDaysPlayed > cloud.totalDaysPlayed) {
+      cloud.totalDaysPlayed = local.totalDaysPlayed;
+    }
+
+    // Preserve user-chosen local name if cloud has a generic fallback name
+    if (local.name.isNotEmpty &&
+        local.name != 'لاعب' &&
+        local.name != 'لاعب 1' &&
+        (cloud.name.isEmpty || cloud.name == 'لاعب' || cloud.name == 'لاعب 1')) {
+      cloud.name = local.name;
     }
     
     // Merge category progress (take higher values)
@@ -267,6 +354,16 @@ class ProfileService extends ChangeNotifier {
         cloud.levelScores[entry.key] = entry.value;
       }
     }
+
+    // Merge achievement progress
+    for (final entry in local.achievementProgress.entries) {
+      final cloudAch = cloud.achievementProgress[entry.key];
+      if (cloudAch == null ||
+          entry.value.currentValue > cloudAch.currentValue ||
+          (entry.value.isUnlocked && !cloudAch.isUnlocked)) {
+        cloud.achievementProgress[entry.key] = entry.value;
+      }
+    }
   }
   
   /// Sync current profile to cloud - call after game completion
@@ -274,7 +371,10 @@ class ProfileService extends ChangeNotifier {
     final profile = activeProfile;
     if (profile == null) return false;
     
-    return await _cloudSync.syncProfileToCloud(profile);
+    final result = await _cloudSync.syncProfileToCloud(profile);
+    await _saveProfiles();
+    notifyListeners();
+    return result;
   }
   
   /// Sync and clear local profile data (called on sign out)
@@ -328,6 +428,8 @@ class ProfileService extends ChangeNotifier {
     final profile = activeProfile;
     if (profile != null) {
       await _cloudSync.syncProfileToCloud(profile);
+      await _saveProfiles();
+      notifyListeners();
     }
   }
   
@@ -392,4 +494,3 @@ class ProfileService extends ChangeNotifier {
     notifyListeners();
   }
 }
-

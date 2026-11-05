@@ -44,7 +44,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     
     // Cancel matchmaking if leaving screen without match
     if (_isSearching) {
-       MultiplayerService.instance.cancelMatchmaking();
+      unawaited(MultiplayerService.instance.cancelMatchmaking());
     }
     super.dispose();
   }
@@ -110,7 +110,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
           final seedValue = matchData['seed'];
           
           if (matchId == null || seedValue == null) {
-            print('Incomplete match data received, waiting...');
+            debugPrint('Incomplete match data received, waiting...');
             return;
           }
           
@@ -122,7 +122,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
           final p2 = matchData['player2_id'];
           
           if (myId == null || p1 == null || p2 == null) {
-            print('Missing player IDs, waiting...');
+            debugPrint('Missing player IDs, waiting...');
             return;
           }
           
@@ -151,17 +151,18 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     _matchSubscription?.cancel();
     setState(() => _isSearching = false);
     
-    // Stop searching online
-    await MultiplayerService.instance.cancelMatchmaking();
+    // Fire-and-forget online queue cleanup so offline/slow network NEVER blocks or throws!
+    unawaited(MultiplayerService.instance.cancelMatchmaking());
     
-    // Start local bot match
+    // Start local bot match immediately (0ms delay)
     final result = await MultiplayerService.instance.createBotMatch();
+    if (!mounted) return;
     _goToVersusScreen(
-       result.matchId!, 
-       result.opponentId!, 
-       result.seed!, 
-       isBot: true, 
-       questionIds: result.questionIds
+      result.matchId!, 
+      result.opponentId!, 
+      result.seed!, 
+      isBot: true, 
+      questionIds: result.questionIds,
     );
   }
 
@@ -192,7 +193,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
         child: SafeArea(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -247,7 +248,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                         shape: BoxShape.circle,
                         color: AppTheme.accentColor,
                         boxShadow: [
-                           BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.5), blurRadius: 20, spreadRadius: 5)
+                          BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.5), blurRadius: 20, spreadRadius: 5)
                         ],
                       ),
                       child: const Icon(Icons.search, size: 50, color: Colors.white),
@@ -259,14 +260,17 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
               const SizedBox(height: 50),
               
               // Status Text
-              Text(
-                _statusText,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontFamily: 'Cairo',
-                  fontSize: 18,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  _statusText,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontFamily: 'Cairo',
+                    fontSize: 18,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
               
               const SizedBox(height: 30),
@@ -279,7 +283,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                     children: [
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
+                        height: 52,
                         child: ElevatedButton.icon(
                           onPressed: () {
                             SoundService().playClick();
@@ -293,24 +297,44 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                             _startMatchmaking();
                           },
                           icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryDark),
-                          label: const Text('إعادة المحاولة', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark, fontFamily: 'Cairo')),
+                          label: const Text(
+                            'إعادة المحاولة',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryDark,
+                              fontFamily: 'Cairo',
+                              fontSize: 16,
+                              height: 1.2,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.accentColor,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
+                        height: 52,
                         child: OutlinedButton.icon(
                           onPressed: _startBotMatch,
                           icon: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-                          label: const Text('تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Cairo')),
+                          label: const Text(
+                            'تحدي الذكاء الاصطناعي 🤖',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'Cairo',
+                              fontSize: 16,
+                              height: 1.2,
+                            ),
+                          ),
                           style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                             side: const BorderSide(color: AppTheme.accentColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
                           ),
                         ),
                       ),
@@ -327,25 +351,35 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                   ),
                 ),
               ] else if (_showBotButton && _isSearching) ...[
-                 AnimatedOpacity(
-                   opacity: _showBotButton ? 1.0 : 0.0,
-                   duration: const Duration(seconds: 1),
-                   child: Container(
-                     width: double.infinity,
-                     margin: const EdgeInsets.symmetric(horizontal: 40),
-                     height: 50,
-                     child: ElevatedButton.icon(
-                       onPressed: _startBotMatch,
-                       icon: const Icon(Icons.smart_toy_rounded, color: AppTheme.primaryDark),
-                       label: const Text('  تحدي الذكاء الاصطناعي 🤖', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryDark, fontFamily: 'Cairo')),
-                       style: ElevatedButton.styleFrom(
-                         backgroundColor: AppTheme.accentColor,
-                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                       ),
-                     ),
-                   ),
-                 ),
-                 const SizedBox(height: 20),
+                AnimatedOpacity(
+                  opacity: _showBotButton ? 1.0 : 0.0,
+                  duration: const Duration(seconds: 1),
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _startBotMatch,
+                      icon: const Icon(Icons.smart_toy_rounded, color: AppTheme.primaryDark),
+                      label: const Text(
+                        'تحدي الذكاء الاصطناعي 🤖',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryDark,
+                          fontFamily: 'Cairo',
+                          fontSize: 16,
+                          height: 1.2,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
               
               // Cancel Button

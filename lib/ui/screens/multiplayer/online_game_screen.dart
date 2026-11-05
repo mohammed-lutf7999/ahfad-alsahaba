@@ -396,6 +396,13 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       trophiesDelta = result['trophiesDelta'] as int?;
       totalTrophies = result['totalTrophies'] as int?;
     }
+
+    // Update local activeProfile and sync to cloud so HomeScreen immediately reflects earned points
+    final activeProfile = ProfileService.instance.activeProfile;
+    if (activeProfile != null && _myScore > 0) {
+      activeProfile.addScore(_myScore);
+      await ProfileService.instance.saveActiveProfileAndSync();
+    }
     
     _showResultDialog(winnerId, trophiesDelta: trophiesDelta, totalTrophies: totalTrophies);
   }

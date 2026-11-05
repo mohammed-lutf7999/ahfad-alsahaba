@@ -1,133 +1,77 @@
-# AGENT.md - دليل الوكيل الذكي الشامل (Universal AI Agent Guide)
-> **مشروع «معركة أحفاد الصحابة» (Battle of Sahaba)**  
-> هذا الملف هو المرجع القياسي العالمي لأي وكيل ذكي (AI Coding Assistant / Agent) يعمل على هذا المشروع لفهم معمارية النظام، القواعد الصارمة، وكيفية التطوير والصيانة دون أخطاء.
+# 🛡️ دستور وقواعد التنفيذ الهندسي الصارم (AGENT.md)
+
+> **تنبيه إلزامي لأي نموذج ذكاء اصطناعي (بما في ذلك Flash / Pro / الصيانة المستقبلية):**
+> يجب قراءة هذا الملف والالتزام بجميع قواعده حرفياً قبل لمس أي سطر برمجي أو قاعدة بيانات في هذا المشروع (`معركة أحفاد الصحابة`). يُمنع منعاً باتاً إعلان إنجاز أي مهمة قبل استيفاء جميع شروط التحقق الواردة أدناه.
 
 ---
 
-## 1. بطاقة تعريف المشروع (Project Identity)
+## 1️⃣ القواعد الهندسية الصارمة (Zero-Tolerance Engineering Rules)
 
-* **اسم المشروع البرمجي**: `ahfad_alsahaba` (سابقاً: `flutter_application_1`)
-* **الاسم التجاري للمتجر**: **معركة أحفاد الصحابة: مسابقات إسلامية** (Battle of Sahaba)
-* **معرف الحزمة (Package ID / Namespace)**: `com.ahfad.alsahaba.battle`
-* **إطار العمل (Framework)**: Flutter SDK `3.32.8+` (قناة Stable)
-* **لغة البرمجة (Language)**: Dart SDK `^3.8.1` (Strict Null Safety)
-* **الحدود الدنيا لنظام Android**: `minSdk = 21` (Android 5.0) • `targetSdk = 35` (Android 15) • `compileSdk = 35`
-* **الخادم السحابي وقاعدة البيانات (Backend)**: Supabase (PostgreSQL 17, PostgREST, Realtime WebSockets, Edge Functions)
-* **المستودع الرسمي (GitHub Repository)**: `https://github.com/mohammed-lutf7999/ahfad-alsahaba.git`
-* **المطور والمالك**: المهندس محمد لطف (Eng. Mohammed Lutf)
+### القاعدة الأولى: ممنوع الكود الصوري أو الوهمي (No Stubs / No Fake Wiring)
+- **يُمنع منعاً باتاً** تعريف متغيرات أو مؤقتات (`Timer? _pollTimer`, `Timer? _safetyTimeoutTimer`, `StreamSubscription?`) فقط لإسكات المترجم أو الإيهام بإنجاز المهمة دون ربطها بمنطق تشغيلي حقيقي (`Timer.periodic` / `Timer(...)`).
+- كل مؤقت أو اشتراك يتم تعريفه **يجب**:
+  1. تفعيله فعلياً داخل دورة حياة الشاشة (`initState` أو الدالة المختصة).
+  2. كتابة منطق المعالجة الكامل بداخله.
+  3. إلغاؤه صراحةً داخل `dispose()` وعند انتهاء الغرض منه.
+
+### القاعدة الثانية: التحقق الحي على قاعدة البيانات السحابية (Mandatory Live Supabase Verification)
+- كتابة ملف `.sql` داخل مجلد `supabase_migrations/` **لا تعني أبداً** أن المشكلة حُلّت! الملف المحلي لا يؤثر على خادم Supabase تلقائياً.
+- عند إنشاء أو تعديل أي دالة `RPC` (`PostgreSQL PL/pgSQL`):
+  1. **منع التباس الأعمدة (`Error 42702 - column reference is ambiguous`):** إذا كانت الدالة تُرجع جدولاً (`RETURNS TABLE (...)`) يحتوي على أسماء أعمدة مطابقة لأسماء أعمدة الجداول (مثل `player1_id`, `player2_id`, `match_id`)، **يجب إلزامياً** وضع `#variable_conflict use_column` في بداية الدالة وتسمية الجداول بأسماء مستعارة صريحة (`m.player1_id`, `mp.user_id`).
+  2. **التطبيق والاختبار الحي:** يجب تنفيذ الكود على قاعدة بيانات Supabase الحية، ثم إجراء اختبار حقيقي (`SELECT pg_get_functiondef(...)` أو معاملة اختبارية `BEGIN ... ROLLBACK`) للتأكد من عدم وجود أي خطأ وقت التشغيل قبل إبلاغ المستخدم.
+
+### القاعدة الثالثة: قدسية بيانات وتقدم اللاعبين (Zero Data Loss & Score Sync Guarantee)
+- **عند تسجيل الدخول بحساب Google (`ProfileService.createOrLoadProfileForUser`):**
+  - إذا كان اللاعب قد لعب محلياً قبل تسجيل الدخول (ملفه المحلي يحمل `linkedUserId == null`)، **يُمنع منعاً باتاً** تجاهل ملفه المحلي أو استبداله بملف سحابي فارغ (`totalScore = 0`).
+  - يجب دائماً البحث عن أي ملف محلي مرتبط بـ `userId` **أو** أي ملف محلي نشط غير مرتبط (`linkedUserId == null`)، ودمج التقدم عبر `_mergeProfiles` بأخذ القيمة الأعلى دائماً (`GREATEST`) في:
+    - `totalScore` و `highScore`
+    - `categoryProgress` (المراحل المفتوحة)
+    - `levelStars` و `levelScores`
+    - `achievementProgress`
+  - بعد الدمج، يجب رفع النسخة المدمجة فوراً إلى السحابة (`user_progress` و `leaderboard`).
+- **عند جلب البيانات من السحابة (`CloudSyncService.fetchProfileFromCloud`):**
+  - يجب مقارنة `user_progress.total_score` مع `leaderboard.score` وأخذ القيمة الأعلى بينهما حتى لا تضيع نقاط التحديات الجماعية أو الفردية.
+- **عند انتهاء أي جولة (فردية، جماعية أونلاين، أو ضد البوت):**
+  - يجب تحديث `ProfileService.instance.activeProfile` فوراً (`activeProfile.addScore(...)` و `saveActiveProfileAndSync()`) حتى يظهر الرصيد المحدث مباشرةً على الشاشة الرئيسية (`HomeScreen`) دون الحاجة لإعادة تشغيل التطبيق.
+- **عند إقلاع التطبيق (`SplashScreen`):**
+  - إذا كان المستخدم مسجلاً للدخول (`isLoggedIn == true`)، يجب دائماً مزامنة ودمج ملفه الشخصي مع السحابة عبر `createOrLoadProfileForUser` حتى لو كان `activeProfile != null` محلياً.
+
+### القاعدة الرابعة: عزل الأزرار المحلية عن أعطال الشبكة (Non-Blocking Offline Fallbacks)
+- الأزرار التي تنقل المستخدم إلى وضع محلي أو تلغي العملية (مثل زر **`تحدي الذكاء الاصطناعي 🤖`** أو زر **`إلغاء`**) **يجب ألا تستخدم `await` على طلب شبكي قد يفشل أو يتجمد عند انقطاع الإنترنت** (مثل `cancelMatchmaking()`).
+- يجب إيقاف المؤقتات والاشتراكات فوراً، وإطلاق تنظيف الشبكة في الخلفية بدون حجب واجهة المستخدم (`unawaited(MultiplayerService.instance.cancelMatchmaking())`)، والانتقال الفوري (`0ms`) إلى الشاشة المطلوبة.
+
+### القاعدة الخامسة: توحيد تحديث رقم الإصدار في 4 مواضع (Unified Version Bump Protocol)
+- مع كل نسخة جديدة أو بناء حزمة متجر (`AAB` / `APK`)، يجب تحديث رقم الإصدار ورقم البناء بالتزامن في المواضع الأربعة التالية دون استثناء:
+  1. `pubspec.yaml` -> `version: X.Y.Z+BUILD`
+  2. `android/app/build.gradle.kts` -> `versionCode = BUILD` و `versionName = "X.Y.Z"`
+  3. `lib/core/app_constants.dart` -> `static const String appVersion = 'X.Y.Z';`
+  4. `lib/ui/screens/splash_screen.dart` -> يجب أن يعرض `'الإصدار ${AppConstants.appVersion}'` ديناميكياً (يُمنع كتابة رقم إصدار ثابت نصياً).
+
+### القاعدة السادسة: جودة التصميم ومنع تداخل أو اقتصاص النصوص (UI/UX Layout Integrity)
+- عند وضع أزرار (`ElevatedButton` أو `OutlinedButton`) داخل `SizedBox` بارتفاع محدد (مثل `48` أو `52`)، يجب دائماً ضبط `padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8)` لأن `AppTheme` الافتراضي يضع `vertical: 16` مما يؤدي إلى اقتصاص النصوص العربية (خط `Cairo`) عمودياً.
+- يُمنع وضع شارات كبيرة (`VS`) فوق بطاقات اللاعبين في `Stack` يغطي الصور أو الأسماء؛ يجب فصلها في نطاق وسطي مستقل (`Column` / `Expanded`).
 
 ---
 
-## 2. الهيكل المعماري للمجلدات (Directory Structure)
+## 2️⃣ بوابة التحقق الإلزامية قبل تسليم أي مهمة (Mandatory Pre-Delivery Checklist)
+
+قبل أن تكتب للمستخدم *"تم الإنجاز"*:
+1. [ ] هل شغّلت `flutter analyze` وتأكدت من عدم وجود أي `error` في الملفات المعدلة؟
+2. [ ] هل راجعت `git diff` سطراً بسطر للتأكد من عدم وجود متغيرات غير مربوطة أو كود ناقص؟
+3. [ ] إذا كان هناك تعديل قاعدة بيانات: هل طبقته فعلياً على Supabase واختبرته باستعلام حي؟
+4. [ ] هل قمت بتحديث رقم الإصدار في `pubspec.yaml` و `build.gradle.kts` و `app_constants.dart` إذا طُلب بناء نسخة جديدة؟
+
+---
+
+## 3️⃣ قالب الأمر القياسي لتكليف النماذج السريعة (مثل Flash) مستقبلاً
+
+عندما تريد تكليف نموذج سريع (مثل Flash) بمهمة برمجية دون أن يترك نواقص أو يدّعي الإنجاز، انسخ له هذا الأمر في بداية رسالتك:
 
 ```text
-d:/newcuzeapp/flutter_application_1/
-├── android/                   # كود نظام أندرويد الأصلي وإعدادات Gradle و R8
-│   ├── app/
-│   │   ├── build.gradle.kts   # إعدادات التطبيق، min/target Sdk، وقواعد R8
-│   │   ├── proguard-rules.pro # قواعد حماية وضغط الكود للمتجر
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml # الأذونات الرسمية واسم التطبيق
-│   │       └── res/           # الموارد، الأيقونات المتكيفة mipmap-anydpi-v26
-├── assets/                    # الأصول الثابتة المدمجة بالتطبيق
-│   ├── audio/                 # المؤثرات الصوتية (WAV & MP3)
-│   ├── data/                  # قواعد بيانات الأسئلة والمكتبة (JSON)
-│   │   ├── library/           # كتب ومصادر المكتبة الإسلامية
-│   │   ├── questions/         # الأسئلة المصنفة حسب الأقسام
-│   │   └── salaf_quotes.json  # أقوال وحكم السلف
-│   ├── fonts/                 # خط Cairo المدمج
-│   └── images/                # الشعار والأيقونات ورسوم الإمبراطورية
-├── lib/                       # كود فلاتر المصدري (Core Application Logic)
-│   ├── main.dart              # نقطة الدخول، تهيئة Supabase والمؤقتات
-│   ├── core/                  # الثوابت، الثيم، الصوتيات، والتكوين السحابي
-│   │   ├── app_constants.dart # نصوص التطبيق، الإصدار، ونقاط اللعبة
-│   │   ├── app_theme.dart     # الألوان، التدرجات، والودجات الموحدة
-│   │   ├── sound_service.dart # تشغيل المؤثرات الصوتية وإدارتها
-│   │   └── supabase_config.dart # رابط ومفاتيح Supabase الرسمية
-│   ├── data/                  # طبقة البيانات والخدمات السحابية والمحلية
-│   │   ├── models/            # نماذج Dart (Question, Category, User, Level...)
-│   │   ├── local/             # التخزين المؤقت SharedPreferences
-│   │   └── services/          # خدمات Auth, Multiplayer, Profile, Ranking...
-│   └── ui/                    # طبقة العرض والواجهات (Screens & Widgets)
-│       ├── screens/           # شاشات اللعب الفردي، الإمبراطورية، الإعدادات...
-│       │   └── multiplayer/   # شاشات اللعب الجماعي والتحدي الأونلاين والمحلي
-│       └── widgets/           # عناصر الواجهة المعاد استخدامها
-├── supabase/                  # بيئة الخادم السحابي
-│   ├── functions/             # الدوال السحابية Edge Functions (welcome-email)
-│   ├── migrations/            # سجلات التغيير التاريخية لقاعدة البيانات
-│   └── init_database.sql      # سكريبت بناء قاعدة البيانات المتكامل
-├── supabase_cli/              # أداة سوبابيس المحلية لإدارة الخادم
-├── test/                      # اختبارات الوحدة والواجهات (widget_test.dart)
-├── pubspec.yaml               # سجل الحزم والتبعيات
-└── README.md                  # التوثيق العام للمشروع
+التزم حرفياً بجميع القواعد الموجودة في الملف AGENT.md في جذر المشروع قبل البدء.
+المطلوب منك تنفيذ المهمة التالية بالكامل، ويُمنع منعاً باتاً:
+1. تعريف متغيرات أو مؤقتات صورية دون ربطها بمنطق فعلي كامل.
+2. ترك أي دالة قاعدة بيانات في ملف محلي دون تطبيقها واختبارها فعلياً.
+3. إعلان الانتهاء قبل تشغيل flutter analyze وإثبات نجاح التعديلات عبر git diff.
+بعد الانتهاء، اعرض لي تقريراً يوضح: (الملفات المعدلة + السطور الفعلية التي أضفتها + نتيجة فحص flutter analyze).
 ```
-
----
-
-## 3. قواعد برمجية وسياسات إلزامية للوكلاء الأذكياء (Strict Agent Rules)
-
-إذا كنت وكيلاً ذكياً تقوم بالتعديل على هذا المشروع، **يجب عليك الالتزام بالقواعد التالية دون أي استثناء**:
-
-### أ. الأذونات وسياسات متجر Google Play:
-1. **ممنوع نهائياً طلب إذن `USE_EXACT_ALARM`**: تم حذفه لأنه يتسبب في رفض فوري للتطبيقات من نوع المسابقات. استخدم دائماً `AndroidScheduleMode.inexactAllowWhileIdle`.
-2. **أذونات الموقع والبلوتوث القديمة**: مقيدة بخاصية `android:maxSdkVersion="30"` في `AndroidManifest.xml` لكي لا يُطالب مستخدمو Android 12 - 15 بأذونات غير مبررة. لا تحذف هذه الخاصية.
-3. **حذف الحساب والبيانات**: دالة `deleteAccountAndData()` في `AuthService` و `ProfileService` إجبارية لبقاء التطبيق على Google Play.
-
-### ب. أفضل ممارسات Flutter الحديثة (Flutter 3.24+ / Dart 3.8):
-1. **فحص السياق غير المتزامن (Async Gap)**: دائماً افحص `if (!mounted) return;` قبل استدعاء `setState` أو استخدام `context` بعد أي عملية `await`.
-2. **الألوان الحديثة**: تجنب استخدام `Color.withOpacity(double)` المندثرة، واستخدم بدلاً منها `.withValues(alpha: ...)` أو `.withAlpha(...)`.
-3. **أبعاد الشاشة**: استخدم `MediaQuery.sizeOf(context)` بدلاً من `MediaQuery.of(context).size` لتفادي إعادة رسم الودجات بلا داعٍ.
-4. **المؤثرات الصوتية**: مسار صوت المؤقت الحقيقي هو `audio/timer_tick.wav`؛ لا تغيّره إلى `.mp3` حتى لا يحدث انهيار وقت انتهاء الـ 5 ثوانٍ.
-
-### ج. التعامل مع الخادم وقاعدة البيانات (Supabase):
-1. **مشروع Supabase الفعال الحالي**:
-   * **Project URL**: `https://khatzzpqxaiwuoodgcst.supabase.co`
-   * **Publishable Key**: `sb_publishable_Zp9URQMtw71oyhZztDGsmg_hT9FfyIv`
-2. **منع الأخطاء التنافسية (Race Conditions) في الأونلاين**:
-   * جدول `matchmaking_queue` يُدار عبر الدالة السحابية `find_or_create_match` التي تطبق قفل الحركات `FOR UPDATE SKIP LOCKED`. لا تقم بتعديل طابور الانتظار عبر استعلامات Client-side مباشرة.
-3. **البوت التلقائي (Fallback Bot)**:
-   * بعد 15 ثانية من عدم العثور على خصم حقيقي، يتحول اللعب إلى البوت الذكي. البوت يعمل محلياً عبر خوارزمية احتمالية بمعدل دقة 85% مع محاكاة سرعة قراءة السؤال ديناميكياً (`length * 40ms`).
-
----
-
-## 4. أوامر التطوير والبناء الشائعة (CLI Commands)
-
-* **تثبيت الحزم**:
-  ```bash
-  flutter pub get
-  ```
-* **تشغيل الاختبارات الآلية**:
-  ```bash
-  flutter test
-  ```
-* **الفحص الثابت للأكواد**:
-  ```bash
-  flutter analyze
-  ```
-* **بناء نسخة الاختبار المباشر (APK)**:
-  ```bash
-  flutter build apk --release
-  ```
-* **بناء حزمة متجر جوجل بلاي (App Bundle - AAB)**:
-  ```bash
-  flutter build appbundle --release
-  ```
-* **نشر الدوال السحابية (Edge Functions) عبر Supabase CLI**:
-  ```bash
-  $env:SUPABASE_ACCESS_TOKEN="<TOKEN>"; .\supabase_cli\supabase.exe functions deploy welcome-email --no-verify-jwt
-  ```
-
----
-
-## 5. مصفوفة الجاهزية والنواقص قبل النشر (Production Checklist)
-
-| البند | الحالة الحالية | الإجراء المتبقي |
-| :--- | :---: | :--- |
-| **الكود البرمجي واستقرار البناء** | ✅ مكتمل 100% | الحزمتان AAB و APK تم بناؤهما واختبارهما |
-| **قواعد البيانات والسحابة** | ✅ متصلة ومفعلة | الجداول الخمسة تعمل على `khatzzpqxaiwuoodgcst` |
-| **البريد الترحيبي التلقائي** | ✅ شغال ومختبر | يرسل من `omnitech9n@gmail.com` عبر Edge Function |
-| **مستودع GitHub** | ✅ متزامن 100% | مرفوع على الفرع `main` |
-| **مفتاح التوقيع الإنتاجي (Production Keystore)** | ⚠️ يحتاج توليد | توليد ملف `upload-keystore.jks` وربطه في `key.properties` |
-| **رابط سياسة الخصوصية الخارجي** | ⚠️ يحتاج نشر ويب | نشر نص سياسة الخصوصية الموجودة في الإعدادات على GitHub Pages |
-| **الأصول الرسومية للمتجر** | ⚠️ يحتاج تجهيز | لقطات الشاشة (Screenshots)، أيقونة 512x512، وبانر 1024x500 |
-
