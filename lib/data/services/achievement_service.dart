@@ -34,10 +34,13 @@ class AchievementService extends ChangeNotifier {
         .length;
   }
 
-  /// الحصول على تقدم كل الإنجازات
+  /// الحصول على تقدم كل الإنجازات مع تسوية ومزامنة فورية للقيم
   List<AchievementWithProgress> getAllAchievementsWithProgress() {
     final profile = ProfileService.instance.activeProfile;
     if (profile == null) return [];
+
+    // مزامنة فورية في الذاكرة حتى تظهر أرقام التقدم بدقة 100%
+    _syncInMemoryValues(profile);
 
     return AchievementDefinitions.all.map((achievement) {
       final progress = profile.getAchievementProgress(achievement.id);
@@ -46,6 +49,87 @@ class AchievementService extends ChangeNotifier {
         progress: progress,
       );
     }).toList();
+  }
+
+  /// تسوية ومزامنة شاملة لجميع الإنجازات مع بيانات الملف الشخصي وحفظها
+  Future<List<Achievement>> reconcileAchievements() async {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return [];
+
+    final newlyUnlocked = _syncInMemoryValues(profile);
+    _pendingUnlocks.addAll(newlyUnlocked);
+
+    if (newlyUnlocked.isNotEmpty) {
+      await ProfileService.instance.saveActiveProfileAndSync();
+      SoundService().playRankUp();
+      notifyListeners();
+    }
+
+    return newlyUnlocked;
+  }
+
+  /// مزامنة القيم الحسابية للإنجازات في الذاكرة (النقاط، المستويات، النجوم، الفئات، المثابرة)
+  List<Achievement> _syncInMemoryValues(PlayerProfile profile) {
+    final newlyUnlocked = <Achievement>[];
+
+    // 1. حساب المستويات المكتملة وإجمالي النجوم
+    final completedLevels = _countCompletedLevels(profile);
+    final totalStars = _countTotalStars(profile);
+
+    // إنجازات التعلم
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'first_level', completedLevels));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'student', completedLevels));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'scholar', completedLevels));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'sheikh', completedLevels));
+
+    // إنجازات الإتقان والنجوم
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'first_star', totalStars));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'star_collector', totalStars));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'shining', totalStars));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'constellation', totalStars));
+
+    // 2. إنجازات الفئات الست
+    final categoryAchievementMap = {
+      'quran': 'quran_master',
+      'hadith': 'hadith_master',
+      'fiqh': 'fiqh_master',
+      'seerah': 'seerah_master',
+      'history': 'history_master',
+      'aqeedah': 'aqeedah_master',
+    };
+    for (final entry in categoryAchievementMap.entries) {
+      final catLevels = _countCategoryCompletedLevels(profile, entry.key);
+      newlyUnlocked.addAll(_checkAndUnlock(profile, entry.value, catLevels));
+    }
+
+    // 3. إنجازات النقاط (تشمل نقاط المسابقات الجماعية والفردية)
+    final totalScore = profile.totalScore;
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'beginner_points', totalScore));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'rich_points', totalScore));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'king_points', totalScore));
+
+    // 4. إنجازات الكمال والدقة من المستويات المحققة لثلاث نجوم
+    final perfectLevels = _countPerfectLevels(profile);
+    final currentNoMistakes = _getProgress(profile, 'no_mistakes');
+    if (perfectLevels > currentNoMistakes) {
+      profile.getAchievementProgress('no_mistakes').currentValue = perfectLevels;
+      profile.getAchievementProgress('sniper').currentValue = perfectLevels;
+      profile.getAchievementProgress('perfectionist').currentValue = perfectLevels;
+    }
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'no_mistakes', _getProgress(profile, 'no_mistakes')));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'sniper', _getProgress(profile, 'sniper')));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'perfectionist', _getProgress(profile, 'perfectionist')));
+
+    // 5. إنجازات المثابرة
+    if (profile.totalDaysPlayed == 0 && (profile.totalScore > 0 || completedLevels > 0)) {
+      profile.totalDaysPlayed = 1;
+      profile.currentStreak = 1;
+    }
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'one_day', profile.totalDaysPlayed));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'week_streak', profile.currentStreak));
+    newlyUnlocked.addAll(_checkAndUnlock(profile, 'month_dedication', profile.totalDaysPlayed));
+
+    return newlyUnlocked;
   }
 
   /// الحصول على إنجازات بفئة معينة
@@ -219,18 +303,20 @@ class AchievementService extends ChangeNotifier {
     return newlyUnlocked;
   }
 
-  /// فحص وفتح إنجاز
+  /// فحص وفتح إنجاز مع الحفاظ على أعلى قيمة محققة دائماً
   List<Achievement> _checkAndUnlock(PlayerProfile profile, String achievementId, int currentValue) {
     final achievement = AchievementDefinitions.getById(achievementId);
     if (achievement == null) return [];
 
     final progress = profile.getAchievementProgress(achievementId);
     
-    // تحديث التقدم
-    progress.currentValue = currentValue;
+    // تحديث التقدم بأخذ القيمة الأعلى دائماً
+    if (currentValue > progress.currentValue) {
+      progress.currentValue = currentValue;
+    }
 
     // التحقق من الفتح
-    if (!progress.isUnlocked && currentValue >= achievement.targetValue) {
+    if (!progress.isUnlocked && progress.currentValue >= achievement.targetValue) {
       progress.isUnlocked = true;
       progress.unlockedAt = DateTime.now();
       progress.hasBeenSeen = false;

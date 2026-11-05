@@ -58,6 +58,9 @@ class _HomeScreenState extends State<HomeScreen>
     AchievementService.instance.addListener(_onProfileChanged);
     AuthService().addListener(_onProfileChanged);
     
+    // Reconcile and check achievements
+    AchievementService.instance.reconcileAchievements();
+
     // Load quotes
     _loadQuotes();
 

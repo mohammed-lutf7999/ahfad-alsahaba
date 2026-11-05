@@ -5,6 +5,8 @@ import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
 import '../../data/local/shared_prefs_service.dart';
 import '../../data/services/profile_service.dart';
+import '../../data/services/achievement_service.dart';
+import '../../data/models/achievement_model.dart';
 
 
 class SplashScreen extends StatefulWidget {
@@ -146,11 +148,24 @@ class _SplashScreenState extends State<SplashScreen>
           debugPrint('Error loading/merging profile in splash: $e');
         }
         
+        try {
+          await AchievementService.instance.checkAchievements(AchievementEvent.appOpened());
+          await AchievementService.instance.reconcileAchievements();
+        } catch (e) {
+          debugPrint('Error reconciling achievements in splash: ');
+        }
+        
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(AppRoutes.home);
         }
       } else if (ProfileService.instance.hasProfiles) {
         // Not logged in but has local profiles - go to home
+        try {
+          await AchievementService.instance.checkAchievements(AchievementEvent.appOpened());
+          await AchievementService.instance.reconcileAchievements();
+        } catch (e) {
+          debugPrint('Error reconciling achievements in splash: ');
+        }
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       } else {
         // No login and no profiles - show profile setup

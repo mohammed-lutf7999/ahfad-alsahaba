@@ -6,6 +6,8 @@ import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/question_service.dart';
 import '../../../data/services/profile_service.dart';
+import '../../../data/services/achievement_service.dart';
+import '../../../data/models/achievement_model.dart';
 import '../../../data/models/question_model.dart';
 import '../../widgets/avatar_selector.dart';
 
@@ -312,6 +314,11 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       _selectedAnswer = index;
       if (isCorrect) {
         SoundService().playCorrect();
+        if (_timeLeft >= 17) {
+          AchievementService.instance.checkAchievements(
+            AchievementEvent.fastAnswer(secondsRemaining: _timeLeft),
+          );
+        }
       } else {
         SoundService().playWrong();
       }
@@ -403,6 +410,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       activeProfile.addScore(_myScore);
       await ProfileService.instance.saveActiveProfileAndSync();
     }
+    
+    // فحص وتسوية الإنجازات فوراً بنقاط المسابقة الجماعية
+    await AchievementService.instance.reconcileAchievements();
     
     _showResultDialog(winnerId, trophiesDelta: trophiesDelta, totalTrophies: totalTrophies);
   }

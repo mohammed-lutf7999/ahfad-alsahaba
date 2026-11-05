@@ -75,3 +75,4 @@ Future<void> shareVictoryCard(GlobalKey boundaryKey, BuildContext context) async
 ## 4. معايير القبول والاعتماد
 1. توليد ومشاركة البطاقة في زمن أقل من 0.5 ثانية دون أي تعليق في الواجهة.
 2. وضوح فائق لرمز الـ QR ومظهر جذاب يشجع متلقي الصورة على الضغط وتنزيل اللعبة.
+

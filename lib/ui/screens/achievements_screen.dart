@@ -3,6 +3,7 @@ import '../../core/app_theme.dart';
 import '../../core/sound_service.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/services/achievement_service.dart';
+import '../../data/services/profile_service.dart';
 
 /// شاشة عرض جميع الإنجازات
 class AchievementsScreen extends StatefulWidget {
@@ -30,10 +31,19 @@ class _AchievementsScreenState extends State<AchievementsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    AchievementService.instance.reconcileAchievements();
+    AchievementService.instance.addListener(_onServiceChanged);
+    ProfileService.instance.addListener(_onServiceChanged);
+  }
+
+  void _onServiceChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    AchievementService.instance.removeListener(_onServiceChanged);
+    ProfileService.instance.removeListener(_onServiceChanged);
     _tabController.dispose();
     super.dispose();
   }

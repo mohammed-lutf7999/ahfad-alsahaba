@@ -9,6 +9,8 @@ import '../../data/local/shared_prefs_service.dart';
 import '../widgets/question_card.dart';
 import '../widgets/option_button.dart';
 import '../widgets/timer_widget.dart';
+import '../../data/services/achievement_service.dart';
+import '../../data/models/achievement_model.dart';
 
 class QuizScreen extends StatefulWidget {
   final String categoryId;
@@ -87,6 +89,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       SoundService().playCorrect();
       _streak++;
       if (_streak % 3 == 0) SoundService().playStreak();
+      if (_timerController.remainingTime >= 17) {
+        AchievementService.instance.checkAchievements(
+          AchievementEvent.fastAnswer(secondsRemaining: _timerController.remainingTime),
+        );
+      }
     } else {
       SoundService().playWrong();
       _streak = 0;
