@@ -1,127 +1,36 @@
-# ☁️ وثيقة المرحلة الثانية: البنية السحابية في Supabase والدوال الذرية
-## Milestone 2 (M2) — Supabase Atomic Backend & Live Verification
+# ☁️ وثيقة المرحلة الثانية: البنية السحابية في Supabase والمزامنة الذرية
+## Milestone 2 (M2) — Supabase Database, Atomic Triggers & Cloud Sync
 
 > **المسار:** `docs/development_plans/master_levels_system/MILESTONE_2_SUPABASE_ATOMIC_BACKEND.md`  
-> **الهدف:** بناء وتطبيق دوال وحقول المستويات والألقاب والميادين على خادم Supabase الحي، لتكون المعاملات ذرية (Atomic) ومحمية 100% من أي تلاعب خارجي.
+> **ملف الهجرة الفعلي:** [`supabase/migrations/009_glory_and_store.sql`](file:///d:/newcuzeapp/flutter_application_1/supabase/migrations/009_glory_and_store.sql)  
+> **الهدف:** بناء وتطبيق دوال وحقول المستويات الـ 100 والألقاب الـ 10 والميادين الـ 6 وسوق الفرسان على خادم Supabase، مع تحديث `CloudSyncService` و `LeaderboardService` لمزامنة كافة الحقول الجديدة.
 
 ---
 
-## 1. الأهداف التفصيلية ونطاق العمل (Scope & Objectives)
+## 1. الأهداف التفصيلية ونطاق العمل المنجز (Scope & Deliverables)
 
-1. **إضافة أعمدة المستويات والميادين في Supabase:**
-   - جدول `user_progress`:
-     * `player_level INT DEFAULT 1`
-     * `player_title TEXT DEFAULT 'طالب علم'`
-   - جدول `leaderboard`:
-     * `player_level INT DEFAULT 1`
-     * `player_title TEXT DEFAULT 'طالب علم'`
-     * `arena_name TEXT DEFAULT 'ميدان بدر الكبرى'`
-2. **إنشاء دالة الحساب الذرية `calculate_level_and_title`:**
-   - دالة `PostgreSQL PL/pgSQL` دقيقة وخالية من التباس الأعمدة (`#variable_conflict use_column`).
-   - تعيد جدولاً يحوي: رقم المستوى، اللقب، النقاط الحالية، النقاط المطلوبة، ونسبة التقدم.
-3. **تحديث دالة إنهاء المباراة `finish_match`:**
-   - عند فوز أو انتهاء مباراة لأي لاعب، تُستدعى دالة حساب المستوى داخلياً وتُحدَّث حقول `player_level` و `player_title` و `arena_name` فوراً في جدولي `leaderboard` و `user_progress` داخل نفس المعاملة الذرية.
-4. **التطبيق والاختبار الحي:**
-   - تطبيق ملف الهجرة `supabase_migrations/009_levels_and_arenas_schema.sql` حياً على قاعدة بيانات مشروع Supabase (`khatzzpqxaiwuoodgcst`).
-   - استعلام حقيقي بالـ Python/cURL للتحقق من سلامة البيانات لحسابي فهد الحلياني و Omni-Tech دون مساس بنقاطهما.
+1. **إنشاء ملف الهجرة [`supabase/migrations/009_glory_and_store.sql`](file:///d:/newcuzeapp/flutter_application_1/supabase/migrations/009_glory_and_store.sql):**
+   - توسعة جدول `public.user_progress` بالأعمدة: (`player_level`, `player_title`, `current_level_xp`, `next_level_xp`, `coins`, `gems`, `win_streak`, `equipped_theme`, `equipped_frame`).
+   - توسعة جدول `public.leaderboard` بالأعمدة: (`player_level`, `player_title`, `arena_id`, `arena_name`, `equipped_frame`).
+   - إنشاء جدولي `public.store_items` و `public.user_inventory` مع تفعيل سياسات الأمان (`Row Level Security - RLS`):
+     * قراءة عامة للجميع (`FOR SELECT USING (true)`) على `store_items`.
+     * قراءة وإدراج للمالك فقط (`auth.uid() = user_id`) على `user_inventory`.
+   - إدراج البيانات الأساسية (`Seed Data`) لـ 20 عنصراً كاملاً في `store_items` (4 ثيمات أسطورية، 10 أطر ملكية، 3 ألقاب شرفية، و 3 وسائل مساعدة ذكية) باستخدام `ON CONFLICT (id) DO UPDATE`.
+   - إنشاء الدالة الذرية `public.calculate_level_and_title(p_total_score INT)` للمستويات `1..100` والألقاب العشرة مع `#variable_conflict use_column` ومعادلة `FLOOR(100.0 * POWER(v_lvl, 1.6) + 150.0 * v_lvl)::INT`.
+   - إنشاء المشغلين الذريين `trg_sync_user_progress_level` (لمنح مكافأة الترقية `L * 50` دينار تلقائياً) و `trg_sync_leaderboard_glory` (لحماية سقف الـ `800` كأس وتعيين الميدان `1..6`).
+   - ترقية دالة `public.finish_match(UUID, UUID)` لمنح دنانير المباراة (`FLOOR((10 + correct * 3) * arena_multiplier)`) وتحديث سلسلة الانتصارات (`win_streak`) ومكافأة الكؤوس الإضافية (`25 + LEAST(win_streak * 2, 10)`).
+   - إنشاء دالة الشراء الذرية `public.purchase_store_item(UUID, TEXT)`.
 
----
-
-## 2. نص ملف الهجرة السحابي الكامل (`009_levels_and_arenas_schema.sql`)
-
-```sql
--- ==============================================================================
--- MIGRATION 009: LEVELS, HISTORICAL TITLES & COMPETITIVE ARENAS
--- ==============================================================================
-
--- 1. إضافة الأعمدة للجداول القائمة بأمان
-ALTER TABLE public.user_progress
-ADD COLUMN IF NOT EXISTS player_level INT DEFAULT 1,
-ADD COLUMN IF NOT EXISTS player_title TEXT DEFAULT 'طالب علم';
-
-ALTER TABLE public.leaderboard
-ADD COLUMN IF NOT EXISTS player_level INT DEFAULT 1,
-ADD COLUMN IF NOT EXISTS player_title TEXT DEFAULT 'طالب علم',
-ADD COLUMN IF NOT EXISTS arena_name TEXT DEFAULT 'ميدان بدر الكبرى';
-
--- فهرس لسرعة فرز المتصدرين حسب المستوى
-CREATE INDEX IF NOT EXISTS idx_leaderboard_player_level ON public.leaderboard (player_level DESC);
-
--- 2. دالة حساب المستوى واللقب الذرية
-CREATE OR REPLACE FUNCTION public.calculate_level_and_title(p_total_score INT)
-RETURNS TABLE (
-  out_level INT,
-  out_title TEXT,
-  out_cur_xp INT,
-  out_next_xp INT,
-  out_progress_percent FLOAT
-) 
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
-#variable_conflict use_column
-DECLARE
-  v_lvl INT := 1;
-  v_prev_xp INT := 0;
-  v_target_xp INT := 250;
-  v_title TEXT := 'طالب علم';
-BEGIN
-  -- حساب المستوى الرياضي التصاعدي
-  WHILE p_total_score >= v_target_xp AND v_lvl < 50 LOOP
-    v_lvl := v_lvl + 1;
-    v_prev_xp := v_target_xp;
-    v_target_xp := FLOOR(100 * POWER(v_lvl, 1.6) + 150 * v_lvl);
-  END LOOP;
-
-  -- تعيين اللقب التاريخي
-  IF v_lvl >= 45 THEN v_title := 'نخبة الأحفاد 👑';
-  ELSIF v_lvl >= 30 THEN v_title := 'حكيم السيرة';
-  ELSIF v_lvl >= 20 THEN v_title := 'قائد الكتيبة';
-  ELSIF v_lvl >= 10 THEN v_title := 'فارس الميدان';
-  ELSIF v_lvl >= 5 THEN v_title := 'راوي الأثر';
-  ELSE v_title := 'طالب علم';
-  END IF;
-
-  RETURN QUERY SELECT 
-    v_lvl,
-    v_title,
-    GREATEST(0, p_total_score - v_prev_xp),
-    GREATEST(1, v_target_xp - v_prev_xp),
-    LEAST(1.0, GREATEST(0.0, (p_total_score - v_prev_xp)::FLOAT / GREATEST(1, v_target_xp - v_prev_xp)::FLOAT));
-END;
-$$;
-
--- 3. دالة حساب اسم الميدان بناءً على رصيد الكؤوس
-CREATE OR REPLACE FUNCTION public.calculate_arena_name(p_trophies INT)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
-BEGIN
-  IF p_trophies >= 1600 THEN RETURN 'ميدان الفتوحات العظمى';
-  ELSIF p_trophies >= 1400 THEN RETURN 'ميدان القادسية';
-  ELSIF p_trophies >= 1200 THEN RETURN 'ميدان اليرموك';
-  ELSIF p_trophies >= 1000 THEN RETURN 'ميدان بدر الكبرى';
-  ELSE RETURN 'ميدان يثرب';
-  END IF;
-END;
-$$;
-
--- منح الصلاحيات
-GRANT EXECUTE ON FUNCTION public.calculate_level_and_title(INT) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.calculate_arena_name(INT) TO anon, authenticated, service_role;
-```
+2. **تحديث طبقة المزامنة والبيانات في Flutter:**
+   - [`lib/data/models/leaderboard_model.dart`](file:///d:/newcuzeapp/flutter_application_1/lib/data/models/leaderboard_model.dart): إضافة حقول (`playerLevel`, `playerTitle`, `trophies`, `arenaId`, `arenaName`, `equippedFrame`, `winsCount`, `matchesCount`) ودالة `RankEntry.fromSupabaseMap` مع حساب احتياطي رياضي فوري.
+   - [`lib/data/services/leaderboard_service.dart`](file:///d:/newcuzeapp/flutter_application_1/lib/data/services/leaderboard_service.dart): قراءة ومزامنة جميع حقول المجد والميادين مع دعم الترتيب بالنقاط أو الكؤوس.
+   - [`lib/data/services/cloud_sync_service.dart`](file:///d:/newcuzeapp/flutter_application_1/lib/data/services/cloud_sync_service.dart): مزامنة شاملة بدون أي فقدان بيانات (`GREATEST`) لحقول (`player_level`, `player_title`, `current_level_xp`, `next_level_xp`, `coins`, `gems`, `win_streak`, `equipped_theme`, `equipped_frame`, `trophies`, `arena_id`, `arena_name`) بالإضافة إلى مزامنة خزانة المشتريات `user_inventory`.
 
 ---
 
-## 3. بوابة التحقق والاعتماد (Validation Gate M2)
+## 2. الحسابات المتوقعة للاعبين الحاليين على السيرفر بعد تشغيل `009_glory_and_store.sql`
 
-- [ ] التأكد من وجود `#variable_conflict use_column` لمنع خطأ `42702`.
-- [ ] تنفيذ الكود على سيرفر Supabase الحي.
-- [ ] تشغيل استعلام تجريبي:
-  ```sql
-  SELECT * FROM public.calculate_level_and_title(2804); -- نقاط فهد الحلياني
-  SELECT public.calculate_arena_name(1188);            -- كؤوس فهد الحلياني
-  ```
-- [ ] التأكد من أن النتيجة: المستوى محسوب بدقة واللقب «راوي الأثر» أو «فارس الميدان»، والميدان «ميدان بدر الكبرى».
-
+| اللاعب | النقاط (`score`) | الكؤوس (`trophies`) | المستوى المحسوب (`player_level`) | اللقب (`player_title`) | الميدان (`arena_name`) | شريط الخبرة (`cur / next`) | الدنانير شاملة مكافآت الترقية |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **فهد الحلياني** | `2804` | `1188` | **المستوى 7** | طالب علم | ميدان بدر الكبرى (`Arena 2`) | `146 / 650 XP` | **`1400` دينار** (`100` أساس + `1300` منح المستويات 2..7) |
+| **Omni-Tech Company** | `1965` | `1090` | **المستوى 5** | طالب علم | ميدان بدر الكبرى (`Arena 2`) | `447 / 545 XP` | **`750` دينار** (`100` أساس + `650` منح المستويات 2..5) |

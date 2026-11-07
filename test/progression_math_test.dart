@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ahfad_alsahaba/data/models/player_level_model.dart';
 import 'package:ahfad_alsahaba/data/models/arena_model.dart';
+import 'package:ahfad_alsahaba/data/models/store_item_model.dart';
+import 'package:ahfad_alsahaba/data/models/leaderboard_model.dart';
 import 'package:ahfad_alsahaba/core/theme/app_custom_theme.dart';
 
 void main() {
@@ -87,4 +89,37 @@ void main() {
       expect(lerped.deepBackground, isNotNull);
     });
   });
+
+  group('StoreItemModel & RankEntry M2 Sync Tests', () {
+    test('StoreItemModel defaultCatalog has all 20 items (4 themes, 10 frames, 3 titles, 3 powerups)', () {
+      const catalog = StoreItemModel.defaultCatalog;
+      expect(catalog.length, 20);
+      expect(catalog.where((i) => i.category == StoreItemCategory.theme).length, 4);
+      expect(catalog.where((i) => i.category == StoreItemCategory.frame).length, 10);
+      expect(catalog.where((i) => i.category == StoreItemCategory.title).length, 3);
+      expect(catalog.where((i) => i.category == StoreItemCategory.powerup).length, 3);
+    });
+
+    test('RankEntry.fromSupabaseMap parses and computes glory metadata accurately', () {
+      final fahadRank = RankEntry.fromSupabaseMap(
+        {
+          'user_id': '4f0ed9dd-f266-4ef5-a978-e159abfb821c',
+          'display_name': 'فهد الحلياني',
+          'score': 2804,
+          'trophies': 1188,
+          'wins_count': 8,
+          'matches_count': 9,
+        },
+        rank: 1,
+        currentUserId: '4f0ed9dd-f266-4ef5-a978-e159abfb821c',
+      );
+      expect(fahadRank.isMe, isTrue);
+      expect(fahadRank.playerLevel, 7);
+      expect(fahadRank.playerTitle, 'طالب علم');
+      expect(fahadRank.arenaId, 2);
+      expect(fahadRank.arenaName, 'ميدان بدر الكبرى');
+      expect(fahadRank.equippedFrame, 'frame_wood');
+    });
+  });
 }
+

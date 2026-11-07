@@ -62,6 +62,9 @@ class PlayerLevelInfo {
     required this.tierIcon,
   });
 
+  /// Alias for [requiredLevelXp] matching the `next_level_xp` column in Supabase.
+  int get nextLevelXp => requiredLevelXp;
+
   /// The 10 Grand Historical Tiers across the 100-Level Mastery Ladder.
   static const List<LevelTierDefinition> allTiers = [
     LevelTierDefinition(
@@ -290,3 +293,4 @@ class PlayerLevelInfo {
     };
   }
 }
+

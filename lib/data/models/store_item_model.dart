@@ -36,9 +36,11 @@ class StoreItemModel {
     this.isDefaultFree = false,
   });
 
-  /// Master catalog of items in «سوق الفرسان».
+  /// Master catalog of items in «سوق الفرسان» (4 Themes, 10 Frames, Titles, Powerups).
   static const List<StoreItemModel> defaultCatalog = [
-    // 1. Themes (خزانة الثيمات الملكية)
+    // =========================================================================
+    // 1. Themes (خزانة الثيمات الملكية الأربعة)
+    // =========================================================================
     StoreItemModel(
       id: 'theme_andalusian_gold',
       title: 'ثيم الدرع الأندلسي',
@@ -85,7 +87,9 @@ class StoreItemModel {
       icon: Icons.local_fire_department_rounded,
     ),
 
-    // 2. Avatar Frames (الأطر الملكية المتوهجة)
+    // =========================================================================
+    // 2. Avatar Frames (الأطر الملكية العشرة)
+    // =========================================================================
     StoreItemModel(
       id: 'item_frame_wood',
       title: 'الإطار الخشبي العتيق',
@@ -99,12 +103,34 @@ class StoreItemModel {
       isDefaultFree: true,
     ),
     StoreItemModel(
+      id: 'item_frame_copper',
+      title: 'الإطار النحاسي المنقوش',
+      description: 'نقوش أندلسية نحاسية لرواة الأثر',
+      category: StoreItemCategory.frame,
+      priceCoins: 500,
+      minLevel: 10,
+      assetKey: 'frame_copper',
+      previewColor: Color(0xFFD97706),
+      icon: Icons.filter_frames_rounded,
+    ),
+    StoreItemModel(
+      id: 'item_frame_bronze',
+      title: 'الإطار البرونزي المذهب',
+      description: 'درع برونزي متين لمحدثي الميدان',
+      category: StoreItemCategory.frame,
+      priceCoins: 900,
+      minLevel: 20,
+      assetKey: 'frame_bronze',
+      previewColor: Color(0xFFB45309),
+      icon: Icons.shield_moon_outlined,
+    ),
+    StoreItemModel(
       id: 'item_frame_silver',
       title: 'الإطار الفضي الدمشقي',
       description: 'بريق الفضة المشغولة لفرسان المعرفة',
       category: StoreItemCategory.frame,
-      priceCoins: 1200,
-      minLevel: 10,
+      priceCoins: 1500,
+      minLevel: 30,
       assetKey: 'frame_silver',
       previewColor: Color(0xFFE2E8F0),
       icon: Icons.shield_outlined,
@@ -115,7 +141,7 @@ class StoreItemModel {
       description: 'هالة ذهبية متوهجة تليق بقادة الكتائب',
       category: StoreItemCategory.frame,
       priceCoins: 2500,
-      minLevel: 20,
+      minLevel: 40,
       assetKey: 'frame_gold',
       previewColor: Color(0xFFF3C644),
       icon: Icons.hdr_strong_rounded,
@@ -125,26 +151,62 @@ class StoreItemModel {
       title: 'الإطار الزمردي الملكي',
       description: 'نبض زمردي فاخر لحكماء السيرة النبوية',
       category: StoreItemCategory.frame,
-      priceCoins: 4000,
-      minLevel: 30,
+      priceCoins: 3500,
+      minLevel: 50,
       assetKey: 'frame_emerald',
       previewColor: Color(0xFF10B981),
       icon: Icons.hexagon_outlined,
     ),
     StoreItemModel(
+      id: 'item_frame_ruby',
+      title: 'الإطار الياقوتي المشرق',
+      description: 'وهج الياقوت الأحمر لوزراء الديوان',
+      category: StoreItemCategory.frame,
+      priceCoins: 4500,
+      minLevel: 60,
+      assetKey: 'frame_ruby',
+      previewColor: Color(0xFFE11D48),
+      icon: Icons.flare_rounded,
+    ),
+    StoreItemModel(
+      id: 'item_frame_sapphire',
+      title: 'الإطار اللازوردي السلطاني',
+      description: 'فخامة اللازورد الأزرق لأمراء الفتح',
+      category: StoreItemCategory.frame,
+      priceCoins: 6000,
+      minLevel: 70,
+      assetKey: 'frame_sapphire',
+      previewColor: Color(0xFF2563EB),
+      icon: Icons.auto_awesome_motion_rounded,
+    ),
+    StoreItemModel(
+      id: 'item_frame_platinum',
+      title: 'الإطار البلاتيني المتوهج',
+      description: 'شعاع بلاتيني مهيب لأسود الملاحم',
+      category: StoreItemCategory.frame,
+      priceCoins: 7500,
+      priceGems: 25,
+      minLevel: 80,
+      assetKey: 'frame_platinum',
+      previewColor: Color(0xFF8B5CF6),
+      icon: Icons.stars_rounded,
+    ),
+    StoreItemModel(
       id: 'item_frame_diamond',
-      title: 'الإطار الماسي الأندلسي',
+      title: 'الإطار الماسي الأندلسي المشع',
       description: 'شيدر ضوئي مشع خاص بنخبة الأحفاد',
       category: StoreItemCategory.frame,
-      priceCoins: 8000,
+      priceCoins: 10000,
       priceGems: 50,
-      minLevel: 50,
+      minLevel: 90,
       assetKey: 'frame_diamond',
       previewColor: Color(0xFF38BDF8),
       icon: Icons.diamond_rounded,
     ),
 
+    // =========================================================================
     // 3. Honor Titles (أوسمة وألقاب الفرسان)
+    // =========================================================================
     StoreItemModel(
       id: 'title_saqr_quraish',
       title: 'لقب «صقر الأندلس»',
@@ -179,7 +241,9 @@ class StoreItemModel {
       icon: Icons.auto_awesome_rounded,
     ),
 
+    // =========================================================================
     // 4. Smart Power-ups (وسائل المساعدة الذكية)
+    // =========================================================================
     StoreItemModel(
       id: 'powerup_shield',
       title: 'درع الحماية التنافسي',
