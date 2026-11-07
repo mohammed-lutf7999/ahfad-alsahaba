@@ -7,6 +7,7 @@ import 'core/supabase_config.dart';
 import 'data/local/shared_prefs_service.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/profile_service.dart';
+import 'data/services/progression_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,8 +39,6 @@ void main() async {
   // Initialize Notification Service with error handling
   try {
     await NotificationService.init();
-    
-    // Notification service initialized
   } catch (e) {
     debugPrint('NotificationService init error: $e');
   }
@@ -70,18 +69,34 @@ class IslamicQuizApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'معركة أحفاد الصحابة',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      locale: const Locale('ar', 'SA'),
-      onGenerateRoute: AppRoutes.generateRoute,
-      initialRoute: AppRoutes.splash,
-      builder: (context, child) {
-        // تثبيت حجم الخط لمنع تشوه التصميم عند تغيير إعدادات النظام
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
-          child: Directionality(textDirection: TextDirection.rtl, child: child!),
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        ProgressionService.instance,
+        ProfileService.instance,
+      ]),
+      builder: (context, _) {
+        final activeCustomTheme = ProgressionService.instance.activeTheme;
+        return MaterialApp(
+          title: 'معركة أحفاد الصحابة',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.getThemeFor(activeCustomTheme),
+          themeAnimationDuration: const Duration(milliseconds: 300),
+          themeAnimationCurve: Curves.easeInOutCubic,
+          locale: const Locale('ar', 'SA'),
+          onGenerateRoute: AppRoutes.generateRoute,
+          initialRoute: AppRoutes.splash,
+          builder: (context, child) {
+            // تثبيت حجم الخط لمنع تشوه التصميم عند تغيير إعدادات النظام
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(1.0),
+              ),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: child!,
+              ),
+            );
+          },
         );
       },
     );

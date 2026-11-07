@@ -322,6 +322,29 @@ class ProfileService extends ChangeNotifier {
     if (local.totalDaysPlayed > cloud.totalDaysPlayed) {
       cloud.totalDaysPlayed = local.totalDaysPlayed;
     }
+    if (local.coins > cloud.coins) {
+      cloud.coins = local.coins;
+    }
+    if (local.gems > cloud.gems) {
+      cloud.gems = local.gems;
+    }
+    if (local.trophies > cloud.trophies && local.trophies != 1000) {
+      cloud.trophies = local.trophies;
+    }
+    if (local.winStreak > cloud.winStreak) {
+      cloud.winStreak = local.winStreak;
+    }
+    if (local.equippedTheme != 'andalusian_gold' && cloud.equippedTheme == 'andalusian_gold') {
+      cloud.equippedTheme = local.equippedTheme;
+    }
+    if (local.equippedFrame != 'frame_wood' && cloud.equippedFrame == 'frame_wood') {
+      cloud.equippedFrame = local.equippedFrame;
+    }
+    for (final itemId in local.unlockedItemIds) {
+      if (!cloud.unlockedItemIds.contains(itemId)) {
+        cloud.unlockedItemIds.add(itemId);
+      }
+    }
 
     // Preserve user-chosen local name if cloud has a generic fallback name
     if (local.name.isNotEmpty &&

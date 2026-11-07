@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme/app_custom_theme.dart';
 
 class AppTheme {
   // Imperial Gold & Purple color palette
@@ -134,16 +135,19 @@ class AppTheme {
   );
 
   // ThemeData
-  static ThemeData get lightTheme {
+  static ThemeData get lightTheme => getThemeFor(AppCustomTheme.andalusianGold);
+
+  static ThemeData getThemeFor(AppCustomTheme customTheme) {
     return ThemeData(
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: backgroundColor,
+      extensions: <ThemeExtension<dynamic>>[customTheme],
+      primaryColor: customTheme.surfaceCard,
+      scaffoldBackgroundColor: customTheme.deepBackground,
       fontFamily: 'Cairo',
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        primary: primaryColor,
-        secondary: accentColor,
-        surface: surfaceColor,
+        seedColor: customTheme.surfaceCard,
+        primary: customTheme.surfaceCard,
+        secondary: customTheme.sovereignAccent,
+        surface: customTheme.surfaceCard,
         error: errorColor,
         brightness: Brightness.dark,
       ),
@@ -155,13 +159,13 @@ class AppTheme {
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: accentColor,
+          color: customTheme.sovereignAccent,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: accentColor,
-          foregroundColor: primaryDark,
+          backgroundColor: customTheme.sovereignAccent,
+          foregroundColor: customTheme.deepBackground,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -171,8 +175,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: accentColor,
-          side: BorderSide(color: accentColor.withAlpha(150), width: 2),
+          foregroundColor: customTheme.sovereignAccent,
+          side: BorderSide(color: customTheme.sovereignAccent.withAlpha(150), width: 2),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -191,11 +195,11 @@ class AppTheme {
         bodyLarge: bodyLarge,
         bodyMedium: bodyMedium,
       ),
-      iconTheme: const IconThemeData(
-        color: accentColor,
+      iconTheme: IconThemeData(
+        color: customTheme.sovereignAccent,
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: accentColor,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: customTheme.sovereignAccent,
       ),
     );
   }
