@@ -186,7 +186,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       int points = 0;
       if (isCorrect) {
         final timeLeft = (15000 - finalDelay) ~/ 1000;
-        points = 10 + (timeLeft > 10 ? 5 : (timeLeft > 5 ? 2 : 0));
+        points = 10 + timeLeft.clamp(0, 15);
         _opponentScore += points;
       }
 
@@ -314,9 +314,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       _selectedAnswer = index;
       if (isCorrect) {
         SoundService().playCorrect();
-        if (_timeLeft >= 17) {
+        if (_timeLeft >= 12) {
           AchievementService.instance.checkAchievements(
-            AchievementEvent.fastAnswer(secondsRemaining: _timeLeft),
+            AchievementEvent.fastAnswer(secondsRemaining: _timeLeft, totalTime: 15),
           );
         }
       } else {
@@ -326,10 +326,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
     // Submit to Supabase and get updated scores
     if (widget.isBot) {
-       // Local calculation for bot mode
+       // Local calculation for bot mode (10 base + clamp(time, 0, 15) matching online RPC)
        int points = 0;
        if (isCorrect) {
-         points = 10 + (_timeLeft > 10 ? 5 : (_timeLeft > 5 ? 2 : 0));
+         points = 10 + _timeLeft.clamp(0, 15);
        }
        setState(() {
          _myScore += points;
@@ -372,7 +372,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   }
 
   Future<void> _finishGame() async {
-    setState(() => _gameFinished = true);
+    // Strict Guard: Prevent any duplicate execution or double score/trophy counting
+    if (_gameFinished) return;
+    _gameFinished = true;
+    if (mounted) setState(() {});
     _botTimer?.cancel(); // Stop bot if running
     
     String? winnerId;
@@ -382,14 +385,15 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     if (widget.isBot) {
        // Determine winner locally
        final myId = MultiplayerService.instance.currentUserId;
-       if (_myScore > _opponentScore) winnerId = myId;
-       else if (_opponentScore > _myScore) winnerId = widget.opponentId;
-       else winnerId = null; // Draw
-       
-       // Update cloud score if needed (for global leaderboard)
-       if (_myScore > 0) {
-         await MultiplayerService.instance.updateScoreToCloud(_myScore);
+       if (_myScore > _opponentScore) {
+         winnerId = myId;
+       } else if (_opponentScore > _myScore) {
+         winnerId = widget.opponentId;
+       } else {
+         winnerId = null; // Draw
        }
+       
+       // Note: Score is saved locally and synced to cloud in unified block below
     } else {
       final result = await MultiplayerService.instance.finishMatch(widget.matchId);
       

@@ -139,10 +139,14 @@ class AchievementEvent {
     {},
   );
 
-  /// إجابة سريعة
-  factory AchievementEvent.fastAnswer({required int secondsRemaining}) => AchievementEvent._(
+  /// إجابة سريعة (بأقل من 3 ثوانٍ)
+  factory AchievementEvent.fastAnswer({required int secondsRemaining, int totalTime = 20}) => AchievementEvent._(
     AchievementEventType.fastAnswer,
-    {'secondsRemaining': secondsRemaining},
+    {
+      'secondsRemaining': secondsRemaining,
+      'totalTime': totalTime,
+      'timeTaken': (totalTime - secondsRemaining).clamp(0, totalTime),
+    },
   );
 }
 

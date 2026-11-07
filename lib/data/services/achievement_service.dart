@@ -262,8 +262,10 @@ class AchievementService extends ChangeNotifier {
     final newlyUnlocked = <Achievement>[];
     final secondsRemaining = data['secondsRemaining'] as int;
 
-    // إجابة في أقل من 3 ثواني (17 ثانية متبقية من 20)
-    if (secondsRemaining >= 17) {
+    // إجابة في أقل من 3 ثوانٍ (سواء كان مؤقت السؤال 20 ثانية أو 15 ثانية)
+    final timeTaken = data['timeTaken'] as int? ?? (20 - secondsRemaining);
+    final isFast = timeTaken <= 3 || secondsRemaining >= 17 || (data['totalTime'] == 15 && secondsRemaining >= 12);
+    if (isFast) {
       _incrementProgress(profile, 'fast');
       _incrementProgress(profile, 'rocket');
     }

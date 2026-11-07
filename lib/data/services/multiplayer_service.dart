@@ -361,14 +361,8 @@ class MultiplayerService {
         final trophiesDelta = (data['trophies_delta'] as num?)?.toInt() ?? 0;
         final totalTrophies = (data['my_total_trophies'] as num?)?.toInt() ?? 1000;
 
-        // Immediately update local profile score and sync
-        final profile = ProfileService.instance.activeProfile;
-        if (profile != null && myScore > 0) {
-          final newProfile = profile.copyWith(
-            totalScore: profile.totalScore + myScore,
-          );
-          await ProfileService.instance.updateProfile(newProfile);
-        }
+        // Local profile score addition and sync is handled centrally in OnlineGameScreen._finishGame
+        // to ensure zero duplicate scoring.
 
         return {
           'winnerId': winnerId,
