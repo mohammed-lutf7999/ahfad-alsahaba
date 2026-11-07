@@ -14,13 +14,25 @@ class CloudSyncService {
   factory CloudSyncService() => _instance;
   CloudSyncService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
 
-  /// Check if user is authenticated
-  bool get _isAuthenticated => _supabase.auth.currentUser != null;
+  /// Check if user is authenticated (safe even if Supabase is not initialized in offline/test environments)
+  bool get _isAuthenticated {
+    try {
+      return _supabase.auth.currentUser != null;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Get current user ID
-  String? get _userId => _supabase.auth.currentUser?.id;
+  String? get _userId {
+    try {
+      return _supabase.auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Sync complete profile data (including 100-Level Mastery, Economy & Inventory) to cloud.
   Future<bool> syncProfileToCloud(PlayerProfile profile) async {

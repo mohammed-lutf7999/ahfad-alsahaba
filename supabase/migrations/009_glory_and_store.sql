@@ -84,6 +84,13 @@ FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Owner delete user_inventory" ON public.user_inventory;
+CREATE POLICY "Owner delete user_inventory"
+ON public.user_inventory
+FOR DELETE
+TO authenticated
+USING (auth.uid() = user_id);
+
 -- ==============================================================================
 -- 3. SEED CATALOG FOR `store_items` (4 Themes, 10 Frames, 3 Titles, 3 Power-ups)
 -- ==============================================================================
@@ -285,6 +292,7 @@ DECLARE
     v_arena_multiplier FLOAT := 1.2;
     v_correct_est INT := 0;
     v_match_coins INT := 0;
+    v_xp_to_add INT := 0;
 BEGIN
     -- Ensure user is not in matchmaking queue
     DELETE FROM public.matchmaking_queue WHERE user_id = p_user_id;
@@ -322,14 +330,25 @@ BEGIN
     v_cur_trophies := COALESCE(v_cur_trophies, 1000);
 
     -- Determine Winner, New Win Streak & Trophy Delta (25 + min(streak*2, 10))
+    -- Also honors `powerup_shield` (protects trophies & win_streak on loss and consumes the shield)
     IF v_my_score > COALESCE(v_opp_score, 0) THEN
         v_the_winner := p_user_id;
         v_new_streak := v_cur_streak + 1;
         v_trophies_delta := 25 + LEAST(v_new_streak * 2, 10);
     ELSIF COALESCE(v_opp_score, 0) > v_my_score THEN
         v_the_winner := v_opp_id;
-        v_new_streak := 0;
-        v_trophies_delta := -12;
+        IF v_prev_finished_at IS NULL AND EXISTS (
+            SELECT 1 FROM public.user_inventory
+            WHERE user_id = p_user_id AND item_id = 'powerup_shield'
+        ) THEN
+            DELETE FROM public.user_inventory
+            WHERE user_id = p_user_id AND item_id = 'powerup_shield';
+            v_new_streak := v_cur_streak;
+            v_trophies_delta := 0;
+        ELSE
+            v_new_streak := 0;
+            v_trophies_delta := -12;
+        END IF;
     ELSE
         v_the_winner := NULL; -- Draw
         v_new_streak := v_cur_streak;
@@ -343,6 +362,17 @@ BEGIN
 
     -- Only add points, trophies & coins if this player hasn't already called finish_match
     IF v_prev_finished_at IS NULL THEN
+        v_xp_to_add := COALESCE(v_my_score, 0);
+        -- Check if player has an active XP Banner (`powerup_xp_banner`) to double earned XP
+        IF v_xp_to_add > 0 AND EXISTS (
+            SELECT 1 FROM public.user_inventory
+            WHERE user_id = p_user_id AND item_id = 'powerup_xp_banner'
+        ) THEN
+            DELETE FROM public.user_inventory
+            WHERE user_id = p_user_id AND item_id = 'powerup_xp_banner';
+            v_xp_to_add := v_xp_to_add * 2;
+        END IF;
+
         SELECT COALESCE(
             (SELECT up.display_name FROM public.user_progress up WHERE up.user_id = p_user_id LIMIT 1),
             (SELECT lb.display_name FROM public.leaderboard lb WHERE lb.user_id = p_user_id LIMIT 1),
@@ -362,14 +392,14 @@ BEGIN
         VALUES (
             p_user_id, 
             v_display_name,
-            v_my_score, 
+            v_xp_to_add, 
             GREATEST(800, 1000 + v_trophies_delta), 
             CASE WHEN v_the_winner = p_user_id THEN 1 ELSE 0 END, 
             1, 
             NOW()
         )
         ON CONFLICT (user_id) DO UPDATE SET
-            score = COALESCE(public.leaderboard.score, 0) + v_my_score,
+            score = COALESCE(public.leaderboard.score, 0) + v_xp_to_add,
             trophies = GREATEST(800, COALESCE(public.leaderboard.trophies, 1000) + v_trophies_delta),
             wins_count = COALESCE(public.leaderboard.wins_count, 0) + CASE WHEN v_the_winner = p_user_id THEN 1 ELSE 0 END,
             matches_count = COALESCE(public.leaderboard.matches_count, 0) + 1,
@@ -397,8 +427,8 @@ BEGIN
         -- (trg_sync_user_progress_level will also add level-up bonus coins automatically!)
         UPDATE public.user_progress
         SET 
-            total_score = COALESCE(total_score, 0) + v_my_score,
-            high_score = GREATEST(COALESCE(high_score, 0), v_my_score),
+            total_score = COALESCE(total_score, 0) + v_xp_to_add,
+            high_score = GREATEST(COALESCE(high_score, 0), v_xp_to_add),
             coins = COALESCE(coins, 100) + v_match_coins,
             win_streak = v_new_streak,
             updated_at = NOW()

@@ -1,5 +1,5 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'dart:math';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import '../data/local/shared_prefs_service.dart';
 
@@ -8,7 +8,6 @@ class SoundService {
   factory SoundService() => _instance;
   SoundService._internal();
 
-
   // Sound file paths
   // Correct Answer (Randomized)
   static const List<String> _correctSounds = [
@@ -16,17 +15,17 @@ class SoundService {
     'audio/correct_2.mp3',
     'audio/correct_3.mp3',
   ];
-  
+
   // Core Gameplay
   static const String wrongSound = 'audio/wrong.mp3';
   static const String levelCompleteSound = 'audio/level_complete.mp3';
-  static const String timerTickSound = 'audio/timer_tick.wav'; // Long loop or single tick
+  static const String timerTickSound = 'audio/timer_tick.wav';
   static const String hintUseSound = 'audio/hint_use.mp3';
   static const String streakFireSound = 'audio/streak_fire.mp3';
 
   // UI Sounds
-  static const String clickSound = 'audio/click.mp3'; // Standard click
-  static const String uiTapSound = 'audio/ui_tap.mp3'; // Soft tap
+  static const String clickSound = 'audio/click.mp3';
+  static const String uiTapSound = 'audio/ui_tap.mp3';
   static const String uiBackSound = 'audio/ui_back.mp3';
   static const String uiAlertSound = 'audio/ui_alert.mp3';
 
@@ -42,6 +41,10 @@ class SoundService {
 
   // Special player for looping sounds (like timer)
   AudioPlayer? _loopPlayer;
+
+  /// Observable counter for verifying rank-up audio triggers in tests when sound is enabled.
+  @visibleForTesting
+  int rankUpPlayCount = 0;
 
   Future<void> playSound(String assetPath, {double volume = 1.0}) async {
     if (!SharedPrefsService.getSoundEnabled()) return;
@@ -66,7 +69,7 @@ class SoundService {
 
   Future<void> playWrong() async => playSound(wrongSound);
   Future<void> playLevelComplete() async => playSound(levelCompleteSound);
-  
+
   // Hint & Streak
   Future<void> playHintUse() async => playSound(hintUseSound);
   Future<void> playStreak() async => playSound(streakFireSound);
@@ -74,10 +77,10 @@ class SoundService {
   // --- Timer Methods ---
   Future<void> startTimerTick() async {
     if (!SharedPrefsService.getSoundEnabled()) return;
-    _loopPlayer?.dispose(); // Cleanup if existing
+    _loopPlayer?.dispose();
     _loopPlayer = AudioPlayer();
     try {
-      await _loopPlayer!.setVolume(0.5); // Lower volume for background tick
+      await _loopPlayer!.setVolume(0.5);
       await _loopPlayer!.setReleaseMode(ReleaseMode.loop);
       await _loopPlayer!.play(AssetSource(timerTickSound));
     } catch (e) {
@@ -106,6 +109,18 @@ class SoundService {
   Future<void> playGameStart() async => playSound(gameStartSound);
   Future<void> playVictory() async => playSound(victorySound);
   Future<void> playDefeat() async => playSound(defeatSound);
-  Future<void> playRankUp() async => playSound(rankUpSound);
+
+  /// Plays the solemn human vocal rank-up fanfare (`assets/audio/rank_up.mp3`)
+  /// safely respecting mute settings and catching any platform audio errors.
+  Future<void> playRankUp() async {
+    if (!SharedPrefsService.getSoundEnabled()) return;
+    rankUpPlayCount++;
+    try {
+      await playSound(rankUpSound);
+    } catch (e) {
+      debugPrint('Error in playRankUp: $e');
+    }
+  }
+
   Future<void> playNotification() async => playSound(uiAlertSound);
 }

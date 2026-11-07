@@ -1,9 +1,26 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_custom_theme.dart';
+import '../../ui/dialogs/arena_promotion_dialog.dart';
+import '../../ui/dialogs/level_up_celebration_dialog.dart';
 import '../models/arena_model.dart';
 import '../models/player_level_model.dart';
 import '../models/store_item_model.dart';
 import 'profile_service.dart';
+
+/// Snapshot of a player's score & trophies before a game round or reward grant.
+class ProgressionSnapshot {
+  final int score;
+  final int trophies;
+  final int level;
+  final int arenaId;
+
+  const ProgressionSnapshot({
+    required this.score,
+    required this.trophies,
+    required this.level,
+    required this.arenaId,
+  });
+}
 
 /// Represents a detected level-up event for triggering celebration dialogs.
 class LevelUpTransition {
@@ -56,6 +73,19 @@ class ProgressionService extends ChangeNotifier {
     return AppCustomTheme.fromId(themeId);
   }
 
+  /// Captures a [ProgressionSnapshot] of the active profile's current score and trophies.
+  ProgressionSnapshot captureSnapshot() {
+    final profile = ProfileService.instance.activeProfile;
+    final score = profile?.totalScore ?? 0;
+    final trophies = profile?.trophies ?? 1000;
+    return ProgressionSnapshot(
+      score: score,
+      trophies: trophies,
+      level: PlayerLevelInfo.fromTotalScore(score).level,
+      arenaId: ArenaModel.fromTrophies(trophies).id,
+    );
+  }
+
   /// Evaluates if increasing score from [oldScore] to [newScore] resulted in a Level Up.
   LevelUpTransition? evaluateScoreTransition({
     required int oldScore,
@@ -96,6 +126,36 @@ class ProgressionService extends ChangeNotifier {
     );
   }
 
+  /// Checks if the active player leveled up or promoted to a new arena since [before]
+  /// and sequentially presents [LevelUpCelebrationDialog] and/or [ArenaPromotionDialog].
+  Future<void> checkAndTriggerCelebrations(
+    BuildContext context, {
+    required ProgressionSnapshot before,
+    int? overrideNewScore,
+    int? overrideNewTrophies,
+  }) async {
+    final profile = ProfileService.instance.activeProfile;
+    final newScore = overrideNewScore ?? profile?.totalScore ?? before.score;
+    final newTrophies =
+        overrideNewTrophies ?? profile?.trophies ?? before.trophies;
+
+    final levelUp = evaluateScoreTransition(
+      oldScore: before.score,
+      newScore: newScore,
+    );
+    if (levelUp != null && context.mounted) {
+      await LevelUpCelebrationDialog.show(context, transition: levelUp);
+    }
+
+    final arenaPromo = evaluateArenaTransition(
+      oldTrophies: before.trophies,
+      newTrophies: newTrophies,
+    );
+    if (arenaPromo != null && context.mounted) {
+      await ArenaPromotionDialog.show(context, transition: arenaPromo);
+    }
+  }
+
   /// Equips a theme by [themeId] on the active profile and notifies listeners.
   Future<void> equipTheme(String themeId) async {
     final profile = ProfileService.instance.activeProfile;
@@ -112,6 +172,87 @@ class ProgressionService extends ChangeNotifier {
     profile.equippedFrame = frameKey;
     await ProfileService.instance.saveActiveProfileAndSync();
     notifyListeners();
+  }
+
+  /// Applies a match outcome (Online or Bot) to the active profile, honoring:
+  /// - `powerup_xp_banner` (doubles earned XP and consumes the banner).
+  /// - `powerup_shield` (absorbs trophy loss `-12 -> 0` and preserves `winStreak` on loss, consuming the shield).
+  /// - Arena coin multiplier (`calculateMatchCoins`).
+  ({
+    int effectiveXpAdded,
+    int trophiesDelta,
+    int coinsEarned,
+    bool shieldConsumed,
+    bool xpBannerConsumed,
+  }) applyMatchOutcome({
+    required int rawMatchScore,
+    required int correctAnswers,
+    required bool isWin,
+    required bool isDraw,
+    int? serverTotalTrophies,
+  }) {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) {
+      return (
+        effectiveXpAdded: rawMatchScore,
+        trophiesDelta: 0,
+        coinsEarned: 0,
+        shieldConsumed: false,
+        xpBannerConsumed: false,
+      );
+    }
+
+    bool xpBannerConsumed = false;
+    int effectiveXp = rawMatchScore > 0 ? rawMatchScore : 0;
+    if (effectiveXp > 0 &&
+        profile.unlockedItemIds.contains('powerup_xp_banner')) {
+      profile.unlockedItemIds.remove('powerup_xp_banner');
+      effectiveXp *= 2;
+      xpBannerConsumed = true;
+    }
+
+    bool shieldConsumed = false;
+    int trophiesDelta = 0;
+    if (isDraw) {
+      trophiesDelta = 5;
+    } else if (isWin) {
+      profile.winStreak += 1;
+      trophiesDelta = ArenaModel.calculateTrophyDelta(
+        isWin: true,
+        isDraw: false,
+        winStreak: profile.winStreak,
+      );
+    } else {
+      // Loss: check if player owns `powerup_shield`
+      if (profile.unlockedItemIds.contains('powerup_shield')) {
+        profile.unlockedItemIds.remove('powerup_shield');
+        shieldConsumed = true;
+        trophiesDelta = 0; // Shield absorbs -12 loss and preserves winStreak!
+      } else {
+        profile.winStreak = 0;
+        trophiesDelta = -12;
+      }
+    }
+
+    profile.trophies = ArenaModel.clampTrophies(
+      serverTotalTrophies ?? (profile.trophies + trophiesDelta),
+    );
+
+    final arena = ArenaModel.fromTrophies(profile.trophies);
+    final coinsEarned = arena.calculateMatchCoins(
+      correctAnswers: correctAnswers,
+    );
+    profile.coins += coinsEarned;
+    profile.addScore(effectiveXp);
+
+    notifyListeners();
+    return (
+      effectiveXpAdded: effectiveXp,
+      trophiesDelta: trophiesDelta,
+      coinsEarned: coinsEarned,
+      shieldConsumed: shieldConsumed,
+      xpBannerConsumed: xpBannerConsumed,
+    );
   }
 
   /// Purchases an item from «سوق الفرسان» using the active profile's coins/gems.
