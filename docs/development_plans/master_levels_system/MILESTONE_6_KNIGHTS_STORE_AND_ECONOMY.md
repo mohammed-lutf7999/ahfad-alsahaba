@@ -40,8 +40,10 @@ lib/
 
 ---
 
-## 3. بوابة التحقق والاعتماد (Validation Gate M6)
+## 3. بوابة التحقق والاعتماد (Validation Gate M5 / Store & Economy — ✅ مكتمل)
 
-- [ ] التأكد من خصم الدنانير بدقة ومنع شراء العنصر مرتين.
-- [ ] التحقق من تغير ثيم التطبيق فوراً (خلال `300ms`) عند تفعيل أي ثيم من خزانة الثيمات.
-- [ ] اجتياز `flutter analyze` بنتيجة `0 errors`.
+- [x] التأكد من خصم الدنانير بدقة ومنع شراء العنصر مرتين (`StoreService.purchaseOrEquip` + `ProgressionService.purchaseStoreItem`).
+- [x] التحقق من تغير ثيم التطبيق فوراً (خلال `300ms`) عند تفعيل أي ثيم من خزانة الثيمات (`ThemeProvider.instance.setTheme`).
+- [x] اجتياز `flutter analyze` بنتيجة `0 errors` واجتياز اختبارات `test/m5_knights_store_test.dart` (`3/3`).
+
+

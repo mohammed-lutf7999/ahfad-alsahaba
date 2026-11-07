@@ -434,5 +434,5 @@ lib/
 | **M2** | ترقية قاعدة بيانات Supabase | تنفيذ ملف `009_glory_and_store.sql` وتفعيل المشغلات الذرية ومزامنة `CloudSyncService` | ✅ **مكتمل 100% ومطبق حياً على السيرفر** |
 | **M3** | المكونات البصرية والأطر المتوهجة | `animated_avatar_frame.dart`, `level_badge_widget.dart`, `glory_progress_bar.dart` | ✅ **مكتمل 100% ومختبر (`3/3 Widget Tests`)** |
 | **M4** | طريق المجد ونوافذ الاحتفال | `glory_road_screen.dart`, `level_up_celebration_dialog.dart`, `arena_promotion_dialog.dart` | ✅ **مكتمل 100% ومختبر (`4/4 Widget Tests`)** |
-| **M5** | سوق الفرسان والاقتصاد الداخلي | `knights_store_screen.dart`, `store_service.dart` وربط الدنانير والياقوت | ⏳ المرحلة القادمة (لم تُنفذ بعد) |
-| **M6** | دمج الواجهات والبطاقات الفيروسية | تحديث الرئيسية ولوحة الصدارة وشاشة `VS` وبطاقات المشاركة بـ QR | ⏳ مجدولة (لم تُنفذ بعد) |
+| **M5** | سوق الفرسان والاقتصاد الداخلي | `knights_store_screen.dart`, `store_service.dart` وربط الدنانير والياقوت | ✅ **مكتمل 100% ومختبر (`3/3 Store Tests`)** |
+| **M6** | دمج الواجهات والبطاقات الفيروسية | تحديث الرئيسية ولوحة الصدارة وشاشة `VS` وبطاقات المشاركة بـ QR | ⏳ المرحلة الختامية القادمة |
