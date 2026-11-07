@@ -124,3 +124,4 @@ GRANT EXECUTE ON FUNCTION public.calculate_arena_name(INT) TO anon, authenticate
   SELECT public.calculate_arena_name(1188);            -- كؤوس فهد الحلياني
   ```
 - [ ] التأكد من أن النتيجة: المستوى محسوب بدقة واللقب «راوي الأثر» أو «فارس الميدان»، والميدان «ميدان بدر الكبرى».
+

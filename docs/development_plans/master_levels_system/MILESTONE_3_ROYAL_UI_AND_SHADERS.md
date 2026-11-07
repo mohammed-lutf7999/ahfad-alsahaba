@@ -96,3 +96,4 @@ class _AvatarFramePainter extends CustomPainter {
 - [ ] التأكد من وضع `RepaintBoundary` حول الودجات المتحركة لضمان 60/120 إطاراً في الثانية دون أي تقطيع (0 Drop Frames).
 - [ ] التأكد من عدم قص أو تداخل النصوص العربية وفق **القاعدة السادسة في `AGENT.md`**.
 - [ ] فحص `flutter analyze` والتأكد من عدم وجود أي خطأ.
+
