@@ -11,6 +11,7 @@ import '../widgets/question_card.dart';
 import '../widgets/option_button.dart';
 import '../widgets/timer_widget.dart';
 import '../dialogs/app_dialogs.dart';
+import 'quiz/widgets/quiz_lifelines_dock.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/progression_service.dart';
 import '../../data/models/achievement_model.dart';
@@ -390,114 +391,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               ),
 
               // --- Bottom Lifelines Dock ---
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryDark.withOpacity(0.9),
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, -5))
-                  ],
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _LinearLifeline(
-                        icon: Icons.timer_off_rounded,
-                        label: 'تجميد الوقت',
-                        color: Colors.blueAccent,
-                        isUsed: _gameController.hasUsedTimeFreeze,
-                        onTap: () {
-                           if (_gameController.hasUsedTimeFreeze || _gameController.isAnswered) return;
-                           SoundService().playHintUse();
-                           setState(() {
-                             _gameController.useTimeFreeze();
-                             _timerController.pauseTimer();
-                           });
-                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                             content: const Text('تم تجميد الوقت لمدة 15 ثانية!', textAlign: TextAlign.center),
-                             backgroundColor: Colors.blueAccent.withOpacity(0.9),
-                             duration: const Duration(seconds: 2),
-                             behavior: SnackBarBehavior.floating,
-                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                           ));
-
-                           // Auto resume after 15 seconds
-                           Future.delayed(const Duration(seconds: 15), () {
-                             if (mounted && _gameController.currentQuestionIndex == _gameController.currentQuestionIndex && !_gameController.isAnswered) {
-                               _timerController.resumeTimer();
-                             }
-                           });
-                        },
-                      ),
-                      _LinearLifeline(
-                        icon: Icons.skip_next_rounded,
-                        label: 'تخطي',
-                        color: Colors.orangeAccent,
-                        isUsed: _gameController.hasUsedSkip,
-                        onTap: () {
-                           if (_gameController.hasUsedSkip || _gameController.isAnswered) return;
-                           SoundService().playHintUse();
-                           _gameController.useSkip();
-                           _nextQuestion();
-                        },
-                      ),
-                       _LinearLifeline(
-                        icon: Icons.percent_rounded,
-                        label: '50/50',
-                        color: Colors.purpleAccent,
-                        isUsed: _gameController.hasUsedFiftyFifty,
-                        onTap: () {
-                          if (_gameController.hasUsedFiftyFifty || _gameController.isAnswered) return;
-                          SoundService().playHintUse();
-                          setState(() {
-                            _gameController.useFiftyFifty();
-                          });
-                        },
-                      ),
-                      _LinearLifeline(
-                        icon: Icons.lightbulb_rounded,
-                        label: 'بصيرة القائد',
-                        color: const Color(0xFFFFD700),
-                        isUsed: !ProgressionService.instance.hasItem('powerup_insight') ||
-                            _gameController.hiddenOptionIndices.isNotEmpty,
-                        onTap: () async {
-                          if (_gameController.isAnswered ||
-                              _gameController.hiddenOptionIndices.isNotEmpty) {
-                            return;
-                          }
-                          if (!ProgressionService.instance.hasItem('powerup_insight')) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'يمكنك اقتناء «بصيرة القائد 💡» من سوق الفرسان 🪙',
-                                  textAlign: TextAlign.center,
-                                ),
-                                backgroundColor: AppTheme.primaryDark,
-                                duration: const Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          final consumed = await ProgressionService.instance
-                              .consumeCommanderInsight();
-                          if (!consumed || !mounted) return;
-                          SoundService().playHintUse();
-                          setState(() {
-                            _gameController.useCommanderInsight();
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+              QuizLifelinesDock(
+                gameController: _gameController,
+                timerController: _timerController,
+                onNextQuestion: _nextQuestion,
+                onStateChanged: () => setState(() {}),
               ),
             ],
           ),
@@ -725,68 +623,4 @@ class _ShatteringHeartState extends State<_ShatteringHeart> with SingleTickerPro
   }
   
   bool get isOddFrame => DateTime.now().millisecond % 2 == 0;
-}
-
-class _LinearLifeline extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isUsed;
-  final VoidCallback onTap;
-
-  const _LinearLifeline({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isUsed,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.all(12),
-             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: isUsed 
-                ? LinearGradient(colors: [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)])
-                : LinearGradient(
-                    colors: [color.withOpacity(0.9), color.withOpacity(0.5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-              boxShadow: isUsed ? [] : [
-                BoxShadow(
-                  color: color.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ],
-              border: Border.all(
-                color: isUsed ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.4),
-                width: 1.5
-              ),
-            ),
-            child: Icon(icon, color: isUsed ? Colors.white.withOpacity(0.2) : Colors.white, size: 22),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: isUsed ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.9),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Cairo', 
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
