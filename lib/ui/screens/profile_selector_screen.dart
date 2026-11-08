@@ -17,7 +17,6 @@ class ProfileSelectorScreen extends StatefulWidget {
 
 class _ProfileSelectorScreenState extends State<ProfileSelectorScreen>
     with SingleTickerProviderStateMixin {
-  bool _isLoading = false;
   late AnimationController _animController;
 
   @override
@@ -41,7 +40,6 @@ class _ProfileSelectorScreenState extends State<ProfileSelectorScreen>
       return;
     }
     
-    setState(() => _isLoading = true);
     SoundService().playClick();
     
     await ProfileService.instance.setActiveProfile(profile.id);

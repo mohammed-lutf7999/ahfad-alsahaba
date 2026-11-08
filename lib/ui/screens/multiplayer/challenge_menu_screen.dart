@@ -15,7 +15,6 @@ class ChallengeMenuScreen extends StatefulWidget {
 
 class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
     with SingleTickerProviderStateMixin {
-  bool _isLoading = false;
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -39,12 +38,10 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
   }
 
   Future<bool> _requestPermissions() async {
-    setState(() => _isLoading = true);
     
     // التحقق من الأذونات أولاً
     final granted = await NearbyService.instance.requestPermissions();
     
-    setState(() => _isLoading = false);
     
     if (!granted && mounted) {
       // عرض dialog واضح للمستخدم
