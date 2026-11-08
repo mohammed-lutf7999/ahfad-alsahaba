@@ -6,6 +6,7 @@ import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/question_service.dart';
 import '../../../data/services/profile_service.dart';
+import '../../../data/services/progression_service.dart';
 import '../../../data/services/achievement_service.dart';
 import '../../../data/models/achievement_model.dart';
 import '../../../data/models/question_model.dart';
@@ -40,6 +41,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   List<Question> _questions = [];
   int _currentQuestionIndex = 0;
   int _myScore = 0;
+  int _myCorrectAnswersCount = 0;
+  final Set<int> _hiddenOptionIndices = {};
   bool _isLoading = true;
   bool _gameFinished = false;
 
@@ -277,6 +280,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     _progressController.forward(from: 0);
     _selectedAnswer = -1;
     _isAnswered = false;
+    _hiddenOptionIndices.clear();
 
     _questionTimer?.cancel();
     _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -313,6 +317,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       _isAnswered = true;
       _selectedAnswer = index;
       if (isCorrect) {
+        _myCorrectAnswersCount++;
         SoundService().playCorrect();
         if (_timeLeft >= 12) {
           AchievementService.instance.checkAchievements(
@@ -392,8 +397,6 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
        } else {
          winnerId = null; // Draw
        }
-       
-       // Note: Score is saved locally and synced to cloud in unified block below
     } else {
       final result = await MultiplayerService.instance.finishMatch(widget.matchId);
       
@@ -408,20 +411,57 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       totalTrophies = result['totalTrophies'] as int?;
     }
 
-    // Update local activeProfile and sync to cloud so HomeScreen immediately reflects earned points
-    final activeProfile = ProfileService.instance.activeProfile;
-    if (activeProfile != null && _myScore > 0) {
-      activeProfile.addScore(_myScore);
-      await ProfileService.instance.saveActiveProfileAndSync();
-    }
+    final myId = MultiplayerService.instance.currentUserId;
+    final isWinner = winnerId != null ? (winnerId == myId) : (_myScore > _opponentScore);
+    final isDraw = (winnerId == null && _myScore == _opponentScore) || (!isWinner && _myScore == _opponentScore);
+
+    // Capture pre-match progression snapshot BEFORE modifying activeProfile
+    final preSnapshot = ProgressionService.instance.captureSnapshot();
+
+    // Apply progression outcome (XP + Trophies + Arena Coins + Shield / XP Banner)
+    final outcome = ProgressionService.instance.applyMatchOutcome(
+      rawMatchScore: _myScore,
+      correctAnswers: _myCorrectAnswersCount,
+      isWin: isWinner,
+      isDraw: isDraw,
+      serverTotalTrophies: totalTrophies,
+      serverTrophiesDelta: trophiesDelta,
+      updateTrophies: true,
+    );
+
+    await ProfileService.instance.saveActiveProfileAndSync();
     
     // فحص وتسوية الإنجازات فوراً بنقاط المسابقة الجماعية
     await AchievementService.instance.reconcileAchievements();
+
+    // Trigger Epic Level-Up & Arena Promotion Celebration Dialogs if promoted!
+    if (mounted) {
+      await ProgressionService.instance.checkAndTriggerCelebrations(
+        context,
+        before: preSnapshot,
+      );
+    }
     
-    _showResultDialog(winnerId, trophiesDelta: trophiesDelta, totalTrophies: totalTrophies);
+    if (mounted) {
+      _showResultDialog(
+        winnerId,
+        trophiesDelta: outcome.trophiesDelta,
+        totalTrophies: ProfileService.instance.activeProfile?.trophies ?? totalTrophies,
+        coinsEarned: outcome.coinsEarned,
+        shieldConsumed: outcome.shieldConsumed,
+        xpBannerConsumed: outcome.xpBannerConsumed,
+      );
+    }
   }
 
-  void _showResultDialog(String? winnerId, {int? trophiesDelta, int? totalTrophies}) {
+  void _showResultDialog(
+    String? winnerId, {
+    int? trophiesDelta,
+    int? totalTrophies,
+    int coinsEarned = 0,
+    bool shieldConsumed = false,
+    bool xpBannerConsumed = false,
+  }) {
     final myId = MultiplayerService.instance.currentUserId;
     final isWinner = winnerId != null ? (winnerId == myId) : (_myScore > _opponentScore);
     final isDraw = (winnerId == null && _myScore == _opponentScore) || (!isWinner && _myScore == _opponentScore);
@@ -456,26 +496,67 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
               ),
             ),
             const SizedBox(height: 10),
-            if (!widget.isBot)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withOpacity(0.5),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              alignment: WrapAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Text(
+                    '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} 🏆 الكؤوس${totalTrophies != null ? " ($totalTrophies)" : ""}',
+                    style: TextStyle(
+                      color: effectiveDelta >= 0 ? Colors.amberAccent : Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      fontFamily: 'Cairo',
+                    ),
                   ),
                 ),
-                child: Text(
-                  '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} 🏆 الكؤوس${totalTrophies != null ? " ($totalTrophies)" : ""}',
-                  style: TextStyle(
-                    color: effectiveDelta >= 0 ? Colors.amberAccent : Colors.redAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Cairo',
+                if (coinsEarned > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Text(
+                      '+$coinsEarned 🪙 دنانير الفتح',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD700),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
                   ),
+              ],
+            ),
+            if (shieldConsumed || xpBannerConsumed) ...[
+              const SizedBox(height: 8),
+              Text(
+                shieldConsumed
+                    ? '🛡️ درع الحماية حمى كؤوسك وسلسلة انتصاراتك!'
+                    : '🚩 راية المضاعفة ضاعفت خبرتك المكتسبة (2x)!',
+                style: const TextStyle(
+                  color: Colors.cyanAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Cairo',
                 ),
+                textAlign: TextAlign.center,
               ),
+            ],
             const SizedBox(height: 16),
             
             // Scores comparison
@@ -748,9 +829,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                         children: [
                           _buildQuestionCard(question.questionText),
                           const SizedBox(height: 10),
+                          _buildTacticalPowerUpsBar(question),
+                          const SizedBox(height: 8),
                           if (!widget.isBot) _buildHorizontalReactionRibbon(),
                           const SizedBox(height: 10),
                           ...List.generate(question.options.length, (i) {
+                             if (_hiddenOptionIndices.contains(i)) {
+                               return const SizedBox.shrink();
+                             }
                              return _buildOptionButton(i, question.options[i], question.correctAnswerIndex);
                           }),
                         ],
@@ -791,6 +877,131 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     );
   }
   
+  Widget _buildTacticalPowerUpsBar(Question question) {
+    final hasInsight = ProgressionService.instance.hasItem('powerup_insight');
+    final hasShield = ProgressionService.instance.hasItem('powerup_shield');
+    final hasXpBanner = ProgressionService.instance.hasItem('powerup_xp_banner');
+    final isInsightDisabled =
+        _isAnswered || !hasInsight || _hiddenOptionIndices.isNotEmpty;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: isInsightDisabled
+              ? null
+              : () async {
+                  final consumed = await ProgressionService.instance
+                      .consumeCommanderInsight();
+                  if (!consumed || !mounted) return;
+                  SoundService().playHintUse();
+                  final wrongIndices = <int>[];
+                  for (int i = 0; i < question.options.length; i++) {
+                    if (i != question.correctAnswerIndex) {
+                      wrongIndices.add(i);
+                    }
+                  }
+                  wrongIndices.shuffle(_rnd);
+                  final toHide = wrongIndices.length >= 2
+                      ? 2
+                      : (wrongIndices.length == 1 ? 1 : 0);
+                  setState(() {
+                    for (int i = 0; i < toHide; i++) {
+                      _hiddenOptionIndices.add(wrongIndices[i]);
+                    }
+                  });
+                },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isInsightDisabled
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : const Color(0xFFFFD700).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isInsightDisabled
+                    ? Colors.white24
+                    : const Color(0xFFFFD700),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.lightbulb_rounded,
+                  size: 16,
+                  color: isInsightDisabled
+                      ? Colors.white38
+                      : const Color(0xFFFFD700),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  hasInsight
+                      ? (_hiddenOptionIndices.isNotEmpty
+                            ? 'تم تفعيل بصيرة القائد'
+                            : 'بصيرة القائد 💡 (حذف إجابتين)')
+                      : 'بصيرة القائد 💡 (غير متوفرة)',
+                  style: TextStyle(
+                    color: isInsightDisabled
+                        ? Colors.white38
+                        : const Color(0xFFFFD700),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (hasShield)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.cyanAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.cyanAccent.withValues(alpha: 0.4),
+              ),
+            ),
+            child: const Text(
+              '🛡️ درع الحماية نشط',
+              style: TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ),
+        if (hasXpBanner)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.greenAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.greenAccent.withValues(alpha: 0.4),
+              ),
+            ),
+            child: const Text(
+              '🚩 راية المضاعفة 2x',
+              style: TextStyle(
+                color: Colors.greenAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildHorizontalReactionRibbon() {
     final emojis = ['🔥', '👏', '🎯', '🤝', '😂'];
     return Container(

@@ -10,29 +10,34 @@ class LeaderboardService {
   factory LeaderboardService() => _instance;
   LeaderboardService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
 
   /// Fetch global leaderboard stream (Real-time)
   Stream<List<RankEntry>> getLeaderboardStream({
     int limit = 50,
     bool orderByTrophies = false,
   }) {
-    final currentUserId = _supabase.auth.currentUser?.id;
-    return _supabase
-        .from('leaderboard')
-        .stream(primaryKey: ['id'])
-        .order(orderByTrophies ? 'trophies' : 'score', ascending: false)
-        .limit(limit)
-        .map((data) {
-          final List<Map<String, dynamic>> maps = data;
-          return maps.asMap().entries.map((entry) {
-            return RankEntry.fromSupabaseMap(
-              entry.value,
-              rank: entry.key + 1,
-              currentUserId: currentUserId,
-            );
-          }).toList();
-        });
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      return _supabase
+          .from('leaderboard')
+          .stream(primaryKey: ['id'])
+          .order(orderByTrophies ? 'trophies' : 'score', ascending: false)
+          .limit(limit)
+          .map((data) {
+            final List<Map<String, dynamic>> maps = data;
+            return maps.asMap().entries.map((entry) {
+              return RankEntry.fromSupabaseMap(
+                entry.value,
+                rank: entry.key + 1,
+                currentUserId: currentUserId,
+              );
+            }).toList();
+          });
+    } catch (e) {
+      debugPrint('LeaderboardService stream unavailable (offline/uninitialized): $e');
+      return const Stream.empty();
+    }
   }
 
   /// Fetch global leaderboard (One-time fetch)

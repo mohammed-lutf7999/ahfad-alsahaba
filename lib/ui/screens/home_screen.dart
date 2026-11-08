@@ -6,10 +6,14 @@ import 'dart:math' as math;
 import '../../data/local/shared_prefs_service.dart';
 import '../../core/sound_service.dart';
 import '../../data/services/profile_service.dart';
+import '../../data/services/progression_service.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/quote_service.dart';
 import '../../data/services/auth_service.dart';
 import '../widgets/avatar_selector.dart';
+import '../widgets/animated_avatar_frame.dart';
+import '../widgets/level_badge_widget.dart';
+import '../widgets/glory_progress_bar.dart';
 import '../widgets/islamic_quote_card.dart';
 import 'library_screen.dart';
 import '../../core/size_config.dart';
@@ -17,6 +21,8 @@ import '../widgets/coach_mark_overlay.dart'; // Import custom overlay
 import '../widgets/top_notification.dart'; // Import top notification
 import 'creative_empire_screen.dart';
 import 'global_ranking_screen.dart';
+import 'glory/glory_road_screen.dart';
+import 'store/knights_store_screen.dart';
 import 'multiplayer/lobby_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -55,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen>
     
     // Listen for profile changes to update score display
     ProfileService.instance.addListener(_onProfileChanged);
+    ProgressionService.instance.addListener(_onProfileChanged);
     AchievementService.instance.addListener(_onProfileChanged);
     AuthService().addListener(_onProfileChanged);
     
@@ -147,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     ProfileService.instance.removeListener(_onProfileChanged);
+    ProgressionService.instance.removeListener(_onProfileChanged);
     AchievementService.instance.removeListener(_onProfileChanged);
     AuthService().removeListener(_onProfileChanged);
     _controller.dispose();
@@ -174,15 +182,20 @@ class _HomeScreenState extends State<HomeScreen>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leadingWidth: 64,
         leading: profile != null ? GestureDetector(
           onTap: () async {
             SoundService().playClick();
             await Navigator.pushNamed(context, AppRoutes.profileSelector);
             _refreshProfile();
           },
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 40),
+          child: Center(
+            child: AnimatedAvatarFrame(
+              size: 46,
+              frameKey: profile.equippedFrame,
+              winStreak: profile.winStreak,
+              child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 38),
+            ),
           ),
         ) : null,
         title: profile != null ? GestureDetector(
@@ -195,24 +208,58 @@ class _HomeScreenState extends State<HomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                profile.name,
-                style: const TextStyle(
-                  color: AppTheme.accentColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.stars_rounded, color: AppTheme.accentLight, size: 14),
-                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      profile.name,
+                      style: const TextStyle(
+                        color: AppTheme.accentColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  LevelBadgeWidget(
+                    levelInfo: profile.levelInfo,
+                    isCompact: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.stars_rounded, color: AppTheme.accentLight, size: 13),
+                  const SizedBox(width: 3),
                   Text(
                     '${profile.totalScore}',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '🪙 ${profile.coins}',
+                    style: const TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '💎 ${profile.gems}',
+                    style: const TextStyle(
+                      color: Colors.cyanAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -251,7 +298,15 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute safely
                       children: [
-                        SizedBox(height: getProportionateScreenHeight(10)), 
+                        if (profile != null)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: getProportionateScreenWidth(20),
+                              vertical: 4,
+                            ),
+                            child: _buildGloryAndStorePanel(context),
+                          ),
+                        SizedBox(height: getProportionateScreenHeight(6)), 
                         
                         // 1. Logo/Title Area
                         // Use Flexible so it can shrink if needed
@@ -331,6 +386,198 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGloryAndStorePanel(BuildContext context) {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return const SizedBox.shrink();
+    final levelInfo = profile.levelInfo;
+    final arena = ProgressionService.instance.currentArena;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.accentColor.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top Row: Arena & Trophies + Progress Bar clickable to Glory Road
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () async {
+              SoundService().playClick();
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GloryRoadScreen()),
+              );
+              _refreshProfile();
+            },
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            arena.icon,
+                            color: arena.accentColor,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              arena.name,
+                              style: TextStyle(
+                                color: arena.accentColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Cairo',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        '🏆 ${profile.trophies} كأس',
+                        style: const TextStyle(
+                          color: Colors.amberAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                GloryProgressBar(
+                  levelInfo: levelInfo,
+                  height: 8,
+                  showLabels: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Bottom Row: Direct Prominent Buttons for Glory Road & Knight's Store
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      SoundService().playClick();
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GloryRoadScreen(),
+                        ),
+                      );
+                      _refreshProfile();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accentColor,
+                      foregroundColor: AppTheme.primaryDark,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                    ),
+                    icon: const Icon(Icons.military_tech_rounded, size: 18),
+                    label: const Text(
+                      'طريق المجد 🏆',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      SoundService().playClick();
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const KnightsStoreScreen(),
+                        ),
+                      );
+                      _refreshProfile();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFFD700),
+                      backgroundColor: Colors.amber.withValues(alpha: 0.1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      side: const BorderSide(
+                        color: Color(0xFFFFD700),
+                        width: 1.3,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.storefront_rounded, size: 18),
+                    label: const Text(
+                      'سوق الفرسان 🪙',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

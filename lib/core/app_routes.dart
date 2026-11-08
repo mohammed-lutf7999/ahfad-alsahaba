@@ -11,6 +11,8 @@ import '../ui/screens/profile_setup_screen.dart';
 import '../ui/screens/profile_selector_screen.dart';
 import '../ui/screens/achievements_screen.dart';
 import '../ui/screens/multiplayer/challenge_menu_screen.dart';
+import '../ui/screens/glory/glory_road_screen.dart';
+import '../ui/screens/store/knights_store_screen.dart';
 import '../data/models/player_profile_model.dart';
 
 class AppRoutes {
@@ -26,6 +28,8 @@ class AppRoutes {
   static const String profileSelector = '/profile-selector';
   static const String achievements = '/achievements';
   static const String challenge = '/challenge';
+  static const String gloryRoad = '/glory-road';
+  static const String knightsStore = '/knights-store';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -92,6 +96,10 @@ class AppRoutes {
         return _slideRoute(const AchievementsScreen(), settings);
       case challenge:
         return _slideRoute(const ChallengeMenuScreen(), settings);
+      case gloryRoad:
+        return _slideRoute(const GloryRoadScreen(), settings);
+      case knightsStore:
+        return _slideRoute(const KnightsStoreScreen(), settings);
       default:
         return MaterialPageRoute(
           builder: (_) =>

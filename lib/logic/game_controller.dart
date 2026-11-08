@@ -4,6 +4,7 @@ import '../data/models/category_model.dart';
 import '../data/models/level_model.dart';
 import '../data/services/question_service.dart';
 import '../data/services/profile_service.dart';
+import '../data/services/progression_service.dart';
 import '../core/app_constants.dart';
 
 class GameController extends ChangeNotifier {
@@ -264,8 +265,14 @@ class GameController extends ChangeNotifier {
       }
     }
 
-    // Update total score in profile
-    profile.addScore(_score);
+    // Apply progression outcome (XP + Arena coin reward + powerup_xp_banner if owned)
+    ProgressionService.instance.applyMatchOutcome(
+      rawMatchScore: _score,
+      correctAnswers: _correctAnswers,
+      isWin: percentage >= AppConstants.passingScore,
+      isDraw: false,
+      updateTrophies: false,
+    );
     
     // Save profile locally AND sync to cloud
     await ProfileService.instance.saveActiveProfileAndSync();
@@ -368,5 +375,32 @@ class GameController extends ChangeNotifier {
       _hasUsedTimeFreeze = true;
       notifyListeners();
       return true;
+  }
+
+  /// Uses the «بصيرة القائد 💡» (`powerup_insight`) smart power-up from inventory.
+  /// Hides two incorrect answers on the current question.
+  bool useCommanderInsight() {
+    if (_isAnswered ||
+        currentQuestion == null ||
+        _hiddenOptionIndices.isNotEmpty) {
+      return false;
+    }
+
+    final correctIndex = currentQuestion!.correctAnswerIndex;
+    final totalOptions = currentQuestion!.options.length;
+    final List<int> wrongIndices = [];
+    for (int i = 0; i < totalOptions; i++) {
+      if (i != correctIndex) {
+        wrongIndices.add(i);
+      }
+    }
+    wrongIndices.shuffle();
+    final int toHide =
+        wrongIndices.length >= 2 ? 2 : (wrongIndices.length == 1 ? 1 : 0);
+    for (int i = 0; i < toHide; i++) {
+      _hiddenOptionIndices.add(wrongIndices[i]);
+    }
+    notifyListeners();
+    return true;
   }
 }

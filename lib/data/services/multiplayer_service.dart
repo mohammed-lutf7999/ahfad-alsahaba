@@ -466,62 +466,81 @@ class MultiplayerService {
     );
   }
 
-  /// Fetches basic data (name, avatar) for the opponent from the leaderboard
+  /// Fetches basic data (name, avatar, score, glory level, frame, win streak) for the opponent
   Future<Map<String, dynamic>?> fetchOpponentData(String opponentId) async {
     // Check for bot
     if (opponentId == 'bot_opponent') {
-       final rnd = Random();
-       final botNames = ['الذكي', 'المتحدي', 'العبقري', 'المثقف', 'المنافس'];
-       return {
-         'display_name': botNames[rnd.nextInt(botNames.length)],
-         'avatar_index': rnd.nextInt(10), // Assuming 10 avatars
-         'score': 0, // Starts at 0
-       };
+      final rnd = Random();
+      final botNames = ['الذكي', 'المتحدي', 'العبقري', 'المثقف', 'المنافس'];
+      final myProfile = ProfileService.instance.activeProfile;
+      final baseScore = myProfile?.totalScore ?? 600;
+      final botScore = (baseScore + (rnd.nextInt(400) - 150)).clamp(150, 50000);
+      final baseTrophies = myProfile?.trophies ?? 1000;
+      final botTrophies = (baseTrophies + (rnd.nextInt(120) - 60)).clamp(800, 3000);
+      return {
+        'display_name': botNames[rnd.nextInt(botNames.length)],
+        'avatar_index': rnd.nextInt(10),
+        'score': botScore,
+        'trophies': botTrophies,
+        'win_streak': rnd.nextInt(4),
+      };
     }
 
     try {
       final data = await _client
           .from('leaderboard')
-          .select('display_name, avatar_url, score')
+          .select(
+            'display_name, avatar_url, score, trophies, player_level, player_title, equipped_frame, arena_id, arena_name',
+          )
           .eq('user_id', opponentId)
           .maybeSingle();
-      
-      // If not found in leaderboard, try user_progress
-      if (data == null) {
-         final progress = await _client
+
+      final progress = await _client
           .from('user_progress')
-          .select('display_name, avatar_index, total_score')
+          .select(
+            'display_name, avatar_index, total_score, player_level, player_title, equipped_frame, win_streak',
+          )
           .eq('user_id', opponentId)
           .maybeSingle();
-         
-         if (progress != null) {
-           return {
-             'display_name': progress['display_name'] ?? 'لاعب',
-             'avatar_index': (progress['avatar_index'] as num?)?.toInt() ?? 0,
-             'score': (progress['total_score'] as num?)?.toInt() ?? 0,
-           };
-         }
-      }
-      
-      if (data != null) {
+
+      if (data != null || progress != null) {
+        final lbScore = (data?['score'] as num?)?.toInt() ?? 0;
+        final upScore = (progress?['total_score'] as num?)?.toInt() ?? 0;
         return {
-          'display_name': data['display_name'] ?? 'لاعب',
-          'avatar_url': data['avatar_url'],
-          'score': (data['score'] as num?)?.toInt() ?? 0,
+          'display_name':
+              data?['display_name'] ?? progress?['display_name'] ?? 'لاعب',
+          'avatar_url': data?['avatar_url'],
+          'avatar_index': (progress?['avatar_index'] as num?)?.toInt() ?? 0,
+          'score': lbScore >= upScore ? lbScore : upScore,
+          'trophies': (data?['trophies'] as num?)?.toInt() ?? 1000,
+          'player_level':
+              (data?['player_level'] as num?)?.toInt() ??
+              (progress?['player_level'] as num?)?.toInt(),
+          'player_title':
+              (data?['player_title'] as String?) ??
+              (progress?['player_title'] as String?),
+          'equipped_frame':
+              (data?['equipped_frame'] as String?) ??
+              (progress?['equipped_frame'] as String?),
+          'arena_name': data?['arena_name'] as String?,
+          'win_streak': (progress?['win_streak'] as num?)?.toInt() ?? 0,
         };
       }
-      
-      // Return default if nothing found
+
       return {
         'display_name': 'لاعب',
         'avatar_index': 0,
         'score': 0,
+        'trophies': 1000,
+        'win_streak': 0,
       };
     } catch (e) {
       return {
         'display_name': 'لاعب',
         'avatar_index': 0,
         'score': 0,
+        'trophies': 1000,
+        'win_streak': 0,
       };
     }
   }

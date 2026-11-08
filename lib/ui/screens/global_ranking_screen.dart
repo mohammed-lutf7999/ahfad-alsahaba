@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../data/models/leaderboard_model.dart';
+import '../../data/models/player_level_model.dart';
+import '../../data/models/arena_model.dart';
 import '../../data/services/leaderboard_service.dart';
-import '../../data/services/auth_service.dart';
+import '../../data/services/profile_service.dart';
+import '../widgets/animated_avatar_frame.dart';
+import '../widgets/level_badge_widget.dart';
 import 'dart:math' as math;
 
 class GlobalRankingScreen extends StatefulWidget {
@@ -20,12 +24,35 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen> with TickerPr
   bool _isOffline = false;
   List<RankEntry> _globalRanks = [];
   
-  // Mock Local Data (In real app, fetch from SharedPreferences/DB)
-  final List<RankEntry> _localRanks = [
-    const RankEntry(name: "أنت (المستخدم)", score: 2500, rank: 1, isMe: true),
-    const RankEntry(name: "ضيف 1", score: 1200, rank: 2),
-    const RankEntry(name: "ضيف 2", score: 800, rank: 3),
-  ];
+  List<RankEntry> get _localRanks {
+    final profiles = List.of(ProfileService.instance.profiles);
+    if (profiles.isEmpty) {
+      return const [
+        RankEntry(name: "أنت (المستخدم)", score: 2500, rank: 1, isMe: true),
+        RankEntry(name: "ضيف 1", score: 1200, rank: 2),
+        RankEntry(name: "ضيف 2", score: 800, rank: 3),
+      ];
+    }
+    profiles.sort((a, b) => b.totalScore.compareTo(a.totalScore));
+    final activeId = ProfileService.instance.activeProfile?.id;
+    return List.generate(profiles.length, (i) {
+      final p = profiles[i];
+      final lvl = p.levelInfo;
+      final arena = ArenaModel.fromTrophies(p.trophies);
+      return RankEntry(
+        name: p.name,
+        score: p.totalScore,
+        trophies: p.trophies,
+        rank: i + 1,
+        isMe: p.id == activeId,
+        playerLevel: lvl.level,
+        playerTitle: lvl.title,
+        arenaId: arena.id,
+        arenaName: arena.name,
+        equippedFrame: p.equippedFrame,
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -251,7 +278,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen> with TickerPr
                       return Center(child: Text('حدث خطأ غير متوقع', style: const TextStyle(color: Colors.white54)));
                     }
                     
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (snapshot.connectionState == ConnectionState.waiting || _isLoading) {
                       if (_globalRanks.isNotEmpty) {
                          // Show cached data while connecting
                          return _buildList(_globalRanks, isGlobal: true);
@@ -329,101 +356,184 @@ class _RankCard extends StatelessWidget {
     Color rankColor = _getRankColor(entry.rank);
     Color glowColor = entry.isMe ? Colors.green : rankColor;
 
+    final levelInfo = PlayerLevelInfo.fromTotalScore(entry.score);
+    final arena = ArenaModel.fromTrophies(entry.trophies);
+    final String effectiveFrameKey =
+        (entry.equippedFrame.isNotEmpty && entry.equippedFrame != 'frame_wood')
+        ? entry.equippedFrame
+        : (entry.rank == 1 && levelInfo.level < 31
+              ? 'frame_gold'
+              : levelInfo.frameKey);
+    final String avatarLetter = entry.name.trim().isNotEmpty
+        ? entry.name.trim()[0]
+        : 'ف';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: entry.isMe ? const Color(0xFF1E3A1E) : const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: entry.isMe ? Colors.green.withValues(alpha: 0.5) : Colors.white12,
-            width: entry.isMe ? 2 : 1),
+          color: entry.isMe
+              ? Colors.green.withValues(alpha: 0.5)
+              : (isTop3 ? rankColor.withValues(alpha: 0.4) : Colors.white12),
+          width: (entry.isMe || isTop3) ? 1.8 : 1,
+        ),
         boxShadow: [
           if (isTop3 || entry.isMe)
             BoxShadow(
               color: glowColor.withValues(alpha: 0.2),
               blurRadius: 15,
               spreadRadius: 1,
-            )
+            ),
         ],
       ),
       child: Row(
         children: [
           // Rank Badge
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isTop3 ? rankColor.withValues(alpha: 0.2) : Colors.transparent,
+              color: isTop3
+                  ? rankColor.withValues(alpha: 0.2)
+                  : Colors.transparent,
               border: isTop3 ? Border.all(color: rankColor) : null,
             ),
             child: Center(
               child: isTop3
-                  ? Icon(Icons.emoji_events_rounded, color: rankColor, size: 24)
+                  ? Icon(Icons.emoji_events_rounded, color: rankColor, size: 22)
                   : Text(
                       "${entry.rank}",
                       style: const TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
             ),
           ),
-          const SizedBox(width: 16),
-          
-          // Avatar
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey.shade800,
-            child: Text(entry.name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 10),
+
+          // Royal Animated Avatar Frame
+          AnimatedAvatarFrame(
+            size: 48,
+            frameKey: effectiveFrameKey,
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFF263238),
+              child: Text(
+                avatarLetter,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
 
-          // Name & Country
+          // Name, Level Badge & Competitive Arena
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  entry.name,
-                  style: TextStyle(
-                    color: entry.isMe ? Colors.greenAccent : Colors.white,
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                if (!entry.isMe)
-                  Row(
-                    children: [
-                      Icon(Icons.location_on_outlined, size: 12, color: Colors.white54),
-                       const SizedBox(width: 4),
-                       Text(entry.countryCode, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        entry.name,
+                        style: TextStyle(
+                          color: entry.isMe ? Colors.greenAccent : Colors.white,
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (!entry.isMe && entry.countryCode.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        entry.countryCode,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 10,
+                        ),
+                      ),
                     ],
-                  )
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    LevelBadgeWidget(
+                      levelInfo: levelInfo,
+                      isCompact: true,
+                      customTitle: entry.playerTitle.isNotEmpty
+                          ? entry.playerTitle
+                          : null,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: arena.accentColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: arena.accentColor.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Text(
+                        '${arena.name} • 🏆 ${entry.trophies}',
+                        style: TextStyle(
+                          color: arena.accentColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
 
           // Score
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.black38,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white10),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 16),
+                const Icon(
+                  Icons.star_rounded,
+                  color: Color(0xFFFFD700),
+                  size: 15,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   "${entry.score}",
                   style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14),
+                    color: Color(0xFFFFD700),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),

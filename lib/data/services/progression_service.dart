@@ -174,7 +174,28 @@ class ProgressionService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Applies a match outcome (Online or Bot) to the active profile, honoring:
+  /// Checks if the active profile currently owns a specific item or power-up.
+  bool hasItem(String itemId) {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return false;
+    return profile.unlockedItemIds.contains(itemId);
+  }
+
+  /// Consumes `powerup_insight` («بصيرة القائد 💡») from the active profile's inventory
+  /// and syncs to local storage & cloud. Returns `true` if successfully consumed.
+  Future<bool> consumeCommanderInsight() async {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return false;
+    if (!profile.unlockedItemIds.contains('powerup_insight')) {
+      return false;
+    }
+    profile.unlockedItemIds.remove('powerup_insight');
+    await ProfileService.instance.saveActiveProfileAndSync();
+    notifyListeners();
+    return true;
+  }
+
+  /// Applies a match outcome (Online, Bot, or Single-Player) to the active profile, honoring:
   /// - `powerup_xp_banner` (doubles earned XP and consumes the banner).
   /// - `powerup_shield` (absorbs trophy loss `-12 -> 0` and preserves `winStreak` on loss, consuming the shield).
   /// - Arena coin multiplier (`calculateMatchCoins`).
@@ -190,6 +211,8 @@ class ProgressionService extends ChangeNotifier {
     required bool isWin,
     required bool isDraw,
     int? serverTotalTrophies,
+    int? serverTrophiesDelta,
+    bool updateTrophies = true,
   }) {
     final profile = ProfileService.instance.activeProfile;
     if (profile == null) {
@@ -213,30 +236,34 @@ class ProgressionService extends ChangeNotifier {
 
     bool shieldConsumed = false;
     int trophiesDelta = 0;
-    if (isDraw) {
-      trophiesDelta = 5;
-    } else if (isWin) {
-      profile.winStreak += 1;
-      trophiesDelta = ArenaModel.calculateTrophyDelta(
-        isWin: true,
-        isDraw: false,
-        winStreak: profile.winStreak,
-      );
-    } else {
-      // Loss: check if player owns `powerup_shield`
-      if (profile.unlockedItemIds.contains('powerup_shield')) {
-        profile.unlockedItemIds.remove('powerup_shield');
-        shieldConsumed = true;
-        trophiesDelta = 0; // Shield absorbs -12 loss and preserves winStreak!
+    if (updateTrophies) {
+      if (isDraw) {
+        trophiesDelta = serverTrophiesDelta ?? 5;
+      } else if (isWin) {
+        profile.winStreak += 1;
+        trophiesDelta =
+            serverTrophiesDelta ??
+            ArenaModel.calculateTrophyDelta(
+              isWin: true,
+              isDraw: false,
+              winStreak: profile.winStreak,
+            );
       } else {
-        profile.winStreak = 0;
-        trophiesDelta = -12;
+        // Loss: check if player owns `powerup_shield`
+        if (profile.unlockedItemIds.contains('powerup_shield')) {
+          profile.unlockedItemIds.remove('powerup_shield');
+          shieldConsumed = true;
+          trophiesDelta = 0; // Shield absorbs -12 loss and preserves winStreak!
+        } else {
+          profile.winStreak = 0;
+          trophiesDelta = serverTrophiesDelta ?? -12;
+        }
       }
-    }
 
-    profile.trophies = ArenaModel.clampTrophies(
-      serverTotalTrophies ?? (profile.trophies + trophiesDelta),
-    );
+      profile.trophies = ArenaModel.clampTrophies(
+        serverTotalTrophies ?? (profile.trophies + trophiesDelta),
+      );
+    }
 
     final arena = ArenaModel.fromTrophies(profile.trophies);
     final coinsEarned = arena.calculateMatchCoins(

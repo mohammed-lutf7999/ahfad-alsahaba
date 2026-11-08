@@ -10,6 +10,7 @@ import '../widgets/question_card.dart';
 import '../widgets/option_button.dart';
 import '../widgets/timer_widget.dart';
 import '../../data/services/achievement_service.dart';
+import '../../data/services/progression_service.dart';
 import '../../data/models/achievement_model.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -125,16 +126,19 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _completeQuiz() async {
+    final preSnapshot = ProgressionService.instance.captureSnapshot();
     await _gameController.completeLevel();
-    // Check if passed (this logic is duplicated from GameController, ideally we check gameController state)
-    // GameController doesn't expose 'isPassed' directly but completes level.
-    // However, completeLevel unlocks next level if passed.
-    // Let's assume positive sound for completion, result screen handles visual.
-    // Or we can check score.
-    if (_gameController.score > 0) { // Simple check, or just play success
-         SoundService().playLevelComplete();
+    if (_gameController.score > 0) {
+      SoundService().playLevelComplete();
     }
-    
+
+    if (mounted) {
+      await ProgressionService.instance.checkAndTriggerCelebrations(
+        context,
+        before: preSnapshot,
+      );
+    }
+
     if (mounted) {
       Navigator.pushReplacementNamed(context, AppRoutes.result, arguments: {
         'correctAnswers': _gameController.correctAnswers,
@@ -447,6 +451,43 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           SoundService().playHintUse();
                           setState(() {
                             _gameController.useFiftyFifty();
+                          });
+                        },
+                      ),
+                      _LinearLifeline(
+                        icon: Icons.lightbulb_rounded,
+                        label: 'بصيرة القائد',
+                        color: const Color(0xFFFFD700),
+                        isUsed: !ProgressionService.instance.hasItem('powerup_insight') ||
+                            _gameController.hiddenOptionIndices.isNotEmpty,
+                        onTap: () async {
+                          if (_gameController.isAnswered ||
+                              _gameController.hiddenOptionIndices.isNotEmpty) {
+                            return;
+                          }
+                          if (!ProgressionService.instance.hasItem('powerup_insight')) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text(
+                                  'يمكنك اقتناء «بصيرة القائد 💡» من سوق الفرسان 🪙',
+                                  textAlign: TextAlign.center,
+                                ),
+                                backgroundColor: AppTheme.primaryDark,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          final consumed = await ProgressionService.instance
+                              .consumeCommanderInsight();
+                          if (!consumed || !mounted) return;
+                          SoundService().playHintUse();
+                          setState(() {
+                            _gameController.useCommanderInsight();
                           });
                         },
                       ),

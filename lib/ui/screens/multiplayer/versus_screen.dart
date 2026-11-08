@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
+import '../../../data/models/player_level_model.dart';
+import '../../../data/models/arena_model.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/profile_service.dart';
+import '../../../data/services/progression_service.dart';
 import '../../widgets/avatar_selector.dart';
+import '../../widgets/animated_avatar_frame.dart';
+import '../../widgets/level_badge_widget.dart';
 import 'online_game_screen.dart';
 
 class VersusScreen extends StatefulWidget {
@@ -249,6 +254,17 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final myProfile = ProfileService.instance.activeProfile;
+    final myLevelInfo = ProgressionService.instance.currentLevelInfo;
+    final myArena = ProgressionService.instance.currentArena;
+
+    final oppScore = (_opponentData?['score'] as num?)?.toInt() ?? 0;
+    final oppTrophies = (_opponentData?['trophies'] as num?)?.toInt() ?? 1000;
+    final oppLevelInfo = PlayerLevelInfo.fromTotalScore(oppScore);
+    final oppArena = ArenaModel.fromTrophies(oppTrophies);
+    final oppFrame =
+        (_opponentData?['equipped_frame'] as String?) ?? oppLevelInfo.frameKey;
+    final oppWinStreak = (_opponentData?['win_streak'] as num?)?.toInt() ?? 0;
+    final oppTitle = _opponentData?['player_title'] as String?;
     
     return Scaffold(
       body: Container(
@@ -262,52 +278,89 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    Expanded(
                      child: Container(
                        width: double.infinity,
-                       color: Colors.blue.withOpacity(0.08),
-                       child: Column(
-                         mainAxisAlignment: MainAxisAlignment.center,
-                         children: [
-                           ProfileAvatar(
-                             avatarIndex: myProfile?.avatarIndex ?? 0, 
-                             size: 84,
-                           ),
-                           const SizedBox(height: 10),
-                           Padding(
-                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                             child: Text(
-                               myProfile?.name ?? 'أنا',
-                               style: const TextStyle(
-                                 color: Colors.white,
-                                 fontSize: 22,
-                                 fontWeight: FontWeight.bold,
-                                 fontFamily: 'Cairo',
+                       color: Colors.blue.withValues(alpha: 0.08),
+                       child: Center(
+                         child: SingleChildScrollView(
+                           padding: const EdgeInsets.symmetric(vertical: 8),
+                           child: Column(
+                             mainAxisAlignment: MainAxisAlignment.center,
+                             children: [
+                               AnimatedAvatarFrame(
+                                 size: 88,
+                                 frameKey:
+                                     myProfile?.equippedFrame ??
+                                     myLevelInfo.frameKey,
+                                 winStreak: myProfile?.winStreak ?? 0,
+                                 child: ProfileAvatar(
+                                   avatarIndex: myProfile?.avatarIndex ?? 0,
+                                   size: 76,
+                                 ),
                                ),
-                               maxLines: 1,
-                               overflow: TextOverflow.ellipsis,
-                             ),
+                               const SizedBox(height: 8),
+                               Padding(
+                                 padding: const EdgeInsets.symmetric(
+                                   horizontal: 24,
+                                 ),
+                                 child: Text(
+                                   myProfile?.name ?? 'أنا',
+                                   style: const TextStyle(
+                                     color: Colors.white,
+                                     fontSize: 20,
+                                     fontWeight: FontWeight.bold,
+                                     fontFamily: 'Cairo',
+                                   ),
+                                   maxLines: 1,
+                                   overflow: TextOverflow.ellipsis,
+                                 ),
+                               ),
+                               const SizedBox(height: 4),
+                               LevelBadgeWidget(
+                                 levelInfo: myLevelInfo,
+                                 isCompact: true,
+                               ),
+                               const SizedBox(height: 4),
+                               Text(
+                                 'النقاط: ${myProfile?.totalScore ?? 0}  •  🏆 ${myProfile?.trophies ?? 1000} (${myArena.name})',
+                                 style: const TextStyle(
+                                   color: Colors.white70,
+                                   fontSize: 12,
+                                   fontFamily: 'Cairo',
+                                 ),
+                               ),
+                               const SizedBox(height: 6),
+                               // Ready indicator
+                               Container(
+                                 padding: const EdgeInsets.symmetric(
+                                   horizontal: 12,
+                                   vertical: 4,
+                                 ),
+                                 decoration: BoxDecoration(
+                                   color: Colors.green.withValues(alpha: 0.3),
+                                   borderRadius: BorderRadius.circular(12),
+                                   border: Border.all(color: Colors.green),
+                                 ),
+                                 child: const Row(
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                     Icon(
+                                       Icons.check_circle,
+                                       color: Colors.green,
+                                       size: 16,
+                                     ),
+                                     SizedBox(width: 4),
+                                     Text(
+                                       'جاهز',
+                                       style: TextStyle(
+                                         color: Colors.green,
+                                         fontFamily: 'Cairo',
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                             ],
                            ),
-                           Text(
-                             'النقاط: ${myProfile?.totalScore ?? 0}',
-                             style: const TextStyle(color: Colors.white70, fontSize: 13),
-                           ),
-                           const SizedBox(height: 8),
-                           // Ready indicator
-                           Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                             decoration: BoxDecoration(
-                               color: Colors.green.withOpacity(0.3),
-                               borderRadius: BorderRadius.circular(12),
-                               border: Border.all(color: Colors.green),
-                             ),
-                             child: const Row(
-                               mainAxisSize: MainAxisSize.min,
-                               children: [
-                                 Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                 SizedBox(width: 4),
-                                 Text('جاهز', style: TextStyle(color: Colors.green, fontFamily: 'Cairo')),
-                               ],
-                             ),
-                           ),
-                         ],
+                         ),
                        ),
                      ),
                    ),
@@ -317,7 +370,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                      width: double.infinity,
                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                      decoration: BoxDecoration(
-                       color: Colors.black.withOpacity(0.25),
+                       color: Colors.black.withValues(alpha: 0.25),
                        border: const Border.symmetric(
                          horizontal: BorderSide(color: Colors.white12, width: 1),
                        ),
@@ -333,7 +386,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                shape: BoxShape.circle,
                                gradient: AppTheme.goldGradient,
                                boxShadow: [
-                                 BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15)
+                                 BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15)
                                ],
                              ),
                              child: const Text(
@@ -379,80 +432,135 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    Expanded(
                      child: Container(
                        width: double.infinity,
-                       color: Colors.red.withOpacity(0.08),
+                       color: Colors.red.withValues(alpha: 0.08),
                        child: Center(
                          child: _isLoading 
                            ? const CircularProgressIndicator(color: Colors.white)
-                           : Column(
-                               mainAxisAlignment: MainAxisAlignment.center,
-                               children: [
-                                 ProfileAvatar(
-                                   avatarIndex: (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0, 
-                                   size: 84,
-                                 ),
-                                 const SizedBox(height: 10),
-                                 Padding(
-                                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                                   child: Text(
-                                     _opponentData?['display_name'] ?? 'الخصم',
+                           : SingleChildScrollView(
+                               padding: const EdgeInsets.symmetric(vertical: 8),
+                               child: Column(
+                                 mainAxisAlignment: MainAxisAlignment.center,
+                                 children: [
+                                   AnimatedAvatarFrame(
+                                     size: 88,
+                                     frameKey: oppFrame,
+                                     winStreak: oppWinStreak,
+                                     child: ProfileAvatar(
+                                       avatarIndex:
+                                           (_opponentData?['avatar_index']
+                                                   as num?)
+                                               ?.toInt() ??
+                                           0,
+                                       size: 76,
+                                     ),
+                                   ),
+                                   const SizedBox(height: 8),
+                                   Padding(
+                                     padding: const EdgeInsets.symmetric(
+                                       horizontal: 24,
+                                     ),
+                                     child: Text(
+                                       _opponentData?['display_name'] ?? 'الخصم',
+                                       style: const TextStyle(
+                                         color: Colors.white,
+                                         fontSize: 20,
+                                         fontWeight: FontWeight.bold,
+                                         fontFamily: 'Cairo',
+                                       ),
+                                       maxLines: 1,
+                                       overflow: TextOverflow.ellipsis,
+                                     ),
+                                   ),
+                                   const SizedBox(height: 4),
+                                   LevelBadgeWidget(
+                                     levelInfo: oppLevelInfo,
+                                     isCompact: true,
+                                     customTitle: oppTitle,
+                                   ),
+                                   const SizedBox(height: 4),
+                                   Text(
+                                     'النقاط: $oppScore  •  🏆 $oppTrophies (${oppArena.name})',
                                      style: const TextStyle(
-                                       color: Colors.white,
-                                       fontSize: 22,
-                                       fontWeight: FontWeight.bold,
+                                       color: Colors.white70,
+                                       fontSize: 12,
                                        fontFamily: 'Cairo',
                                      ),
-                                     maxLines: 1,
-                                     overflow: TextOverflow.ellipsis,
                                    ),
-                                 ),
-                                 Text(
-                                   'النقاط: ${_opponentData?['score'] ?? 0}',
-                                   style: const TextStyle(color: Colors.white70, fontSize: 13),
-                                 ),
-                                 const SizedBox(height: 8),
-                                 // Opponent ready indicator
-                                 if (_waitingForOpponent && !_bothReady)
-                                   Container(
-                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                     decoration: BoxDecoration(
-                                       color: Colors.orange.withOpacity(0.3),
-                                       borderRadius: BorderRadius.circular(12),
-                                       border: Border.all(color: Colors.orange),
-                                     ),
-                                     child: const Row(
-                                       mainAxisSize: MainAxisSize.min,
-                                       children: [
-                                         SizedBox(
-                                           width: 14,
-                                           height: 14,
-                                           child: CircularProgressIndicator(
-                                             strokeWidth: 2,
-                                             color: Colors.orange,
-                                           ),
+                                   const SizedBox(height: 6),
+                                   // Opponent ready indicator
+                                   if (_waitingForOpponent && !_bothReady)
+                                     Container(
+                                       padding: const EdgeInsets.symmetric(
+                                         horizontal: 12,
+                                         vertical: 4,
+                                       ),
+                                       decoration: BoxDecoration(
+                                         color: Colors.orange.withValues(
+                                           alpha: 0.3,
                                          ),
-                                         SizedBox(width: 6),
-                                         Text('في الانتظار...', style: TextStyle(color: Colors.orange, fontFamily: 'Cairo')),
-                                       ],
+                                         borderRadius: BorderRadius.circular(12),
+                                         border: Border.all(
+                                           color: Colors.orange,
+                                         ),
+                                       ),
+                                       child: const Row(
+                                         mainAxisSize: MainAxisSize.min,
+                                         children: [
+                                           SizedBox(
+                                             width: 14,
+                                             height: 14,
+                                             child: CircularProgressIndicator(
+                                               strokeWidth: 2,
+                                               color: Colors.orange,
+                                             ),
+                                           ),
+                                           SizedBox(width: 6),
+                                           Text(
+                                             'في الانتظار...',
+                                             style: TextStyle(
+                                               color: Colors.orange,
+                                               fontFamily: 'Cairo',
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                     )
+                                   else if (_bothReady)
+                                     Container(
+                                       padding: const EdgeInsets.symmetric(
+                                         horizontal: 12,
+                                         vertical: 4,
+                                       ),
+                                       decoration: BoxDecoration(
+                                         color: Colors.green.withValues(
+                                           alpha: 0.3,
+                                         ),
+                                         borderRadius: BorderRadius.circular(12),
+                                         border: Border.all(
+                                           color: Colors.green,
+                                         ),
+                                       ),
+                                       child: const Row(
+                                         mainAxisSize: MainAxisSize.min,
+                                         children: [
+                                           Icon(
+                                             Icons.check_circle,
+                                             color: Colors.green,
+                                             size: 16,
+                                           ),
+                                           SizedBox(width: 4),
+                                           Text(
+                                             'جاهز',
+                                             style: TextStyle(
+                                               color: Colors.green,
+                                               fontFamily: 'Cairo',
+                                             ),
+                                           ),
+                                         ],
+                                       ),
                                      ),
-                                   )
-                                 else if (_bothReady)
-                                   Container(
-                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                     decoration: BoxDecoration(
-                                       color: Colors.green.withOpacity(0.3),
-                                       borderRadius: BorderRadius.circular(12),
-                                       border: Border.all(color: Colors.green),
-                                     ),
-                                     child: const Row(
-                                       mainAxisSize: MainAxisSize.min,
-                                       children: [
-                                         Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                         SizedBox(width: 4),
-                                         Text('جاهز', style: TextStyle(color: Colors.green, fontFamily: 'Cairo')),
-                                       ],
-                                     ),
-                                   ),
-                               ],
+                                 ],
+                               ),
                              ),
                        ),
                      ),
