@@ -13,6 +13,10 @@ import '../../../data/models/achievement_model.dart';
 import '../../../data/models/question_model.dart';
 import '../../widgets/avatar_selector.dart';
 import '../../widgets/animated_avatar_frame.dart';
+import '../../dialogs/app_dialogs.dart';
+import 'widgets/game_match_result_dialog.dart';
+import 'widgets/game_tactical_powerups_bar.dart';
+import 'widgets/game_reactions_ribbon.dart';
 
 class OnlineGameScreen extends StatefulWidget {
   final String matchId;
@@ -468,178 +472,20 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     final isWinner = winnerId != null ? (winnerId == myId) : (_myScore > _opponentScore);
     final isDraw = (winnerId == null && _myScore == _opponentScore) || (!isWinner && _myScore == _opponentScore);
     final effectiveDelta = trophiesDelta ?? (isDraw ? 5 : (isWinner ? 25 : -12));
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.primaryDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('انتهت المباراة!', style: TextStyle(color: Colors.white), textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Trophy or Result Icon
-            Icon(
-              isDraw ? Icons.handshake : (isWinner ? Icons.emoji_events : Icons.sentiment_dissatisfied),
-              size: 60,
-              color: isDraw ? Colors.blue : (isWinner ? AppTheme.accentColor : Colors.red),
-            ),
-            const SizedBox(height: 16),
-            
-            // Result text
-            Text(
-              isDraw ? 'تعادل!' : (isWinner ? '🎉 أنت الفائز!' : 'حظاً أوفر..'),
-              style: TextStyle(
-                color: isDraw ? Colors.blue : (isWinner ? Colors.green : Colors.red),
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Cairo',
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: (effectiveDelta >= 0 ? Colors.amber : Colors.redAccent).withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Text(
-                    '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} 🏆 الكؤوس${totalTrophies != null ? " ($totalTrophies)" : ""}',
-                    style: TextStyle(
-                      color: effectiveDelta >= 0 ? Colors.amberAccent : Colors.redAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ),
-                if (coinsEarned > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFFFD700).withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Text(
-                      '+$coinsEarned 🪙 دنانير الفتح',
-                      style: const TextStyle(
-                        color: Color(0xFFFFD700),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (shieldConsumed || xpBannerConsumed) ...[
-              const SizedBox(height: 8),
-              Text(
-                shieldConsumed
-                    ? '🛡️ درع الحماية حمى كؤوسك وسلسلة انتصاراتك!'
-                    : '🚩 راية المضاعفة ضاعفت خبرتك المكتسبة (2x)!',
-                style: const TextStyle(
-                  color: Colors.cyanAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Cairo',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            const SizedBox(height: 16),
-            
-            // Scores comparison
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // My Score
-                  Column(
-                    children: [
-                      const Text('أنت', style: TextStyle(color: Colors.white70)),
-                      Text(
-                        '$_myScore',
-                        style: const TextStyle(
-                          color: AppTheme.accentColor,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  Container(
-                    width: 2,
-                    height: 50,
-                    color: Colors.white24,
-                  ),
-                  
-                  // Opponent Score
-                  Column(
-                    children: [
-                      Text(widget.opponentName, style: const TextStyle(color: Colors.white70)),
-                      Text(
-                        '$_opponentScore',
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: AppTheme.primaryDark,
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              child: const Text(
-                'العودة للرئيسية',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Cairo',
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+
+    GameMatchResultDialog.show(
+      context,
+      isWinner: isWinner,
+      isDraw: isDraw,
+      effectiveDelta: effectiveDelta,
+      totalTrophies: totalTrophies,
+      coinsEarned: coinsEarned,
+      shieldConsumed: shieldConsumed,
+      xpBannerConsumed: xpBannerConsumed,
+      myScore: _myScore,
+      opponentScore: _opponentScore,
+      opponentName: widget.opponentName,
+      onDismiss: () => Navigator.of(context).popUntil((route) => route.isFirst),
     );
   }
 
@@ -689,7 +535,22 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     final question = _questions[_currentQuestionIndex];
     final myProfile = ProfileService.instance.activeProfile;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        AppDialogs.showExitConfirmationDialog(
+          context,
+          title: 'الانسحاب من المباراة؟',
+          message: 'الخروج أثناء المباراة المباشرة سيؤدي إلى خسارتك النقاط والكؤوس. هل تريد الخروج حقاً؟',
+          confirmLabel: 'تأكيد الانسحاب',
+          cancelLabel: 'متابعة القتال',
+          onConfirm: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        );
+      },
+      child: Scaffold(
       floatingActionButton: null,
       body: Container(
         decoration: BoxDecoration(
@@ -838,9 +699,22 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                         children: [
                           _buildQuestionCard(question.questionText),
                           const SizedBox(height: 10),
-                          _buildTacticalPowerUpsBar(question),
+                          GameTacticalPowerUpsBar(
+                            question: question,
+                            isAnswered: _isAnswered,
+                            hiddenOptionIndices: _hiddenOptionIndices,
+                            random: _rnd,
+                            onInsightUsed: (newHidden) {
+                              setState(() {
+                                _hiddenOptionIndices.addAll(newHidden);
+                              });
+                            },
+                          ),
                           const SizedBox(height: 8),
-                          if (!widget.isBot) _buildHorizontalReactionRibbon(),
+                          if (!widget.isBot)
+                            GameReactionsRibbon(
+                              onReactionSelected: _sendReaction,
+                            ),
                           const SizedBox(height: 10),
                           ...List.generate(question.options.length, (i) {
                              if (_hiddenOptionIndices.contains(i)) {
@@ -883,159 +757,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
           ),
         ),
       ),
+      ),
     );
   }
   
-  Widget _buildTacticalPowerUpsBar(Question question) {
-    final hasInsight = ProgressionService.instance.hasItem('powerup_insight');
-    final hasShield = ProgressionService.instance.hasItem('powerup_shield');
-    final hasXpBanner = ProgressionService.instance.hasItem('powerup_xp_banner');
-    final isInsightDisabled =
-        _isAnswered || !hasInsight || _hiddenOptionIndices.isNotEmpty;
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: isInsightDisabled
-              ? null
-              : () async {
-                  final consumed = await ProgressionService.instance
-                      .consumeCommanderInsight();
-                  if (!consumed || !mounted) return;
-                  SoundService().playHintUse();
-                  final wrongIndices = <int>[];
-                  for (int i = 0; i < question.options.length; i++) {
-                    if (i != question.correctAnswerIndex) {
-                      wrongIndices.add(i);
-                    }
-                  }
-                  wrongIndices.shuffle(_rnd);
-                  final toHide = wrongIndices.length >= 2
-                      ? 2
-                      : (wrongIndices.length == 1 ? 1 : 0);
-                  setState(() {
-                    for (int i = 0; i < toHide; i++) {
-                      _hiddenOptionIndices.add(wrongIndices[i]);
-                    }
-                  });
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isInsightDisabled
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : const Color(0xFFFFD700).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isInsightDisabled
-                    ? Colors.white24
-                    : const Color(0xFFFFD700),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lightbulb_rounded,
-                  size: 16,
-                  color: isInsightDisabled
-                      ? Colors.white38
-                      : const Color(0xFFFFD700),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  hasInsight
-                      ? (_hiddenOptionIndices.isNotEmpty
-                            ? 'تم تفعيل بصيرة القائد'
-                            : 'بصيرة القائد 💡 (حذف إجابتين)')
-                      : 'بصيرة القائد 💡 (غير متوفرة)',
-                  style: TextStyle(
-                    color: isInsightDisabled
-                        ? Colors.white38
-                        : const Color(0xFFFFD700),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Cairo',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (hasShield)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.cyanAccent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.cyanAccent.withValues(alpha: 0.4),
-              ),
-            ),
-            child: const Text(
-              '🛡️ درع الحماية نشط',
-              style: TextStyle(
-                color: Colors.cyanAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Cairo',
-              ),
-            ),
-          ),
-        if (hasXpBanner)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.greenAccent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.greenAccent.withValues(alpha: 0.4),
-              ),
-            ),
-            child: const Text(
-              '🚩 راية المضاعفة 2x',
-              style: TextStyle(
-                color: Colors.greenAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Cairo',
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildHorizontalReactionRibbon() {
-    final emojis = ['🔥', '👏', '🎯', '🤝', '😂'];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: emojis.map((emoji) {
-          return InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => _sendReaction(emoji),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: Text(emoji, style: const TextStyle(fontSize: 22)),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   Widget _buildQuestionCard(String text) {
     return Container(
       width: double.infinity,
