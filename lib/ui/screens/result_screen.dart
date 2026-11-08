@@ -12,6 +12,7 @@ import '../../data/models/question_model.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/services/achievement_service.dart';
 import '../widgets/achievement_popup.dart';
+import '../widgets/particles/unified_particle_system.dart';
 
 class ResultScreen extends StatefulWidget {
   final int correctAnswers;
@@ -210,19 +211,11 @@ class _ResultScreenState extends State<ResultScreen>
               children: [
                 // Confetti animation
                 if (isPassed)
-              AnimatedBuilder(
-                animation: _confettiController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: ConfettiPainter(
-                      particles: _particles,
-                      progress: _confettiController.value,
-                      screenSize: MediaQuery.of(context).size,
-                    ),
-                    size: MediaQuery.of(context).size,
-                  );
-                },
-              ),
+                  CelebrationConfettiOverlay(
+                    animation: _confettiController,
+                    particles: _particles,
+                    screenSize: MediaQuery.of(context).size,
+                  ),
 
             SafeArea(
               child: Padding(
@@ -1084,37 +1077,4 @@ Future<void> _captureAndShare() async {
     
     return buffer.toString();
   }
-}
-
-// Confetti classes
-class ConfettiParticle {
-  double x, y, speed, size, rotation, rotationSpeed;
-  Color color;
-  int shape;
-  ConfettiParticle({required this.x, required this.y, required this.speed, required this.size, required this.color, required this.rotation, required this.rotationSpeed, required this.shape});
-}
-
-class ConfettiPainter extends CustomPainter {
-  final List<ConfettiParticle> particles;
-  final double progress;
-  final Size screenSize;
-  ConfettiPainter({required this.particles, required this.progress, required this.screenSize});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var p in particles) {
-      final x = p.x * screenSize.width;
-      final y = (p.y + progress * p.speed * 3) % 1.2 * screenSize.height - screenSize.height * 0.1;
-      final paint = Paint()..color = p.color..style = PaintingStyle.fill;
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(p.rotation + progress * p.rotationSpeed * math.pi * 4);
-      if (p.shape == 0) canvas.drawCircle(Offset.zero, p.size / 2, paint);
-      else if (p.shape == 1) canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6), paint);
-      else { final path = Path(); for (int i = 0; i < 5; i++) { final a = (i * 4 * math.pi / 5) - math.pi / 2; if (i == 0) path.moveTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2); else path.lineTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2); } path.close(); canvas.drawPath(path, paint); }
-      canvas.restore();
-    }
-  }
-  @override
-  bool shouldRepaint(ConfettiPainter oldDelegate) => true;
 }

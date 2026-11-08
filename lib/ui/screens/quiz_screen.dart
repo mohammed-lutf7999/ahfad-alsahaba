@@ -10,6 +10,7 @@ import '../../data/local/shared_prefs_service.dart';
 import '../widgets/question_card.dart';
 import '../widgets/option_button.dart';
 import '../widgets/timer_widget.dart';
+import '../dialogs/app_dialogs.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/progression_service.dart';
 import '../../data/models/achievement_model.dart';
@@ -507,79 +508,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _showExitDialog() {
-    SoundService().playAlert(); // Alert sound on dialog open
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: "Dismiss",
-      barrierColor: Colors.black.withOpacity(0.8),
-      transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (ctx, anim1, anim2) {
-        return Center(
-          child: ScaleTransition(
-            scale: CurvedAnimation(parent: anim1, curve: Curves.elasticOut),
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.cardGradient,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppTheme.accentColor, width: 2),
-                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 30, spreadRadius: 5)],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80, height: 80,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.errorColor.withOpacity(0.1), border: Border.all(color: AppTheme.errorColor.withOpacity(0.3), width: 2)),
-                      child: const Icon(Icons.logout_rounded, size: 40, color: AppTheme.errorColor),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text("هل تود الانسحاب؟", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryDark)),
-                    const SizedBox(height: 10),
-                    const Text("خروجك الآن يعني فقدان تقدمك في هذا المستوى. هل أنت متأكد من قرارك؟", textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: AppTheme.textSecondary, height: 1.5)),
-                    const SizedBox(height: 25),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              SoundService().playClick();
-                              Navigator.pop(context);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(color: Colors.transparent, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.primaryColor, width: 2)),
-                              child: const Center(child: Text("تراجع", style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16))),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () { 
-                              SoundService().playClick();
-                              Navigator.pop(context); 
-                              Navigator.pop(context); 
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppTheme.errorColor, Color(0xFFE57373)]), borderRadius: BorderRadius.circular(14), boxShadow: [BoxShadow(color: AppTheme.errorColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]),
-                              child: const Center(child: Text("تأكيد الخروج", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
+    SoundService().playAlert();
+    AppDialogs.showExitConfirmationDialog(
+      context,
+      title: 'هل تود الانسحاب؟',
+      message: 'خروجك الآن يعني فقدان تقدمك في هذا المستوى. هل أنت متأكد من قرارك؟',
+      confirmLabel: 'تأكيد الخروج',
+      cancelLabel: 'تراجع ومتابعة',
+      onConfirm: () {
+        Navigator.pop(context);
       },
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_constants.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/network_error_formatter.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import 'versus_screen.dart';
@@ -50,19 +51,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
   }
 
   String _formatErrorMessage(String rawError) {
-    if (rawError.contains('SocketException') || 
-        rawError.contains('Failed host lookup') || 
-        rawError.contains('errno = 7') ||
-        rawError.contains('ClientException')) {
-      return 'تعذر الاتصال بالخادم السحابي.\nيرجى التحقق من اتصال الإنترنت.';
-    }
-    if (rawError.contains('timedOut') || rawError.contains('Timeout') || rawError.contains('RealtimeSubscribeException')) {
-      return 'انتهت مهلة انتظار الخادم بسبب بطء الشبكة.\nيمكنك المحاولة مجدداً أو اللعب ضد الذكاء الاصطناعي.';
-    }
-    if (rawError.contains('User not logged in')) {
-      return 'يجب تسجيل الدخول أولاً لتحدي اللاعبين.';
-    }
-    return 'تعذر الاتصال المباشر حالياً.\nيمكنك التحدي ضد الذكاء الاصطناعي.';
+    return NetworkErrorFormatter.format(rawError);
   }
 
   Future<void> _startMatchmaking() async {

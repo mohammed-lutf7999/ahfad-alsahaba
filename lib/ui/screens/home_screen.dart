@@ -25,6 +25,7 @@ import 'global_ranking_screen.dart';
 import 'glory/glory_road_screen.dart';
 import 'store/knights_store_screen.dart';
 import 'multiplayer/lobby_screen.dart';
+import '../widgets/particles/unified_particle_system.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -851,7 +852,7 @@ class _LogoWithEffectsState extends State<_LogoWithEffects> with TickerProviderS
 
               // 2. Gold Particles (Falling/Floating)
               Positioned.fill(
-                child: _ParticleSystem(controller: _particleController),
+                child: AmbientGoldParticles(animation: _particleController),
               ),
 
               // 3. Main Logo with Breathing Glow
@@ -964,53 +965,6 @@ class _SolarRaysPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ParticleSystem extends StatelessWidget {
-  final AnimationController controller;
-  const _ParticleSystem({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: _ParticlePainter(progress: controller.value),
-        );
-      },
-    );
-  }
-}
-
-class _ParticlePainter extends CustomPainter {
-  final double progress;
-  _ParticlePainter({required this.progress});
-
-  // Static random seeds for 20 particles (x, y, speed, size)
-  static final List<List<double>> _particles = List.generate(20, (index) {
-     final r = math.Random(index);
-     return [r.nextDouble(), r.nextDouble(), r.nextDouble() * 0.5 + 0.5, r.nextDouble() * 3 + 1];
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFFFD700);
-    
-    for (var p in _particles) {
-      final x = p[0] * size.width;
-      // y moves down with progress
-      double y = (p[1] + progress) % 1.0 * size.height;
-      
-      final opacity = 1.0 - ((y - size.height/2).abs() / (size.height/2)); // Fade edges
-      
-      paint.color = const Color(0xFFFFD700).withValues(alpha: opacity.clamp(0.0, 1.0));
-      canvas.drawCircle(Offset(x, y), p[3], paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ParticlePainter oldDelegate) => oldDelegate.progress != progress;
 }
 
 class _StartGameButton extends StatefulWidget {
