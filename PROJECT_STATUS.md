@@ -3,7 +3,8 @@
 > **إصدار التطبيق الحالي:** `1.0.8` (رقم البناء `versionCode`: `9`)  
 > **حزمة التطبيق (Package ID):** `com.ahfad.alsahaba.battle`  
 > **كبير المهندسين والمسؤول:** م. محمد لطف  
-> **ملف الإطلاق الجاهز للرفع:** `build/app/outputs/bundle/release/app-release.aab`
+> **ملف المتجر الجاهز للرفع (AAB):** `build/app/outputs/bundle/release/app-release.aab` (48.9 MB)  
+> **ملف التجربة المباشر (APK):** `build/app/outputs/flutter-apk/app-release.apk` (60.9 MB)  
 
 ---
 
@@ -44,6 +45,9 @@
 
 | العنصر | الحالة والتفاصيل |
 | :--- | :--- |
-| **مشروع Supabase** | `khatzzpqxaiwuoodgcst` — جميع الدوال الأربع (`find_or_create_match`, `confirm_ready`, `submit_answer`, `finish_match`) مفعلة ومختبرة حياً. |
-| **حالة فحص الكود (`flutter analyze`)** | ✅ `0 errors` (خالٍ تماماً من أي خطأ برمجي). |
+| **مشروع Supabase** | `khatzzpqxaiwuoodgcst` — جميع الدوال والمشغلات (`009_glory_and_store.sql` و `008_multiplayer`) مفعلة ومختبرة حياً 100%. |
+| **حالة فحص الكود (`flutter analyze`)** | ✅ `0 errors, 0 warnings` (خالٍ تماماً من أي خطأ أو تحذير برمجي). |
+| **حزمة الاختبارات (`flutter test`)** | ✅ `27/27` اختباراً ناجحاً بنسبة 100% تغطي الميكانيكا الرياضية، الأطر، المتجر، والحماية التنافسية. |
+| **ملف حزمة المتجر (AAB)** | ✅ `build/app/outputs/bundle/release/app-release.aab` (`48.9 MB`) — موقع بمفتاح الإنتاج وجاهز للرفع الفوري. |
+| **ملف التثبيت للتجربة (APK)** | ✅ `build/app/outputs/flutter-apk/app-release.apk` (`60.9 MB`) — جاهز للتثبيت والتجربة الميدانية. |
 | **دستور الوكيل الذكي** | موثق ومفعل تلقائياً في `AGENT.md` و `AGENTS.md`. |
