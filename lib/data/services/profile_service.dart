@@ -340,6 +340,11 @@ class ProfileService extends ChangeNotifier {
     if (local.equippedFrame != 'frame_wood' && cloud.equippedFrame == 'frame_wood') {
       cloud.equippedFrame = local.equippedFrame;
     }
+    if (local.equippedTitle != null &&
+        local.equippedTitle!.isNotEmpty &&
+        (cloud.equippedTitle == null || cloud.equippedTitle!.isEmpty)) {
+      cloud.equippedTitle = local.equippedTitle;
+    }
     for (final itemId in local.unlockedItemIds) {
       if (!cloud.unlockedItemIds.contains(itemId)) {
         cloud.unlockedItemIds.add(itemId);

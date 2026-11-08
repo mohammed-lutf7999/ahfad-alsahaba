@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../core/app_theme.dart';
+import '../../../core/theme/app_custom_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/models/player_level_model.dart';
 import '../../../data/models/arena_model.dart';
@@ -268,7 +269,9 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
     
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
            child: Stack(
              children: [
@@ -316,6 +319,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                const SizedBox(height: 4),
                                LevelBadgeWidget(
                                  levelInfo: myLevelInfo,
+                                 customTitle: myProfile?.effectiveTitle,
                                  isCompact: true,
                                ),
                                const SizedBox(height: 4),

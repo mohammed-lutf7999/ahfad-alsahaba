@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme/app_custom_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/question_service.dart';
@@ -11,6 +12,7 @@ import '../../../data/services/achievement_service.dart';
 import '../../../data/models/achievement_model.dart';
 import '../../../data/models/question_model.dart';
 import '../../widgets/avatar_selector.dart';
+import '../../widgets/animated_avatar_frame.dart';
 
 class OnlineGameScreen extends StatefulWidget {
   final String matchId;
@@ -690,7 +692,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     return Scaffold(
       floatingActionButton: null,
       body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
           child: Stack(
             children: [
@@ -707,7 +711,12 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                          Expanded(
                            child: Row(
                              children: [
-                               ProfileAvatar(avatarIndex: myProfile?.avatarIndex ?? 0, size: 36),
+                               AnimatedAvatarFrame(
+                                 size: 42,
+                                 frameKey: myProfile?.equippedFrame ?? 'frame_wood',
+                                 winStreak: myProfile?.winStreak ?? 0,
+                                 child: ProfileAvatar(avatarIndex: myProfile?.avatarIndex ?? 0, size: 34),
+                               ),
                                const SizedBox(width: 6),
                                Expanded(
                                  child: Column(

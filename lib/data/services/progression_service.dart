@@ -174,6 +174,15 @@ class ProgressionService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Equips an Honor Title by [title] (or `null` to revert to default level tier title).
+  Future<void> equipTitle(String? title) async {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return;
+    profile.equippedTitle = title;
+    await ProfileService.instance.saveActiveProfileAndSync();
+    notifyListeners();
+  }
+
   /// Checks if the active profile currently owns a specific item or power-up.
   bool hasItem(String itemId) {
     final profile = ProfileService.instance.activeProfile;
@@ -261,7 +270,9 @@ class ProgressionService extends ChangeNotifier {
       }
 
       profile.trophies = ArenaModel.clampTrophies(
-        serverTotalTrophies ?? (profile.trophies + trophiesDelta),
+        shieldConsumed
+            ? profile.trophies
+            : (serverTotalTrophies ?? (profile.trophies + trophiesDelta)),
       );
     }
 
@@ -325,6 +336,8 @@ class ProgressionService extends ChangeNotifier {
       profile.equippedTheme = item.assetKey;
     } else if (item.category == StoreItemCategory.frame) {
       profile.equippedFrame = item.assetKey;
+    } else if (item.category == StoreItemCategory.title) {
+      profile.equippedTitle = item.assetKey;
     }
 
     await ProfileService.instance.saveActiveProfileAndSync();

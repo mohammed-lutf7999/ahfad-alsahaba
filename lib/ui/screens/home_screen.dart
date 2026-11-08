@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import '../../core/app_theme.dart';
+import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import 'dart:math' as math;
 import '../../data/local/shared_prefs_service.dart';
@@ -226,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen>
                   const SizedBox(width: 6),
                   LevelBadgeWidget(
                     levelInfo: profile.levelInfo,
+                    customTitle: profile.effectiveTitle,
                     isCompact: true,
                   ),
                 ],
@@ -284,7 +286,9 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {

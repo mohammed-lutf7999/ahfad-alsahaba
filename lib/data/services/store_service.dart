@@ -52,6 +52,7 @@ class StoreService extends ChangeNotifier {
       case StoreItemCategory.frame:
         return profile.equippedFrame == item.assetKey;
       case StoreItemCategory.title:
+        return profile.effectiveTitle == item.assetKey;
       case StoreItemCategory.powerup:
         return profile.unlockedItemIds.contains(item.id);
     }
@@ -134,20 +135,18 @@ class StoreService extends ChangeNotifier {
           message: '«${item.title}» مفعّل وجاهز في خزانتك للمباراة القادمة! ⚡',
         );
       } else {
+        await ProgressionService.instance.equipTitle(item.assetKey);
+        _triggerFeedback(isPurchase: false);
+        notifyListeners();
         return (
           success: true,
-          message: '«${item.title}» مفعّل في أوسمتك الشرفية! 👑',
+          message: 'تم تفعيل «${item.title}» في أوسمتك الشرفية! 👑',
         );
       }
     }
 
-    // 2. Otherwise, validate and purchase via ProgressionService + Cloud RPC
-    final result = await ProgressionService.instance.purchaseStoreItem(item);
-    if (!result.success) {
-      return result;
-    }
-
-    // Sync atomic purchase with Supabase `purchase_store_item` RPC if authenticated
+    // 2. If authenticated online, execute atomic `purchase_store_item` RPC first
+    // before local save & sync so server and local balances never conflict.
     try {
       final client = Supabase.instance.client;
       final userId = client.auth.currentUser?.id;
@@ -162,6 +161,12 @@ class StoreService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('StoreService: Cloud RPC sync notice: $e');
+    }
+
+    // 3. Validate, deduct, equip, and sync via ProgressionService
+    final result = await ProgressionService.instance.purchaseStoreItem(item);
+    if (!result.success) {
+      return result;
     }
 
     _triggerFeedback(isPurchase: true);
@@ -185,3 +190,4 @@ class StoreService extends ChangeNotifier {
     } catch (_) {}
   }
 }
+

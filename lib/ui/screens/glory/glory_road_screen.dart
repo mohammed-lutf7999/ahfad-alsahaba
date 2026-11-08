@@ -177,6 +177,7 @@ class _GloryRoadScreenState extends State<GloryRoadScreen>
               customTheme: customTheme,
               levelInfo: levelInfo,
               equippedFrame: equippedFrame,
+              customTitle: profile?.effectiveTitle,
               coins: coins,
               winStreak: winStreak,
               playerName: profile?.name ?? 'فارس المعرفة',
@@ -199,6 +200,7 @@ class _GloryRoadScreenState extends State<GloryRoadScreen>
     required AppCustomTheme customTheme,
     required PlayerLevelInfo levelInfo,
     required String equippedFrame,
+    String? customTitle,
     required int coins,
     required int winStreak,
     required String playerName,
@@ -262,6 +264,7 @@ class _GloryRoadScreenState extends State<GloryRoadScreen>
                         const SizedBox(height: 4),
                         LevelBadgeWidget(
                           levelInfo: levelInfo,
+                          customTitle: customTitle,
                           isCompact: true,
                         ),
                       ],

@@ -38,6 +38,7 @@ class PlayerProfile {
   int winStreak;
   String equippedTheme;
   String equippedFrame;
+  String? equippedTitle;
   List<String> unlockedItemIds;
 
   PlayerProfile({
@@ -62,6 +63,7 @@ class PlayerProfile {
     this.winStreak = 0,
     this.equippedTheme = 'andalusian_gold',
     this.equippedFrame = 'frame_wood',
+    this.equippedTitle,
     List<String>? unlockedItemIds,
   })  : createdAt = createdAt ?? DateTime.now(),
         lastPlayedAt = lastPlayedAt ?? DateTime.now(),
@@ -74,6 +76,12 @@ class PlayerProfile {
 
   /// Computed 100-Level Mastery Info from [totalScore].
   PlayerLevelInfo get levelInfo => PlayerLevelInfo.fromTotalScore(totalScore);
+
+  /// Active display title: returns the equipped Honor Title if set, otherwise the historical tier title for [levelInfo].
+  String get effectiveTitle =>
+      (equippedTitle != null && equippedTitle!.trim().isNotEmpty)
+          ? equippedTitle!
+          : levelInfo.title;
 
   /// Computed Competitive Arena Info from [trophies].
   ArenaModel get arenaInfo => ArenaModel.fromTrophies(trophies);
@@ -118,6 +126,7 @@ class PlayerProfile {
       'winStreak': winStreak,
       'equippedTheme': equippedTheme,
       'equippedFrame': equippedFrame,
+      'equippedTitle': equippedTitle,
       'unlockedItemIds': unlockedItemIds,
     };
   }
@@ -160,6 +169,7 @@ class PlayerProfile {
       winStreak: (json['winStreak'] as num?)?.toInt() ?? 0,
       equippedTheme: json['equippedTheme'] as String? ?? 'andalusian_gold',
       equippedFrame: json['equippedFrame'] as String? ?? 'frame_wood',
+      equippedTitle: json['equippedTitle'] as String?,
       unlockedItemIds: json['unlockedItemIds'] != null
           ? List<String>.from(json['unlockedItemIds'] as List)
           : ['theme_andalusian_gold', 'item_frame_wood'],
@@ -264,6 +274,7 @@ class PlayerProfile {
     int? winStreak,
     String? equippedTheme,
     String? equippedFrame,
+    String? equippedTitle,
     List<String>? unlockedItemIds,
   }) {
     return PlayerProfile(
@@ -288,6 +299,7 @@ class PlayerProfile {
       winStreak: winStreak ?? this.winStreak,
       equippedTheme: equippedTheme ?? this.equippedTheme,
       equippedFrame: equippedFrame ?? this.equippedFrame,
+      equippedTitle: equippedTitle ?? this.equippedTitle,
       unlockedItemIds: unlockedItemIds ?? List.from(this.unlockedItemIds),
     );
   }

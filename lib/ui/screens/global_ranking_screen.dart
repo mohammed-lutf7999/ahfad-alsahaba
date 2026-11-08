@@ -46,7 +46,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen> with TickerPr
         rank: i + 1,
         isMe: p.id == activeId,
         playerLevel: lvl.level,
-        playerTitle: lvl.title,
+        playerTitle: p.effectiveTitle,
         arenaId: arena.id,
         arenaName: arena.name,
         equippedFrame: p.equippedFrame,

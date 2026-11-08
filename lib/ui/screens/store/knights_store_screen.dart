@@ -164,6 +164,7 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
               customTheme: customTheme,
               levelInfo: levelInfo,
               equippedFrame: equippedFrame,
+              customTitle: profile?.effectiveTitle,
               coins: coins,
               gems: gems,
               winStreak: winStreak,
@@ -211,6 +212,7 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
     required AppCustomTheme customTheme,
     required dynamic levelInfo,
     required String equippedFrame,
+    String? customTitle,
     required int coins,
     required int gems,
     required int winStreak,
@@ -269,6 +271,7 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
                 const SizedBox(height: 4),
                 LevelBadgeWidget(
                   levelInfo: levelInfo,
+                  customTitle: customTitle,
                   isCompact: true,
                 ),
               ],
@@ -582,3 +585,4 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
     );
   }
 }
+

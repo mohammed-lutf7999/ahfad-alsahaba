@@ -196,7 +196,12 @@ DECLARE
 BEGIN
     SELECT * INTO v_calc FROM public.calculate_level_and_title(NEW.total_score);
     NEW.player_level := v_calc.out_level;
-    NEW.player_title := v_calc.out_title;
+    IF NEW.player_title IS NULL OR NOT EXISTS (
+        SELECT 1 FROM public.store_items s
+        WHERE s.category = 'title' AND s.asset_key = NEW.player_title
+    ) THEN
+        NEW.player_title := v_calc.out_title;
+    END IF;
     NEW.current_level_xp := v_calc.out_cur_xp;
     NEW.next_level_xp := v_calc.out_next_xp;
 
@@ -214,7 +219,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_sync_user_progress_level ON public.user_progress;
 CREATE TRIGGER trg_sync_user_progress_level
-BEFORE INSERT OR UPDATE OF total_score ON public.user_progress
+BEFORE INSERT OR UPDATE OF total_score, player_title ON public.user_progress
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_fn_sync_user_progress_level();
 
@@ -233,7 +238,12 @@ BEGIN
 
     SELECT * INTO v_calc FROM public.calculate_level_and_title(NEW.score);
     NEW.player_level := v_calc.out_level;
-    NEW.player_title := v_calc.out_title;
+    IF NEW.player_title IS NULL OR NOT EXISTS (
+        SELECT 1 FROM public.store_items s
+        WHERE s.category = 'title' AND s.asset_key = NEW.player_title
+    ) THEN
+        NEW.player_title := v_calc.out_title;
+    END IF;
 
     IF NEW.trophies >= 1850 THEN
         NEW.arena_id := 6; NEW.arena_name := 'ميدان الفتوحات العظمى';
@@ -255,7 +265,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_sync_leaderboard_glory ON public.leaderboard;
 CREATE TRIGGER trg_sync_leaderboard_glory
-BEFORE INSERT OR UPDATE OF score, trophies ON public.leaderboard
+BEFORE INSERT OR UPDATE OF score, trophies, player_title ON public.leaderboard
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_fn_sync_leaderboard_glory();
 

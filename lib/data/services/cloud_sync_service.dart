@@ -54,25 +54,15 @@ class CloudSyncService {
       if (existing != null) {
         final cloudScore = (existing['total_score'] as num?)?.toInt() ?? 0;
         final cloudHighScore = (existing['high_score'] as num?)?.toInt() ?? 0;
-        final cloudCoins = (existing['coins'] as num?)?.toInt() ?? 100;
-        final cloudGems = (existing['gems'] as num?)?.toInt() ?? 10;
-        final cloudWinStreak = (existing['win_streak'] as num?)?.toInt() ?? 0;
 
-        // Reconcile with GREATEST so server-awarded points/coins are never overwritten
+        // Reconcile strictly monotonic fields (`total_score` & `high_score`) with GREATEST
+        // so server-awarded points are never overwritten, while allowing non-monotonic fields
+        // (`coins`, `gems`, `win_streak`) to reflect legitimate deductions/resets.
         if (cloudScore > profile.totalScore) {
           profile.totalScore = cloudScore;
         }
         if (cloudHighScore > profile.highScore) {
           profile.highScore = cloudHighScore;
-        }
-        if (cloudCoins > profile.coins) {
-          profile.coins = cloudCoins;
-        }
-        if (cloudGems > profile.gems) {
-          profile.gems = cloudGems;
-        }
-        if (cloudWinStreak > profile.winStreak) {
-          profile.winStreak = cloudWinStreak;
         }
       }
 
@@ -98,7 +88,7 @@ class CloudSyncService {
       final fullData = <String, dynamic>{
         ...baseData,
         'player_level': levelInfo.level,
-        'player_title': levelInfo.title,
+        'player_title': profile.effectiveTitle,
         'current_level_xp': levelInfo.currentLevelXp,
         'next_level_xp': levelInfo.nextLevelXp,
         'coins': profile.coins,
@@ -145,9 +135,10 @@ class CloudSyncService {
     }
   }
 
-  /// Syncs locally unlocked store items to `public.user_inventory`.
+  /// Syncs locally unlocked store items to `public.user_inventory`,
+  /// and removes consumed tactical power-ups so they never resurrect or block re-purchase.
   Future<void> _syncInventoryToCloud(List<String> unlockedItemIds) async {
-    if (!_isAuthenticated || _userId == null || unlockedItemIds.isEmpty) return;
+    if (!_isAuthenticated || _userId == null) return;
 
     try {
       for (final itemId in unlockedItemIds) {
@@ -158,6 +149,21 @@ class CloudSyncService {
           },
           onConflict: 'user_id,item_id',
         );
+      }
+
+      const consumablePowerups = [
+        'powerup_shield',
+        'powerup_insight',
+        'powerup_xp_banner',
+      ];
+      for (final powerupId in consumablePowerups) {
+        if (!unlockedItemIds.contains(powerupId)) {
+          await _supabase
+              .from('user_inventory')
+              .delete()
+              .eq('user_id', _userId!)
+              .eq('item_id', powerupId);
+        }
       }
     } catch (e) {
       // Non-fatal if migration 009 is not yet applied or item_id not in store_items
@@ -184,11 +190,8 @@ class CloudSyncService {
         profile.totalScore = newScore;
       }
 
-      // Preserve server-side trophies if present, enforcing 800-trophy protection floor
-      final cloudTrophies = (existing?['trophies'] as num?)?.toInt();
-      final effectiveTrophies = ArenaModel.clampTrophies(
-        cloudTrophies ?? profile.trophies,
-      );
+      // Enforce 800-trophy protection floor while honoring active profile's updated trophies
+      final effectiveTrophies = ArenaModel.clampTrophies(profile.trophies);
       profile.trophies = effectiveTrophies;
 
       final levelInfo = PlayerLevelInfo.fromTotalScore(newScore);
@@ -205,7 +208,7 @@ class CloudSyncService {
         ...baseLeaderboardData,
         'trophies': effectiveTrophies,
         'player_level': levelInfo.level,
-        'player_title': levelInfo.title,
+        'player_title': profile.effectiveTitle,
         'arena_id': arenaInfo.id,
         'arena_name': arenaInfo.name,
         'equipped_frame': profile.equippedFrame,
@@ -402,6 +405,11 @@ class CloudSyncService {
       final equippedFrame = data['equipped_frame']?.toString() ??
           lbFrame ??
           computedLevel.frameKey;
+      final rawTitle = data['player_title']?.toString() ??
+          lbData?['player_title']?.toString();
+      const honorTitles = ['صقر الأندلس', 'درع القادسية', 'علامة الزمان'];
+      final equippedTitle =
+          (rawTitle != null && honorTitles.contains(rawTitle)) ? rawTitle : null;
 
       final profile = PlayerProfile(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -422,6 +430,7 @@ class CloudSyncService {
         winStreak: cloudWinStreak,
         equippedTheme: equippedTheme,
         equippedFrame: equippedFrame,
+        equippedTitle: equippedTitle,
         unlockedItemIds: unlockedItemIds,
       );
 

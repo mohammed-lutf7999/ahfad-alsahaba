@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
+import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../logic/game_controller.dart';
 import '../../logic/timer_controller.dart';
@@ -184,7 +185,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
