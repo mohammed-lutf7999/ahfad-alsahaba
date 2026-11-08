@@ -51,7 +51,7 @@ class _IslamicQuoteCardState extends State<IslamicQuoteCard> {
             },
             itemBuilder: (context, index) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: _QuoteCardItem(quote: widget.quotes[index]),
               );
             },
@@ -59,7 +59,7 @@ class _IslamicQuoteCardState extends State<IslamicQuoteCard> {
         ),
         // Page indicators
         Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.only(bottom: 4.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
@@ -191,7 +191,7 @@ class _QuoteCardItem extends StatelessWidget {
           
           // Content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -200,8 +200,8 @@ class _QuoteCardItem extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 30,
-                      height: 2,
+                      width: 24,
+                      height: 1.5,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -211,21 +211,21 @@ class _QuoteCardItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Text(
                       '﴿ ${quote.title} ﴾',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.accentColor,
                         fontFamily: 'Cairo',
-                        letterSpacing: 1,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Container(
-                      width: 30,
-                      height: 2,
+                      width: 24,
+                      height: 1.5,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -238,7 +238,7 @@ class _QuoteCardItem extends StatelessWidget {
                   ],
                 ),
                 
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 
                 // Quote text with internal scrolling
                 Expanded(
@@ -248,10 +248,10 @@ class _QuoteCardItem extends StatelessWidget {
                       child: Text(
                         '« ${quote.text} »',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13.5,
                           color: Colors.white.withOpacity(0.95),
                           fontFamily: 'Cairo',
-                          height: 1.6,
+                          height: 1.45,
                           fontWeight: FontWeight.w500,
                         ),
                         textAlign: TextAlign.center,
@@ -260,12 +260,12 @@ class _QuoteCardItem extends StatelessWidget {
                   ),
                 ),
                 
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 
                 // Divider
                 Container(
-                  width: 60,
-                  height: 2,
+                  width: 50,
+                  height: 1.5,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -278,7 +278,7 @@ class _QuoteCardItem extends StatelessWidget {
                   ),
                 ),
                 
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 
                 // Author
                 Row(
@@ -286,14 +286,14 @@ class _QuoteCardItem extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.format_quote_rounded,
-                      size: 16,
+                      size: 14,
                       color: AppTheme.accentLight.withOpacity(0.7),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
                       quote.author,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         color: AppTheme.accentLight,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Cairo',

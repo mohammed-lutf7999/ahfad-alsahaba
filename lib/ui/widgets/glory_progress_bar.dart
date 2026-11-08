@@ -74,20 +74,34 @@ class GloryProgressBar extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
-                      child: Text(
-                        isMaxLevel
-                            ? 'القمة الأسطورية (المستوى 100) 👑'
-                            : '$animatedCurrentXp / $resolvedRequiredXp XP',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11.5,
-                          height: 1.2,
-                        ),
-                      ),
+                      child: isMaxLevel
+                          ? const Text(
+                              'القمة الأسطورية (المستوى 100) 👑',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11.5,
+                                height: 1.2,
+                              ),
+                            )
+                          : Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                '$animatedCurrentXp / $resolvedRequiredXp XP',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11.5,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 8),
                     Container(

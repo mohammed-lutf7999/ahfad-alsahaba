@@ -317,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen>
                         // 1. Logo/Title Area
                         // Use Flexible so it can shrink if needed
                         Flexible(
-                          flex: 4,
+                          flex: 3,
                           child: FadeTransition(
                             opacity: _fadeAnimation,
                             child: SlideTransition(
@@ -335,14 +335,15 @@ class _HomeScreenState extends State<HomeScreen>
                         // 2. Islamic Quote Card Area
                         // Use Expanded/Flexible
                         Expanded(
-                          flex: 4,
+                          flex: 5,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                                 horizontal: getProportionateScreenWidth(20),
-                                vertical: 10),
+                                vertical: 6),
                             child: _quotesLoaded && QuoteService.instance.dailyQuotes.isNotEmpty
                                 ? Container(
                                     key: _quoteKey, // Attach Key Here (Container wrapper to ensure bounds)
+                                    constraints: const BoxConstraints(minHeight: 140),
                                     child: IslamicQuoteCard(
                                       quotes: QuoteService.instance.dailyQuotes,
                                     ),

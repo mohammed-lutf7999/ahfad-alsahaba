@@ -76,7 +76,7 @@ class GameMatchResultDialog {
                     ),
                   ),
                   child: Text(
-                    '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} 🏆 الكؤوس${totalTrophies != null ? " ($totalTrophies)" : ""}',
+                    '${effectiveDelta >= 0 ? "+$effectiveDelta" : "$effectiveDelta"} كأساً 🏆${totalTrophies != null ? " ($totalTrophies)" : ""}',
                     style: TextStyle(
                       color: effectiveDelta >= 0
                           ? Colors.amberAccent
@@ -141,21 +141,25 @@ class GameMatchResultDialog {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   // My Score
-                  Column(
-                    children: [
-                      const Text(
-                        'أنت',
-                        style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
-                      ),
-                      Text(
-                        '$myScore',
-                        style: const TextStyle(
-                          color: AppTheme.accentColor,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'أنت',
+                          style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Text(
+                          '$myScore',
+                          style: const TextStyle(
+                            color: AppTheme.accentColor,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   Container(
@@ -165,24 +169,29 @@ class GameMatchResultDialog {
                   ),
 
                   // Opponent Score
-                  Column(
-                    children: [
-                      Text(
-                        opponentName,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontFamily: 'Cairo',
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          opponentName,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontFamily: 'Cairo',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      Text(
-                        '$opponentScore',
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                        Text(
+                          '$opponentScore',
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -193,12 +202,13 @@ class GameMatchResultDialog {
         actions: [
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 52,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor,
                 foregroundColor: AppTheme.primaryDark,
                 elevation: 4,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -214,6 +224,7 @@ class GameMatchResultDialog {
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   fontFamily: 'Cairo',
+                  height: 1.2,
                 ),
               ),
             ),
