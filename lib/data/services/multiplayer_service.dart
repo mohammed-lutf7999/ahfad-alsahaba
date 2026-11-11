@@ -12,6 +12,7 @@ class MatchmakingResult {
   final List<String>? questionIds;
   final bool isWaiting;
   final String? error;
+  final bool isFriendly;
 
   MatchmakingResult({
     this.success = false,
@@ -21,6 +22,7 @@ class MatchmakingResult {
     this.questionIds,
     this.isWaiting = false,
     this.error,
+    this.isFriendly = false,
   });
 }
 
@@ -62,6 +64,7 @@ class MultiplayerService {
   // Subscriptions management
   RealtimeChannel? _matchChannel;
   RealtimeChannel? _reactionChannel;
+  RealtimeChannel? _rematchChannel;
   StreamController<MatchState>? _matchStateController;
 
   MultiplayerService._internal();
@@ -445,6 +448,140 @@ class MultiplayerService {
     return controller.stream;
   }
 
+  /// Sends a rematch offer to the opponent via Broadcast
+  Future<void> sendRematchOffer(String matchId) async {
+    try {
+      final channel = _rematchChannel ?? _client.channel('rematch_$matchId');
+      _rematchChannel = channel;
+      await channel.sendBroadcastMessage(
+        event: 'rematch_offer',
+        payload: {'senderId': currentUserId},
+      );
+    } catch (e) {
+      debugPrint('Error sending rematch offer: $e');
+    }
+  }
+
+  /// Sends a rematch leave/exit signal to notify opponent immediately
+  Future<void> sendRematchLeave(String matchId) async {
+    try {
+      final channel = _rematchChannel ?? _client.channel('rematch_$matchId');
+      await channel.sendBroadcastMessage(
+        event: 'rematch_leave',
+        payload: {'senderId': currentUserId},
+      );
+    } catch (e) {
+      debugPrint('Error sending rematch leave: $e');
+    }
+  }
+
+  /// Listens to rematch events (offer, accept, leave)
+  Stream<Map<String, dynamic>> listenToRematchEvents(String matchId) {
+    _rematchChannel?.unsubscribe();
+    final controller = StreamController<Map<String, dynamic>>.broadcast();
+
+    _rematchChannel = _client.channel('rematch_$matchId');
+    _rematchChannel!.onBroadcast(
+      event: 'rematch_offer',
+      callback: (payload) {
+        final senderId = payload['senderId'] as String?;
+        if (senderId != null && senderId != currentUserId) {
+          controller.add({'event': 'offer', 'senderId': senderId});
+        }
+      },
+    );
+    _rematchChannel!.onBroadcast(
+      event: 'rematch_accept',
+      callback: (payload) {
+        final senderId = payload['senderId'] as String?;
+        final newMatchId = payload['matchId'] as String?;
+        if (senderId != null && senderId != currentUserId) {
+          controller.add({
+            'event': 'accept',
+            'senderId': senderId,
+            'matchId': newMatchId,
+          });
+        }
+      },
+    );
+    _rematchChannel!.onBroadcast(
+      event: 'rematch_leave',
+      callback: (payload) {
+        final senderId = payload['senderId'] as String?;
+        if (senderId != null && senderId != currentUserId) {
+          controller.add({'event': 'leave', 'senderId': senderId});
+        }
+      },
+    );
+
+    _rematchChannel!.subscribe();
+
+    return controller.stream;
+  }
+
+  /// Calls the idempotent RPC `create_instant_rematch` to start or join a rematch room
+  Future<MatchmakingResult> createInstantRematch({
+    required String parentMatchId,
+  }) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return MatchmakingResult(error: 'User not logged in');
+
+      final response = await _client.rpc('create_instant_rematch', params: {
+        'p_parent_match_id': parentMatchId,
+        'p_user_id': userId,
+      });
+
+      if (response == null || (response is List && response.isEmpty)) {
+        return MatchmakingResult(error: 'Failed to create rematch');
+      }
+
+      final data = (response as List).first as Map<String, dynamic>;
+      final matchId = data['match_id'] as String;
+      final seed = (data['seed'] as num).toInt();
+      final questionIds = data['question_ids'] != null
+          ? List<String>.from(data['question_ids'])
+          : null;
+      final isFriendly = data['is_friendly'] as bool? ?? false;
+
+      final p1 = data['player1_id'] as String;
+      final p2 = data['player2_id'] as String;
+      final opponentId = (p1 == userId) ? p2 : p1;
+
+      // Broadcast acceptance with the new match ID
+      try {
+        final channel = _rematchChannel ?? _client.channel('rematch_$parentMatchId');
+        await channel.sendBroadcastMessage(
+          event: 'rematch_accept',
+          payload: {
+            'senderId': userId,
+            'matchId': matchId,
+          },
+        );
+      } catch (e) {
+        debugPrint('Error broadcasting rematch accept: $e');
+      }
+
+      return MatchmakingResult(
+        success: true,
+        matchId: matchId,
+        opponentId: opponentId,
+        seed: seed,
+        questionIds: questionIds,
+        isFriendly: isFriendly,
+      );
+    } catch (e) {
+      debugPrint('Error creating instant rematch: $e');
+      return MatchmakingResult(error: e.toString());
+    }
+  }
+
+  /// Closes the rematch channel
+  void closeRematchChannel() {
+    _rematchChannel?.unsubscribe();
+    _rematchChannel = null;
+  }
+
   /// Creates a local bot match
   Future<MatchmakingResult> createBotMatch() async {
     final rnd = Random();
@@ -570,6 +707,8 @@ class MultiplayerService {
     _matchChannel = null;
     _reactionChannel?.unsubscribe();
     _reactionChannel = null;
+    _rematchChannel?.unsubscribe();
+    _rematchChannel = null;
     _matchStateController?.close();
     _matchStateController = null;
   }

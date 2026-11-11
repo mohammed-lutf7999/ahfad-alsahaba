@@ -460,6 +460,23 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     }
   }
 
+  void _onRematchAccepted(MatchmakingResult newMatch) {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OnlineGameScreen(
+          matchId: newMatch.matchId!,
+          opponentId: newMatch.opponentId ?? widget.opponentId,
+          seed: newMatch.seed ?? widget.seed,
+          questionIds: newMatch.questionIds ?? [],
+          opponentName: widget.opponentName,
+          opponentAvatarIndex: widget.opponentAvatarIndex,
+          isBot: widget.isBot,
+        ),
+      ),
+    );
+  }
+
   void _showResultDialog(
     String? winnerId, {
     int? trophiesDelta,
@@ -485,6 +502,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       myScore: _myScore,
       opponentScore: _opponentScore,
       opponentName: widget.opponentName,
+      matchId: widget.matchId,
+      opponentId: widget.opponentId,
+      isBot: widget.isBot,
+      onRematchAccepted: _onRematchAccepted,
       onDismiss: () => Navigator.of(context).popUntil((route) => route.isFirst),
     );
   }
