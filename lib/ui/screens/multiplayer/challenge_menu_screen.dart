@@ -4,6 +4,8 @@ import '../../../core/sound_service.dart';
 import '../../../data/services/nearby_service.dart';
 import 'create_challenge_screen.dart';
 import 'join_challenge_screen.dart';
+import 'private_room_hub_screen.dart';
+import 'lobby_screen.dart';
 
 /// القائمة الرئيسية لوضع التحدي
 class ChallengeMenuScreen extends StatefulWidget {
@@ -113,26 +115,37 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                         // VS Icon
                         _buildVsIcon(),
                         
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 30),
                         
-                        // Create Challenge Button
+                        // 1. Private Rooms (Code & WhatsApp Invite)
                         _buildMenuButton(
-                          icon: Icons.add_circle_outline_rounded,
-                          title: 'إنشاء تحدي',
-                          subtitle: 'كن المضيف وادعُ أصدقاءك',
+                          icon: Icons.castle_rounded,
+                          title: 'غرف التحدي الخاصة 🏰',
+                          subtitle: 'كود سداسي ودعوة الأصدقاء عبر واتساب',
                           color: AppTheme.accentColor,
-                          onTap: () => _navigateTo(const CreateChallengeScreen()),
+                          onTap: () => _navigateTo(const PrivateRoomHubScreen()),
                         ),
                         
-                        const SizedBox(height: 20),
-                        
-                        // Join Challenge Button
+                        const SizedBox(height: 16),
+
+                        // 2. Quick Matchmaking (Online Arena)
                         _buildMenuButton(
-                          icon: Icons.search_rounded,
-                          title: 'انضم لتحدي',
-                          subtitle: 'ابحث عن تحدي قريب',
+                          icon: Icons.radar_rounded,
+                          title: 'الميدان السريع المباشر ⚔️',
+                          subtitle: 'مطابقة أونلاين فورية أو ضد البوت',
                           color: AppTheme.accentLight,
-                          onTap: () => _navigateTo(const JoinChallengeScreen()),
+                          onTap: () => _navigateTo(const LobbyScreen()),
+                        ),
+                        
+                        const SizedBox(height: 16),
+
+                        // 3. Local Bluetooth Challenge (Offline Nearby)
+                        _buildMenuButton(
+                          icon: Icons.bluetooth_searching_rounded,
+                          title: 'تحدي البلوتوث المحلي 📡',
+                          subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
+                          color: Colors.blueAccent,
+                          onTap: () => _navigateTo(const CreateChallengeScreen()),
                         ),
                         
                         const SizedBox(height: 40),

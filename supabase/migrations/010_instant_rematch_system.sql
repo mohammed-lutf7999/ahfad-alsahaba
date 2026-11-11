@@ -129,3 +129,4 @@ BEGIN
     v_is_friendly;
 END;
 $$;
+

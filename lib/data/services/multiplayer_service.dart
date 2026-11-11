@@ -26,6 +26,28 @@ class MatchmakingResult {
   });
 }
 
+class PrivateRoomResult {
+  final bool success;
+  final String? matchId;
+  final String? roomCode;
+  final DateTime? expiresAt;
+  final String? opponentId;
+  final int? seed;
+  final List<String>? questionIds;
+  final String? error;
+
+  PrivateRoomResult({
+    this.success = false,
+    this.matchId,
+    this.roomCode,
+    this.expiresAt,
+    this.opponentId,
+    this.seed,
+    this.questionIds,
+    this.error,
+  });
+}
+
 class MatchState {
   final String status;
   final int currentQuestion;
@@ -59,7 +81,7 @@ class MultiplayerService {
   static final MultiplayerService _instance = MultiplayerService._internal();
   static MultiplayerService get instance => _instance;
 
-  final SupabaseClient _client = Supabase.instance.client;
+  SupabaseClient get _client => Supabase.instance.client;
   
   // Subscriptions management
   RealtimeChannel? _matchChannel;
@@ -69,7 +91,13 @@ class MultiplayerService {
 
   MultiplayerService._internal();
 
-  String? get currentUserId => _client.auth.currentUser?.id;
+  String? get currentUserId {
+    try {
+      return _client.auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Finds a match using the server-side RPC function.
   Future<MatchmakingResult> findMatch({required String appVersion}) async {
@@ -580,6 +608,105 @@ class MultiplayerService {
   void closeRematchChannel() {
     _rematchChannel?.unsubscribe();
     _rematchChannel = null;
+  }
+
+  /// Creates a private room with a 6-digit PIN code and 3-minute validity
+  Future<PrivateRoomResult> createPrivateRoom() async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return PrivateRoomResult(error: 'User not logged in');
+
+      final response = await _client.rpc('create_private_room', params: {
+        'p_host_id': userId,
+      });
+
+      if (response == null || (response is List && response.isEmpty)) {
+        return PrivateRoomResult(error: 'Failed to create room');
+      }
+
+      final data = (response as List).first as Map<String, dynamic>;
+      final matchId = data['match_id'] as String;
+      final roomCode = data['room_code'] as String;
+      final expiresAtStr = data['expires_at'] as String?;
+      final seed = (data['seed'] as num).toInt();
+      final questionIds = data['question_ids'] != null
+          ? List<String>.from(data['question_ids'])
+          : null;
+
+      return PrivateRoomResult(
+        success: true,
+        matchId: matchId,
+        roomCode: roomCode,
+        expiresAt: expiresAtStr != null ? DateTime.tryParse(expiresAtStr) : null,
+        seed: seed,
+        questionIds: questionIds,
+      );
+    } catch (e) {
+      debugPrint('Error creating private room: $e');
+      return PrivateRoomResult(error: e.toString());
+    }
+  }
+
+  /// Joins an active private room using its 6-digit PIN code
+  Future<PrivateRoomResult> joinPrivateRoom(String roomCode) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return PrivateRoomResult(error: 'User not logged in');
+
+      final response = await _client.rpc('join_private_room', params: {
+        'p_room_code': roomCode.trim(),
+        'p_guest_id': userId,
+      });
+
+      if (response == null || (response is List && response.isEmpty)) {
+        return PrivateRoomResult(error: 'Failed to join room');
+      }
+
+      final data = (response as List).first as Map<String, dynamic>;
+      final matchId = data['match_id'] as String;
+      final hostId = data['host_id'] as String;
+      final seed = (data['seed'] as num).toInt();
+      final questionIds = data['question_ids'] != null
+          ? List<String>.from(data['question_ids'])
+          : null;
+
+      return PrivateRoomResult(
+        success: true,
+        matchId: matchId,
+        opponentId: hostId,
+        seed: seed,
+        questionIds: questionIds,
+      );
+    } catch (e) {
+      debugPrint('Error joining private room: $e');
+      return PrivateRoomResult(error: e.toString());
+    }
+  }
+
+  /// Cancels an active private room safely
+  Future<void> cancelPrivateRoom(String matchId) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return;
+      await _client.rpc('cancel_private_room', params: {
+        'p_match_id': matchId,
+        'p_user_id': userId,
+      });
+    } catch (e) {
+      debugPrint('Error cancelling private room: $e');
+    }
+  }
+
+  /// Listens to a private room for guest joining (when status becomes 'matched')
+  Stream<Map<String, dynamic>> listenToPrivateRoom(String matchId) {
+    return _client
+        .from('matches')
+        .stream(primaryKey: ['id'])
+        .eq('id', matchId)
+        .map((event) {
+          if (event.isEmpty) return <String, dynamic>{};
+          return event.first;
+        });
   }
 
   /// Creates a local bot match
