@@ -14,8 +14,11 @@ import '../widgets/animated_avatar_frame.dart';
 import '../widgets/level_badge_widget.dart';
 import '../widgets/islamic_quote_card.dart';
 import 'library_screen.dart';
+import 'glory/glory_road_screen.dart';
+import 'store/knights_store_screen.dart';
 import '../../core/size_config.dart';
 import '../widgets/coach_mark_overlay.dart';
+import '../widgets/navigation/royal_bottom_nav_bar.dart';
 import 'home/widgets/home_logo_with_effects.dart';
 import 'home/widgets/home_start_button.dart';
 import 'home/widgets/home_glowing_trophy_button.dart';
@@ -35,13 +38,14 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   bool _quotesLoaded = false;
+  final int _bottomNavIndex = 0;
   
   // Tutorial Keys
-  final GlobalKey _profileKey = GlobalKey(); // New
-  final GlobalKey _quoteKey = GlobalKey();   // New
+  final GlobalKey _profileKey = GlobalKey();
+  final GlobalKey _quoteKey = GlobalKey();
   final GlobalKey _startKey = GlobalKey();
   final GlobalKey _libraryKey = GlobalKey();
-  final GlobalKey _challengeKey = GlobalKey(); // Speed Dial or Action
+  final GlobalKey _challengeKey = GlobalKey();
   final GlobalKey _achievementsKey = GlobalKey();
 
   @override
@@ -75,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _checkTutorial() async {
-    final hasSeen = await SharedPrefsService.getHasSeenTutorial(); // Need to implement this getter
+    final hasSeen = await SharedPrefsService.getHasSeenTutorial();
     if (!hasSeen) {
       _showTutorial();
     }
@@ -92,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen>
             key: _profileKey,
             title: 'ملفك الشخصي',
             description: 'اضغط هنا لتعديل اسمك وصورتك الرمزية ومتابعة مستواك.',
-            shape: BoxShape.rectangle, // Or Circle if we target avatar only
+            shape: BoxShape.rectangle,
           ),
           CoachMarkStep(
             key: _startKey,
@@ -158,14 +162,56 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
   
-  // Called when profile data changes (e.g. after game completion)
   void _onProfileChanged() {
     if (mounted) setState(() {});
   }
   
-  // Refresh profile data when navigating back
   void _refreshProfile() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _handleBottomNavTap(int index) async {
+    if (index == 0) {
+      // Already on Home
+      return;
+    }
+
+    if (index == 1) {
+      // Library
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LibraryScreen()),
+      );
+      _refreshProfile();
+      return;
+    }
+
+    if (index == 2) {
+      // Center Crest: Challenge / Direct Battles
+      await Navigator.pushNamed(context, AppRoutes.challenge);
+      _refreshProfile();
+      return;
+    }
+
+    if (index == 3) {
+      // Glory Road
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const GloryRoadScreen()),
+      );
+      _refreshProfile();
+      return;
+    }
+
+    if (index == 4) {
+      // Knights Store
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const KnightsStoreScreen()),
+      );
+      _refreshProfile();
+      return;
+    }
   }
 
   @override
@@ -176,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen>
     
     return Scaffold(
       extendBodyBehindAppBar: true,
+      extendBody: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -196,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ) : null,
         title: profile != null ? GestureDetector(
-          key: _profileKey, // Attach Key Here
+          key: _profileKey,
           onTap: () async {
             SoundService().playClick();
             await Navigator.pushNamed(context, AppRoutes.profileSelector);
@@ -284,6 +331,14 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: RoyalBottomNavBar(
+          currentIndex: _bottomNavIndex,
+          onTap: _handleBottomNavTap,
+          libraryKey: _libraryKey,
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: AppCustomTheme.of(context).backgroundGradient,
@@ -291,149 +346,90 @@ class _HomeScreenState extends State<HomeScreen>
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute safely
-                      children: [
-                        if (profile != null)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: getProportionateScreenWidth(20),
-                              vertical: 4,
-                            ),
-                            child: HomeGloryPanel(
-                              profile: profile,
-                              onRefresh: _refreshProfile,
-                            ),
-                          ),
-                        SizedBox(height: getProportionateScreenHeight(6)), 
-                        
-                        // 1. Logo/Title Area
-                        // Use Flexible so it can shrink if needed
-                        Flexible(
-                          flex: 3,
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: SlideTransition(
-                              position: _slideAnimation,
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  HomeLogoWithEffects(),
-                                ],
-                              ),
-                            ),
+              final isVerySmall = constraints.maxHeight < 560;
+
+              Widget content = Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Upper Arena & Glory Card
+                  if (profile != null)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: getProportionateScreenWidth(20),
+                        vertical: 2,
+                      ),
+                      child: HomeGloryPanel(
+                        profile: profile,
+                        onRefresh: _refreshProfile,
+                      ),
+                    ),
+                  
+                  // 1. Center Hero Visual Emblem (Responsive Size)
+                  Flexible(
+                    flex: 3,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SlideTransition(
+                        position: _slideAnimation,
+                        child: Center(
+                          child: HomeLogoWithEffects(
+                            customSize: (constraints.maxHeight * 0.20).clamp(115.0, 138.0),
                           ),
                         ),
-
-                        // 2. Islamic Quote Card Area
-                        // Use Expanded/Flexible
-                        Expanded(
-                          flex: 5,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: getProportionateScreenWidth(20),
-                                vertical: 6),
-                            child: _quotesLoaded && QuoteService.instance.dailyQuotes.isNotEmpty
-                                ? Container(
-                                    key: _quoteKey, // Attach Key Here (Container wrapper to ensure bounds)
-                                    constraints: const BoxConstraints(minHeight: 140),
-                                    child: IslamicQuoteCard(
-                                      quotes: QuoteService.instance.dailyQuotes,
-                                    ),
-                                  )
-                                : const SizedBox.shrink(), // Don't show empty placeholder large
-                          ),
-                        ),
-
-                        // 3. Buttons Area
-                        // Keep fixed height logic but ensure padding
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: getProportionateScreenWidth(40),
-                              vertical: getProportionateScreenHeight(20)),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              HomeStartButton(
-                                key: _startKey,
-                                onTap: () => Navigator.pushNamed(
-                                    context, AppRoutes.categories),
-                              ),
-
-                              SizedBox(height: getProportionateScreenHeight(16)),
-                              _buildMenuButton(
-                                context,
-                                'مكتبة أحفاد الصحابة',
-                                Icons.menu_book_rounded,
-                                () {
-                                  Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              const LibraryScreen()));
-                                },
-                                isPrimary: false,
-                                key: _libraryKey,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+
+                  // 2. Compact Islamic Wisdom Capsule (92px)
+                  if (_quotesLoaded && QuoteService.instance.dailyQuotes.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: getProportionateScreenWidth(20),
+                        vertical: 4,
+                      ),
+                      child: Container(
+                        key: _quoteKey,
+                        child: IslamicQuoteCard(
+                          quotes: QuoteService.instance.dailyQuotes,
+                        ),
+                      ),
+                    ),
+
+                  // 3. Main Start CTA Button (Opulent Gold)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: getProportionateScreenWidth(32),
+                      vertical: 6,
+                    ),
+                    child: HomeStartButton(
+                      key: _startKey,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.categories,
+                      ),
+                    ),
+                  ),
+
+                  // Space for Bottom Floating Dock
+                  const SizedBox(height: 70),
+                ],
               );
+
+              if (isVerySmall) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: IntrinsicHeight(child: content),
+                  ),
+                );
+              }
+
+              return content;
             },
           ),
         ),
       ),
     );
   }
-
-  Widget _buildMenuButton(BuildContext context, String title, IconData icon,
-      VoidCallback onTap, {bool isPrimary = true, Key? key}) {
-    return SizedBox(
-      key: key,
-      width: double.infinity,
-      height: getProportionateScreenHeight(60), // Resizable height
-      child: ElevatedButton(
-        onPressed: () {
-          SoundService().playClick();
-          onTap();
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppTheme.accentColor : Colors.transparent,
-          foregroundColor: isPrimary ? AppTheme.primaryDark : AppTheme.accentColor,
-          elevation: isPrimary ? 8 : 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: isPrimary
-                ? BorderSide.none
-                : const BorderSide(color: AppTheme.accentColor, width: 1.5),
-          ),
-          shadowColor: AppTheme.accentColor.withValues(alpha: 80),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          textDirection: TextDirection.rtl, // Ensuring RTL
-          children: [
-            Icon(icon, size: getProportionateScreenWidth(24)),
-            SizedBox(width: getProportionateScreenWidth(12)),
-            Text(
-              title,
-              style: TextStyle(fontSize: getProportionateScreenWidth(18), fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
 }

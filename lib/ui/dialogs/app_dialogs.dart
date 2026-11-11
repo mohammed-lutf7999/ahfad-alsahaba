@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/sound_service.dart';
+import '../../core/theme/app_custom_theme.dart';
 
 /// نوافذ الحوار والتأكيد المركزية للتطبيق
 class AppDialogs {
-  /// نافذة تأكيد الخروج أو الانسحاب الموحدة
+  /// نافذة تأكيد الخروج أو الانسحاب الموحدة بالهوية الملكية الأندلسية
   /// تُستخدم في: QuizScreen, OnlineGameScreen, VersusScreen
   static Future<bool?> showExitConfirmationDialog(
     BuildContext context, {
@@ -12,9 +13,11 @@ class AppDialogs {
     String message = 'خروجك الآن يعني فقدان تقدمك في هذه الجولة. هل أنت متأكد من قرارك؟',
     String confirmLabel = 'تأكيد الخروج',
     String cancelLabel = 'تراجع ومتابعة',
-    IconData icon = Icons.logout_rounded,
+    IconData icon = Icons.shield_outlined,
     VoidCallback? onConfirm,
   }) {
+    final customTheme = AppCustomTheme.of(context);
+
     return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -34,39 +37,56 @@ class AppDialogs {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: MediaQuery.of(context).size.width * 0.85,
-              padding: const EdgeInsets.all(24),
+              width: MediaQuery.of(context).size.width * 0.86,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
               decoration: BoxDecoration(
-                color: AppTheme.primaryDark,
+                color: customTheme.surfaceCard,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: AppTheme.accentColor.withValues(alpha: 0.3),
+                  color: customTheme.sovereignAccent.withValues(alpha: 0.45),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
+                    color: Colors.black.withValues(alpha: 0.6),
                     blurRadius: 30,
-                    spreadRadius: 5,
+                    spreadRadius: 4,
+                  ),
+                  BoxShadow(
+                    color: customTheme.sovereignAccent.withValues(alpha: 0.12),
+                    blurRadius: 20,
+                    spreadRadius: -2,
                   ),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icon badge
+                  // Royal Chivalric Emblem Badge
                   Container(
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.errorColor.withValues(alpha: 0.12),
+                      color: customTheme.sovereignAccent.withValues(alpha: 0.12),
                       border: Border.all(
-                        color: AppTheme.errorColor.withValues(alpha: 0.35),
+                        color: customTheme.sovereignAccent.withValues(alpha: 0.5),
                         width: 2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: customTheme.sovereignAccent.withValues(alpha: 0.2),
+                          blurRadius: 15,
+                        ),
+                      ],
                     ),
-                    child: Icon(icon, size: 36, color: AppTheme.errorColor),
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        size: 36,
+                        color: customTheme.sovereignAccent,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 18),
 
@@ -75,10 +95,11 @@ class AppDialogs {
                     title,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       fontFamily: 'Cairo',
+                      letterSpacing: 0.2,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -87,80 +108,94 @@ class AppDialogs {
                   Text(
                     message,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                      height: 1.5,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: customTheme.textMuted,
+                      height: 1.55,
                       fontFamily: 'Cairo',
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Action buttons
+                  // Action buttons (Balanced Hierarchy & Zero Cairo Clipping)
                   Row(
                     children: [
-                      // Cancel Button
+                      // Subdued Exit Button (Secondary)
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            SoundService().playClick();
-                            Navigator.of(context).pop(false);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: AppTheme.accentColor.withValues(alpha: 0.6),
-                              width: 1.5,
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              SoundService().playClick();
+                              Navigator.of(context).pop(true);
+                              if (onConfirm != null) {
+                                onConfirm();
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white.withValues(alpha: 0.05),
+                              side: BorderSide(
+                                color: const Color(0xFFE11D48).withValues(alpha: 0.45),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                          child: Text(
-                            cancelLabel,
-                            style: const TextStyle(
-                              color: AppTheme.accentColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              fontFamily: 'Cairo',
+                            child: Text(
+                              confirmLabel,
+                              style: const TextStyle(
+                                color: Color(0xFFFDA4AF),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontFamily: 'Cairo',
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
 
-                      // Confirm Exit Button
+                      // Heroic Golden Continue Button (Primary Action)
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            SoundService().playClick();
-                            Navigator.of(context).pop(true);
-                            if (onConfirm != null) {
-                              onConfirm();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.errorColor,
-                            elevation: 4,
-                            shadowColor: AppTheme.errorColor.withValues(alpha: 0.4),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              SoundService().playClick();
+                              Navigator.of(context).pop(false);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: customTheme.sovereignAccent,
+                              foregroundColor: AppTheme.primaryDark,
+                              elevation: 5,
+                              shadowColor: customTheme.sovereignAccent.withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                          child: Text(
-                            confirmLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              fontFamily: 'Cairo',
+                            child: Text(
+                              cancelLabel,
+                              style: const TextStyle(
+                                color: AppTheme.primaryDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.5,
+                                fontFamily: 'Cairo',
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),

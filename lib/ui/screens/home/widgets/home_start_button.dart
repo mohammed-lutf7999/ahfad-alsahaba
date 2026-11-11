@@ -36,7 +36,7 @@ class _HomeStartButtonState extends State<HomeStartButton>
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: getProportionateScreenHeight(64),
+      height: 52,
       child: GestureDetector(
         onTap: () {
           SoundService().playClick();

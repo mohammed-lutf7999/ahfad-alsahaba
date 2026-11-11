@@ -6,7 +6,9 @@ import '../../../widgets/particles/unified_particle_system.dart';
 
 /// الشعار الرئيسي التفاعلي مع أشعة الشمس وجزيئات الذهب الطافية والنبض الحي
 class HomeLogoWithEffects extends StatefulWidget {
-  const HomeLogoWithEffects({super.key});
+  final double? customSize;
+
+  const HomeLogoWithEffects({super.key, this.customSize});
 
   @override
   State<HomeLogoWithEffects> createState() => _HomeLogoWithEffectsState();
@@ -75,7 +77,7 @@ class _HomeLogoWithEffectsState extends State<HomeLogoWithEffects>
 
   @override
   Widget build(BuildContext context) {
-    final double size = getProportionateScreenWidth(160);
+    final double size = widget.customSize ?? getProportionateScreenWidth(130);
 
     return GestureDetector(
       onTapDown: _onTapDown,
