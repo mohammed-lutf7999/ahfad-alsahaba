@@ -13,6 +13,9 @@ ADD COLUMN IF NOT EXISTS room_code VARCHAR(6),
 ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
+-- Allow player2_id to be NULL while private room is waiting for guest
+ALTER TABLE public.matches ALTER COLUMN player2_id DROP NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_matches_room_code 
 ON public.matches(room_code) 
 WHERE room_code IS NOT NULL;
