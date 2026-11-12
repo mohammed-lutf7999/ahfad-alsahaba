@@ -404,6 +404,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
          winnerId = null; // Draw
        }
     } else {
+      if (widget.opponentId.isNotEmpty) {
+        MultiplayerService.instance.lastOpponentId = widget.opponentId;
+      }
       final result = await MultiplayerService.instance.finishMatch(widget.matchId);
       
       if (mounted) {

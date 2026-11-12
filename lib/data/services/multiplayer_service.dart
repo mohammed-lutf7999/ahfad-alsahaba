@@ -251,6 +251,12 @@ class MultiplayerService {
           );
           if (myMatch.isNotEmpty) {
             stopHeartbeat();
+            final p1 = myMatch['player1_id'] as String?;
+            final p2 = myMatch['player2_id'] as String?;
+            final oppId = (p1 == userId) ? p2 : p1;
+            if (oppId != null) {
+              lastOpponentId = oppId;
+            }
           }
           return myMatch;
         })
