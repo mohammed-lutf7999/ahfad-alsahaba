@@ -99,16 +99,30 @@ class MultiplayerService {
     }
   }
 
-  /// Finds a match using the server-side RPC function.
-  Future<MatchmakingResult> findMatch({required String appVersion}) async {
+  String? lastOpponentId;
+
+  /// Finds a match using the server-side RPC function with dynamic trophy matchmaking & anti-farming.
+  Future<MatchmakingResult> findMatch({
+    required String appVersion,
+    int? trophies,
+    String? lastOpponentId,
+  }) async {
     try {
       final userId = currentUserId;
       if (userId == null) return MatchmakingResult(error: 'User not logged in');
 
-      final response = await _client.rpc('find_or_create_match', params: {
+      final effectiveOpponentId = lastOpponentId ?? this.lastOpponentId;
+
+      final params = <String, dynamic>{
         'p_user_id': userId,
         'p_app_version': appVersion,
-      });
+        'p_trophies': trophies ?? 1000,
+      };
+      if (effectiveOpponentId != null && effectiveOpponentId.isNotEmpty) {
+        params['p_last_opponent_id'] = effectiveOpponentId;
+      }
+
+      final response = await _client.rpc('find_or_create_match', params: params);
       
       if (response == null || (response is List && response.isEmpty)) {
         // User added to queue - waiting
@@ -128,6 +142,9 @@ class MultiplayerService {
         final p1 = data['player1_id'] as String;
         final p2 = data['player2_id'] as String;
         final opponentId = (p1 == userId) ? p2 : p1;
+
+        // Remember as last opponent for diversity/anti-farming
+        lastOpponentId = opponentId;
 
         return MatchmakingResult(
           success: true,

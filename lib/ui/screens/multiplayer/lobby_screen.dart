@@ -6,6 +6,7 @@ import '../../../core/app_theme.dart';
 import '../../../core/network_error_formatter.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/services/multiplayer_service.dart';
+import '../../../data/services/profile_service.dart';
 import 'versus_screen.dart';
 
 class LobbyScreen extends StatefulWidget {
@@ -65,10 +66,15 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
       }
     });
 
-    // Get actual app version from package info
+    // Get actual app version and player trophies
     final appVersion = AppConstants.appVersion; 
+    final profile = ProfileService.instance.activeProfile;
+    final trophies = profile?.trophies ?? 1000;
     
-    final result = await MultiplayerService.instance.findMatch(appVersion: appVersion);
+    final result = await MultiplayerService.instance.findMatch(
+      appVersion: appVersion,
+      trophies: trophies,
+    );
     
     if (!mounted) return;
 
