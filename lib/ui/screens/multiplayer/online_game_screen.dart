@@ -17,6 +17,7 @@ import '../../dialogs/app_dialogs.dart';
 import 'widgets/game_match_result_dialog.dart';
 import 'widgets/game_tactical_powerups_bar.dart';
 import 'widgets/game_reactions_ribbon.dart';
+import '../../../data/services/ghost_playback_service.dart';
 
 class OnlineGameScreen extends StatefulWidget {
   final String matchId;
@@ -26,6 +27,11 @@ class OnlineGameScreen extends StatefulWidget {
   final String opponentName;
   final int opponentAvatarIndex;
   final bool isBot; // New parameter
+  final bool isGhost;
+  final List<Map<String, dynamic>>? ghostTimeline;
+  final String? ghostFrame;
+  final int? ghostLevel;
+  final int? ghostTrophies;
 
   const OnlineGameScreen({
     super.key,
@@ -36,6 +42,11 @@ class OnlineGameScreen extends StatefulWidget {
     required this.opponentName,
     required this.opponentAvatarIndex,
     this.isBot = false,
+    this.isGhost = false,
+    this.ghostTimeline,
+    this.ghostFrame,
+    this.ghostLevel,
+    this.ghostTrophies,
   });
 
   @override
@@ -59,6 +70,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   // Bot State
   Timer? _botTimer;
   final Random _rnd = Random();
+  GhostPlaybackService? _ghostPlaybackService;
+  DateTime _questionStartTime = DateTime.now();
+  final List<Map<String, dynamic>> _myAnswerTimelines = [];
 
 
   // UI State
@@ -96,6 +110,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   @override
   void dispose() {
+    _ghostPlaybackService?.dispose();
     _botTimer?.cancel();
     _questionTimer?.cancel();
     _progressController.dispose();
@@ -129,6 +144,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       if (widget.isBot) {
         // Start Bot Logic after questions are loaded
         _startBotLogic();
+      } else if (widget.isGhost && widget.ghostTimeline != null && widget.ghostTimeline!.isNotEmpty) {
+        // Start Ghost Replay Logic
+        _startGhostLogic();
       } else {
         // 2. Listen to Opponent progress
         _opponentSubscription = MultiplayerService.instance
@@ -161,6 +179,32 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
         _showErrorDialog('خطأ في تحميل الأسئلة: $e');
       }
     }
+  }
+
+  // --- GHOST REPLAY LOGIC ---
+
+  void _startGhostLogic() {
+    _ghostPlaybackService = GhostPlaybackService(
+      timeline: widget.ghostTimeline!,
+      onGhostAnswer: ({
+        required int questionIndex,
+        required int selectedOption,
+        required bool isCorrect,
+        required int scoreGained,
+      }) {
+        if (!mounted || _gameFinished) return;
+        setState(() {
+          _opponentScore += scoreGained;
+          _opponentQuestionIndex = questionIndex + 1;
+        });
+
+        // Occasional chivalric reaction
+        if (_rnd.nextDouble() < 0.25) {
+          final reaction = isCorrect ? '⚔️' : '😅';
+          Future.delayed(const Duration(milliseconds: 400), () => _showIncomingReaction(reaction));
+        }
+      },
+    );
   }
 
   // --- BOT LOGIC ---
@@ -282,6 +326,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   }
 
   void _startQuestionTimer() {
+    _questionStartTime = DateTime.now();
+    if (widget.isGhost && _ghostPlaybackService != null) {
+      _ghostPlaybackService!.playQuestion(_currentQuestionIndex);
+    }
     _timeLeft = 15;
     _progressController.forward(from: 0);
     _selectedAnswer = -1;
@@ -319,6 +367,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       isCorrect = index == question.correctAnswerIndex;
     }
 
+    final elapsedMs = DateTime.now().difference(_questionStartTime).inMilliseconds;
+    _myAnswerTimelines.add({
+      'q': _currentQuestionIndex,
+      'ms': elapsedMs,
+      'ans': index,
+      'ok': isCorrect,
+    });
+
     setState(() {
       _isAnswered = true;
       _selectedAnswer = index;
@@ -347,7 +403,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
        });
        // Opponent score is updated by _botWaitAndAnswer
     } else {
-       // Online match
+       // Online match (human or ghost on Supabase)
        final scores = await MultiplayerService.instance.submitAnswer(
         matchId: widget.matchId,
         questionIndex: _currentQuestionIndex,
@@ -359,9 +415,11 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       if (mounted) {
         setState(() {
           _myScore = scores['myScore'] ?? _myScore;
-          final oppScore = scores['opponentScore'] ?? 0;
-          if (oppScore > _opponentScore) {
-            _opponentScore = oppScore;
+          if (!widget.isGhost) {
+            final oppScore = scores['opponentScore'] ?? 0;
+            if (oppScore > _opponentScore) {
+              _opponentScore = oppScore;
+            }
           }
         });
       }
@@ -388,6 +446,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     _gameFinished = true;
     if (mounted) setState(() {});
     _botTimer?.cancel(); // Stop bot if running
+    _ghostPlaybackService?.dispose();
+
+    if (!widget.isBot && !widget.isGhost && _myAnswerTimelines.length == 5) {
+      unawaited(MultiplayerService.instance.saveGhostTimeline(
+        matchId: widget.matchId,
+        timeline: _myAnswerTimelines,
+      ));
+    }
     
     String? winnerId;
     int? trophiesDelta;
@@ -507,7 +573,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       opponentName: widget.opponentName,
       matchId: widget.matchId,
       opponentId: widget.opponentId,
-      isBot: widget.isBot,
+      isBot: widget.isBot || widget.isGhost,
       onRematchAccepted: _onRematchAccepted,
       onDismiss: () => Navigator.of(context).popUntil((route) => route.isFirst),
     );

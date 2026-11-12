@@ -35,6 +35,6 @@ class AppConstants {
   // App & Developer info
   static const String appName = 'معركة أحفاد الصحابة';
   static const String storeTitle = 'معركة أحفاد الصحابة: مسابقات';
-  static const String appVersion = '1.0.13';
+  static const String appVersion = '1.0.14';
   static const String developerName = 'م. محمد لطف';
 }

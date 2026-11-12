@@ -77,6 +77,40 @@ class MatchState {
   }
 }
 
+class GhostMatchResult {
+  final bool success;
+  final String? matchId;
+  final String? ghostUserId;
+  final String? ghostName;
+  final int? ghostAvatarIndex;
+  final String? ghostFrame;
+  final int? ghostLevel;
+  final int? ghostTrophies;
+  final int? seed;
+  final List<String>? questionIds;
+  final List<Map<String, dynamic>>? timeline;
+  final bool isFriendly;
+  final int dailyGhostCount;
+  final String? error;
+
+  GhostMatchResult({
+    this.success = false,
+    this.matchId,
+    this.ghostUserId,
+    this.ghostName,
+    this.ghostAvatarIndex,
+    this.ghostFrame,
+    this.ghostLevel,
+    this.ghostTrophies,
+    this.seed,
+    this.questionIds,
+    this.timeline,
+    this.isFriendly = false,
+    this.dailyGhostCount = 0,
+    this.error,
+  });
+}
+
 class MultiplayerService {
   static final MultiplayerService _instance = MultiplayerService._internal();
   static MultiplayerService get instance => _instance;
@@ -730,6 +764,85 @@ class MultiplayerService {
           if (event.isEmpty) return <String, dynamic>{};
           return event.first;
         });
+  }
+
+  /// Matches or creates a realistic Ghost match with Strict Question Binding & Daily Cap
+  Future<GhostMatchResult> findOrCreateGhostMatch({int? trophies}) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return GhostMatchResult(error: 'User not logged in');
+
+      final response = await _client.rpc('find_or_create_ghost_match', params: {
+        'p_user_id': userId,
+        'p_trophies': trophies ?? 1000,
+      });
+
+      if (response == null || (response is List && response.isEmpty)) {
+        return GhostMatchResult(error: 'No ghost available');
+      }
+
+      final data = (response as List).first as Map<String, dynamic>;
+      final matchId = data['match_id'] as String;
+      final ghostUserId = data['ghost_user_id'] as String?;
+      final ghostName = data['ghost_name'] as String? ?? 'فارس الأندلس';
+      final ghostAvatarIndex =
+          (data['ghost_avatar_index'] as num?)?.toInt() ?? 0;
+      final ghostFrame = data['ghost_frame'] as String? ?? 'frame_wood';
+      final ghostLevel = (data['ghost_level'] as num?)?.toInt() ?? 5;
+      final ghostTrophies = (data['ghost_trophies'] as num?)?.toInt() ?? 1000;
+      final seed = (data['seed'] as num).toInt();
+      final questionIds = data['question_ids'] != null
+          ? List<String>.from(data['question_ids'])
+          : null;
+      final timelineRaw = data['timeline'];
+      final List<Map<String, dynamic>> timeline = (timelineRaw is List)
+          ? timelineRaw
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final isFriendly = data['is_friendly'] as bool? ?? false;
+      final dailyCount = (data['daily_ghost_count'] as num?)?.toInt() ?? 0;
+
+      return GhostMatchResult(
+        success: true,
+        matchId: matchId,
+        ghostUserId: ghostUserId,
+        ghostName: ghostName,
+        ghostAvatarIndex: ghostAvatarIndex,
+        ghostFrame: ghostFrame,
+        ghostLevel: ghostLevel,
+        ghostTrophies: ghostTrophies,
+        seed: seed,
+        questionIds: questionIds,
+        timeline: timeline,
+        isFriendly: isFriendly,
+        dailyGhostCount: dailyCount,
+      );
+    } catch (e) {
+      debugPrint('Error finding ghost match: $e');
+      return GhostMatchResult(error: e.toString());
+    }
+  }
+
+  /// Saves a human match timeline to ghost_recordings after applying Hygiene Filter
+  Future<bool> saveGhostTimeline({
+    required String matchId,
+    required List<Map<String, dynamic>> timeline,
+  }) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return false;
+
+      final res = await _client.rpc('save_ghost_timeline', params: {
+        'p_match_id': matchId,
+        'p_user_id': userId,
+        'p_timeline': timeline,
+      });
+      return res as bool? ?? false;
+    } catch (e) {
+      debugPrint('Error saving ghost timeline: $e');
+      return false;
+    }
   }
 
   /// Creates a local bot match

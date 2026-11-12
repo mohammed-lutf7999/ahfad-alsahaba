@@ -18,7 +18,10 @@ class VersusScreen extends StatefulWidget {
   final String opponentId;
   final int seed;
   final bool isBot;
+  final bool isGhost;
   final List<String>? questionIds;
+  final List<Map<String, dynamic>>? ghostTimeline;
+  final Map<String, dynamic>? initialOpponentData;
 
   const VersusScreen({
     super.key,
@@ -26,7 +29,10 @@ class VersusScreen extends StatefulWidget {
     required this.opponentId,
     required this.seed,
     this.isBot = false,
+    this.isGhost = false,
     this.questionIds,
+    this.ghostTimeline,
+    this.initialOpponentData,
   });
 
   @override
@@ -72,6 +78,21 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   }
 
   Future<void> _loadDataAndConfirmReady() async {
+    // If ghost match with pre-fetched profile, launch countdown immediately
+    if (widget.isGhost && widget.initialOpponentData != null) {
+      if (!mounted) return;
+      setState(() {
+        _opponentData = widget.initialOpponentData;
+        _questionIds = widget.questionIds;
+        _isLoading = false;
+        _bothReady = true;
+      });
+      _vsController.forward();
+      SoundService().playGameStart();
+      _startCountdown();
+      return;
+    }
+
     // 1. Fetch Opponent Data
     final opponentData = await MultiplayerService.instance.fetchOpponentData(widget.opponentId);
     if (!mounted) return;
@@ -247,6 +268,11 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
           opponentName: _opponentData?['display_name'] ?? 'الخصم',
           opponentAvatarIndex: (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0,
           isBot: widget.isBot,
+          isGhost: widget.isGhost,
+          ghostTimeline: widget.ghostTimeline,
+          ghostFrame: _opponentData?['equipped_frame'] as String?,
+          ghostLevel: (_opponentData?['player_level'] as num?)?.toInt(),
+          ghostTrophies: (_opponentData?['trophies'] as num?)?.toInt(),
         ),
       ),
     );

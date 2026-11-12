@@ -107,6 +107,7 @@ class SoundService {
   // --- Multiplayer & Results Methods ---
   Future<void> playPlayerJoin() async => playSound(playerJoinSound);
   Future<void> playGameStart() async => playSound(gameStartSound);
+  Future<void> playVersusImpact() async => playSound(gameStartSound);
   Future<void> playVictory() async => playSound(victorySound);
   Future<void> playDefeat() async => playSound(defeatSound);
 

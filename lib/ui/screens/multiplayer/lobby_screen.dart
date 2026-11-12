@@ -149,7 +149,40 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     // Fire-and-forget online queue cleanup so offline/slow network NEVER blocks or throws!
     unawaited(MultiplayerService.instance.cancelMatchmaking());
     
-    // Start local bot match immediately (0ms delay)
+    // Try Ghost replay match first (real human recording, real trophies, strict binding)
+    try {
+      final profile = ProfileService.instance.activeProfile;
+      final ghostResult = await MultiplayerService.instance.findOrCreateGhostMatch(
+        trophies: profile?.trophies ?? 1000,
+      );
+
+      if (ghostResult.success && ghostResult.matchId != null && mounted) {
+        final ghostData = {
+          'display_name': ghostResult.ghostName ?? 'فارس الأندلس',
+          'avatar_index': ghostResult.ghostAvatarIndex ?? 0,
+          'equipped_frame': ghostResult.ghostFrame ?? 'frame_wood',
+          'player_level': ghostResult.ghostLevel ?? 5,
+          'trophies': ghostResult.ghostTrophies ?? 1000,
+          'score': 0,
+        };
+
+        _goToVersusScreen(
+          ghostResult.matchId!,
+          ghostResult.ghostUserId ?? 'ghost_${DateTime.now().millisecondsSinceEpoch}',
+          ghostResult.seed ?? 1000,
+          isBot: false,
+          isGhost: true,
+          ghostTimeline: ghostResult.timeline,
+          initialOpponentData: ghostData,
+          questionIds: ghostResult.questionIds,
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Ghost match fallback to bot: $e');
+    }
+
+    // Fallback to local bot if offline
     final result = await MultiplayerService.instance.createBotMatch();
     if (!mounted) return;
     _goToVersusScreen(
@@ -161,7 +194,16 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
     );
   }
 
-  void _goToVersusScreen(String matchId, String opponentId, int seed, {bool isBot = false, List<String>? questionIds}) {
+  void _goToVersusScreen(
+    String matchId, 
+    String opponentId, 
+    int seed, {
+    bool isBot = false, 
+    bool isGhost = false,
+    List<Map<String, dynamic>>? ghostTimeline,
+    Map<String, dynamic>? initialOpponentData,
+    List<String>? questionIds,
+  }) {
     // Cancel subscription and stop search
     _matchSubscription?.cancel();
     _lobbyTimer?.cancel();
@@ -178,6 +220,9 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
           opponentId: opponentId,
           seed: seed,
           isBot: isBot,
+          isGhost: isGhost,
+          ghostTimeline: ghostTimeline,
+          initialOpponentData: initialOpponentData,
           questionIds: questionIds,
         ),
       ),
