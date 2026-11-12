@@ -42,21 +42,13 @@ ON public.ghost_recordings(trophies, created_at);
 CREATE INDEX IF NOT EXISTS idx_ghost_user 
 ON public.ghost_recordings(user_id);
 
--- Enable Row Level Security and allow public reads
+-- Enable Row Level Security (Access is mediated exclusively via SECURITY DEFINER RPCs)
 ALTER TABLE public.ghost_recordings ENABLE ROW LEVEL SECURITY;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies 
-    WHERE schemaname = 'public' 
-      AND tablename = 'ghost_recordings' 
-      AND policyname = 'Allow public read ghost_recordings'
-  ) THEN
-    CREATE POLICY "Allow public read ghost_recordings" 
-    ON public.ghost_recordings FOR SELECT TO public USING (true);
-  END IF;
-END $$;
+-- Unique index to prevent duplicate recordings for same match and user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_unique_match_user 
+ON public.ghost_recordings(source_match_id, user_id) 
+WHERE source_match_id IS NOT NULL AND user_id IS NOT NULL;
 
 -- Alter matches table to support ghost matches & friendly flag
 ALTER TABLE public.matches 
@@ -172,7 +164,8 @@ BEGIN
     p_timeline,
     v_participant.current_score,
     NOW()
-  );
+  )
+  ON CONFLICT (source_match_id, user_id) WHERE source_match_id IS NOT NULL AND user_id IS NOT NULL DO NOTHING;
 
   RETURN TRUE;
 END;
@@ -337,6 +330,7 @@ DECLARE
     v_my_score INT := 0;
     v_opp_id UUID;
     v_opp_score INT := 0;
+    v_ghost_score INT := 0;
     v_the_winner UUID := NULL;
     v_trophies_delta INT := 0;
     v_my_new_trophies INT := 1000;
@@ -371,10 +365,22 @@ BEGIN
     RETURNING COALESCE(current_score, 0) INTO v_my_score;
 
     IF v_is_ghost THEN
-        SELECT COALESCE(m.ghost_score, 0) INTO v_opp_score
+        -- Resolve real ghost score from matches.ghost_score and ghost_recordings.total_score
+        SELECT 
+            COALESCE(m.ghost_score, 0),
+            COALESCE(gr.total_score, 0)
+        INTO v_opp_score, v_ghost_score
         FROM public.matches m
+        LEFT JOIN public.ghost_recordings gr ON gr.id = m.source_ghost_recording_id
         WHERE m.id = p_match_id;
+
+        v_opp_score := GREATEST(COALESCE(v_opp_score, 0), COALESCE(v_ghost_score, 0));
         v_opp_id := NULL;
+
+        -- Update ghost participant record if present
+        UPDATE public.match_participants
+        SET current_score = v_opp_score, finished_at = COALESCE(finished_at, NOW())
+        WHERE match_id = p_match_id AND user_id != p_user_id;
     ELSE
         SELECT user_id, COALESCE(current_score, 0)
         INTO v_opp_id, v_opp_score
@@ -405,7 +411,12 @@ BEGIN
         ELSE
             v_the_winner := NULL;
         END IF;
-        IF v_prev_finished_at IS NULL AND EXISTS (
+
+        IF v_is_friendly = TRUE THEN
+            -- Friendly match: preserve win streak, zero trophies delta, PRESERVE shield (do not consume)
+            v_new_streak := v_cur_streak;
+            v_trophies_delta := 0;
+        ELSIF v_prev_finished_at IS NULL AND EXISTS (
             SELECT 1 FROM public.user_inventory
             WHERE user_id = p_user_id AND item_id = 'powerup_shield'
         ) THEN
@@ -423,9 +434,10 @@ BEGIN
         v_trophies_delta := 5;
     END IF;
 
-    -- Zero out trophies if friendly match (e.g. daily cap exceeded or rematch >= 3)
+    -- Zero out trophies and preserve streak if friendly match
     IF v_is_friendly = TRUE THEN
         v_trophies_delta := 0;
+        v_new_streak := v_cur_streak;
     END IF;
 
     UPDATE public.matches
