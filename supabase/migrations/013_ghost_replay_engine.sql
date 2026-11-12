@@ -42,6 +42,22 @@ ON public.ghost_recordings(trophies, created_at);
 CREATE INDEX IF NOT EXISTS idx_ghost_user 
 ON public.ghost_recordings(user_id);
 
+-- Enable Row Level Security and allow public reads
+ALTER TABLE public.ghost_recordings ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+      AND tablename = 'ghost_recordings' 
+      AND policyname = 'Allow public read ghost_recordings'
+  ) THEN
+    CREATE POLICY "Allow public read ghost_recordings" 
+    ON public.ghost_recordings FOR SELECT TO public USING (true);
+  END IF;
+END $$;
+
 -- Alter matches table to support ghost matches & friendly flag
 ALTER TABLE public.matches 
 ADD COLUMN IF NOT EXISTS is_ghost_match BOOLEAN DEFAULT FALSE,

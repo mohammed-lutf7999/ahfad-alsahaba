@@ -25,8 +25,8 @@ class NetworkErrorFormatter {
       return 'يرجى تسجيل الدخول أولاً لتتمكن من المنافسة عبر الإنترنت.';
     }
 
-    if (str.contains('42702') || str.contains('ambiguous')) {
-      return 'حدث تعارض في استجابة الخادم، يرجى إعادة المحاولة.';
+    if (str.contains('42702') || str.contains('ambiguous') || str.contains('PGRST') || str.contains('PostgrestException')) {
+      return 'تعذر إتمام المطابقة مع الخادم حالياً، يرجى إعادة المحاولة.';
     }
 
     return 'حدث خطأ في الاتصال: $str';

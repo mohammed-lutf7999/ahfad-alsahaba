@@ -18,6 +18,9 @@ CREATE INDEX IF NOT EXISTS idx_queue_trophies_created
 ON public.matchmaking_queue(trophies, created_at);
 
 -- 2. RPC: find_or_create_match
+-- Drop previous 2-argument overload to avoid PostgREST ambiguity (PGRST203)
+DROP FUNCTION IF EXISTS public.find_or_create_match(uuid, text);
+
 CREATE OR REPLACE FUNCTION public.find_or_create_match(
   p_user_id UUID,
   p_app_version TEXT DEFAULT '1.0.13',
@@ -151,4 +154,7 @@ BEGIN
   END IF;
 END;
 $function$;
+
+-- 3. Notify PostgREST to reload schema cache
+NOTIFY pgrst, 'reload schema';
 
