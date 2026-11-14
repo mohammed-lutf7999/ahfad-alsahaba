@@ -54,7 +54,7 @@ class NearbyService extends ChangeNotifier {
   /// تفعيل خدمة الموقع برمجياً
   Future<bool> _enableLocationService() async {
     try {
-      debugPrint('� Checking location service...');
+      debugPrint('📍 Checking location service...');
       bool serviceEnabled = await _location.serviceEnabled();
       
       if (!serviceEnabled) {
@@ -65,81 +65,92 @@ class NearbyService extends ChangeNotifier {
       
       return serviceEnabled;
     } catch (e) {
-      debugPrint('❌ Location service error: $e');
-      return false;
+      debugPrint('⚠️ Location service query notice: $e');
+      return true;
     }
   }
 
-  /// طلب تفعيل البلوتوث
+  /// فحص تفعيل البلوتوث الحقيقي
   Future<bool> _enableBluetooth() async {
     try {
-      debugPrint('📶 Checking Bluetooth...');
-      // nearby_connections يطلب تفعيل البلوتوث تلقائياً عند startAdvertising/startDiscovery
-      // لكن يمكننا التحقق من الأذونات هنا
-      return true;
+      debugPrint('📶 Checking Bluetooth status...');
+      final status = await Permission.bluetooth.serviceStatus;
+      debugPrint('📶 Bluetooth service status: $status');
+      return status.isEnabled;
     } catch (e) {
-      debugPrint('❌ Bluetooth error: $e');
-      return false;
+      debugPrint('⚠️ Bluetooth query notice: $e');
+      return true;
     }
   }
 
-  /// طلب الأذونات مع تفعيل الخدمات
-  Future<bool> requestPermissions() async {
-    debugPrint('� Requesting permissions and enabling services...');
+  /// طلب الأذونات المفصل المتوافق مع جميع أجيال أندرويد (SDK-Aware)
+  Future<NearbyPermissionResult> requestPermissionsDetailed() async {
+    debugPrint('📱 Requesting Nearby permissions with SDK-aware logic...');
     
     try {
-      // 1. تفعيل خدمة الموقع أولاً
-      final locationEnabled = await _enableLocationService();
-      if (!locationEnabled) {
-        debugPrint('❌ Location service not enabled');
-        return false;
-      }
+      // 1. فحص خدمة الموقع
+      await _enableLocationService();
 
-      // تفعيل وفحص البلوتوث
+      // 2. فحص حالة البلوتوث
       await _enableBluetooth();
       
-      // 2. طلب إذن الموقع
-      var locationStatus = await Permission.locationWhenInUse.status;
-      debugPrint('� Location permission status: $locationStatus');
+      // 3. أذونات البلوتوث الحديثة (Android 12+)
+      final bluetoothScanStatus = await Permission.bluetoothScan.request();
+      final bluetoothConnectStatus = await Permission.bluetoothConnect.request();
+      final bluetoothAdvertiseStatus = await Permission.bluetoothAdvertise.request();
       
+      // 4. أجهزة WiFi القريبة (Android 13+)
+      final nearbyWifiStatus = await Permission.nearbyWifiDevices.request();
+      debugPrint('📡 NearbyWifi: $nearbyWifiStatus');
+
+      // 5. إذن الموقع (GPS)
+      var locationStatus = await Permission.locationWhenInUse.status;
       if (!locationStatus.isGranted) {
         locationStatus = await Permission.locationWhenInUse.request();
-        debugPrint('� Location permission after request: $locationStatus');
-        
-        if (locationStatus.isPermanentlyDenied) {
-          debugPrint('❌ Location permanently denied - opening settings');
-          await openAppSettings();
-          return false;
-        }
       }
-      
-      // 3. أذونات البلوتوث
-      var bluetoothScanStatus = await Permission.bluetoothScan.request();
-      debugPrint('📶 BluetoothScan: $bluetoothScanStatus');
-      
-      var bluetoothConnectStatus = await Permission.bluetoothConnect.request();
-      debugPrint('📶 BluetoothConnect: $bluetoothConnectStatus');
-      
-      var bluetoothAdvertiseStatus = await Permission.bluetoothAdvertise.request();
-      debugPrint('📶 BluetoothAdvertise: $bluetoothAdvertiseStatus');
-      
-      // 4. أذونات أجهزة WiFi القريبة
-      var nearbyWifiStatus = await Permission.nearbyWifiDevices.request();
-      debugPrint('📡 NearbyWifi: $nearbyWifiStatus');
-      
-      // التحقق النهائي
-      final allGranted = locationStatus.isGranted &&
-          bluetoothScanStatus.isGranted &&
+
+      final isPermanentlyDenied = locationStatus.isPermanentlyDenied ||
+          bluetoothScanStatus.isPermanentlyDenied ||
+          bluetoothConnectStatus.isPermanentlyDenied ||
+          bluetoothAdvertiseStatus.isPermanentlyDenied ||
+          nearbyWifiStatus.isPermanentlyDenied;
+
+      // التقييم الذكي المتكيف (SDK-Aware Evaluation):
+      // أ) الأجهزة الحديثة (Android 12+): يكفي منح حزمة البلوتوث الحديثة
+      final modernBluetoothGranted = bluetoothScanStatus.isGranted &&
           bluetoothConnectStatus.isGranted &&
           bluetoothAdvertiseStatus.isGranted;
+
+      // ب) الأجهزة الكلاسيكية (Android <= 11): تعتمد على إذن الموقع
+      final legacyLocationGranted = locationStatus.isGranted;
+
+      // ج) دعم أجهزة الواي فاي المجاورة (Android 13+)
+      final nearbyWifiGranted = nearbyWifiStatus.isGranted;
+
+      // د) القبول الإجمالي: يتحقق بنجاح البلوتوث الحديث أو إذن الموقع أو أجهزة الواي فاي
+      final isSuccess = modernBluetoothGranted || legacyLocationGranted || nearbyWifiGranted;
       
-      debugPrint('✅ All permissions granted: $allGranted');
+      debugPrint('✅ All permissions evaluated: success=$isSuccess (modern: $modernBluetoothGranted, legacy: $legacyLocationGranted, wifi: $nearbyWifiGranted)');
       
-      return allGranted;
+      return NearbyPermissionResult(
+        isGranted: isSuccess,
+        isPermanentlyDenied: isPermanentlyDenied && !isSuccess,
+        failureReason: isSuccess ? null : 'الأذونات غير كافية لتشغيل التقارب المحلي',
+      );
     } catch (e) {
       debugPrint('❌ Permission error: $e');
-      return false;
+      return NearbyPermissionResult(
+        isGranted: false,
+        isPermanentlyDenied: false,
+        failureReason: e.toString(),
+      );
     }
+  }
+
+  /// طلب الأذونات مع تفعيل الخدمات (متوافق مع الواجهات الحالية)
+  Future<bool> requestPermissions() async {
+    final result = await requestPermissionsDetailed();
+    return result.isGranted;
   }
 
   /// بدء الإعلان (Host)
@@ -385,5 +396,19 @@ class DiscoveredChallenge {
     required this.hostName,
     required this.discoveredAt,
     this.config,
+  });
+}
+
+
+/// نتيجة فحص أذونات التقارب المحلي
+class NearbyPermissionResult {
+  final bool isGranted;
+  final bool isPermanentlyDenied;
+  final String? failureReason;
+
+  const NearbyPermissionResult({
+    required this.isGranted,
+    this.isPermanentlyDenied = false,
+    this.failureReason,
   });
 }

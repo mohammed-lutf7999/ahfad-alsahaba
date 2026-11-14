@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/services/nearby_service.dart';
@@ -7,7 +8,7 @@ import 'join_challenge_screen.dart';
 import 'private_room_hub_screen.dart';
 import 'lobby_screen.dart';
 
-/// القائمة الرئيسية لوضع التحدي
+/// القائمة الرئيسية لوضع التحدي (منظومة الأونلاين والبلوتوث المحلي)
 class ChallengeMenuScreen extends StatefulWidget {
   const ChallengeMenuScreen({super.key});
 
@@ -39,14 +40,11 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
     super.dispose();
   }
 
+  /// طلب أذونات البلوتوث المحلي حصراً وبشكل ذكي (SDK-Aware)
   Future<bool> _requestPermissions() async {
+    final result = await NearbyService.instance.requestPermissionsDetailed();
     
-    // التحقق من الأذونات أولاً
-    final granted = await NearbyService.instance.requestPermissions();
-    
-    
-    if (!granted && mounted) {
-      // عرض dialog واضح للمستخدم
+    if (!result.isGranted && mounted) {
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -55,41 +53,263 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Row(
             children: [
-              Icon(Icons.bluetooth_disabled, color: Colors.orange, size: 30),
+              Icon(Icons.bluetooth_disabled, color: Colors.orange, size: 28),
               SizedBox(width: 12),
-              Text('الأذونات مطلوبة', style: TextStyle(color: Colors.white)),
+              Text(
+                'أذونات التقارب المحلي',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
-          content: const Column(
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'لتشغيل وضع التحدي، يجب:',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              const Text(
+                'لتشغيل وضع التحدي المحلي بدون إنترنت، يلزم:',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Cairo',
+                  fontSize: 13,
+                ),
               ),
-              SizedBox(height: 12),
-              Text('✓ تفعيل البلوتوث', style: TextStyle(color: Colors.white70)),
-              Text('✓ تفعيل الموقع (GPS)', style: TextStyle(color: Colors.white70)),
-              Text('✓ السماح بالأذونات للتطبيق', style: TextStyle(color: Colors.white70)),
-              SizedBox(height: 12),
+              const SizedBox(height: 10),
+              const Text(
+                '✓ تفعيل البلوتوث للأجهزة القريبة',
+                style: TextStyle(color: Colors.white70, fontFamily: 'Cairo', fontSize: 12),
+              ),
+              const Text(
+                '✓ السماح بأذونات البحث والمزامنة',
+                style: TextStyle(color: Colors.white70, fontFamily: 'Cairo', fontSize: 12),
+              ),
+              const SizedBox(height: 12),
               Text(
-                'فعّلها من إعدادات الجهاز ثم حاول مرة أخرى.',
-                style: TextStyle(color: Colors.orange, fontSize: 12),
+                result.isPermanentlyDenied
+                    ? 'تم حظر الأذونات مسبقاً من إعدادات النظام؛ يرجى فتح الإعدادات لتمكينها يدوياً.'
+                    : 'يمكنك المحاولة مجدداً أو تمكينها من إعدادات التطبيق.',
+                style: const TextStyle(color: Colors.orange, fontSize: 11, fontFamily: 'Cairo'),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('حسناً', style: TextStyle(color: AppTheme.accentColor)),
+              child: const Text(
+                'إلغاء',
+                style: TextStyle(color: Colors.white60, fontFamily: 'Cairo'),
+              ),
             ),
+            if (result.isPermanentlyDenied)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: AppTheme.primaryDark,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await openAppSettings();
+                },
+                icon: const Icon(Icons.settings_rounded, size: 16),
+                label: const Text(
+                  'فتح الإعدادات',
+                  style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                ),
+              )
+            else
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: AppTheme.primaryDark,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'حسناً',
+                  style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                ),
+              ),
           ],
         ),
       );
       return false;
     }
     return true;
+  }
+
+  /// نافذة اختيار دور تحدي البلوتوث المحلي (إنشاء أو انضمام)
+  void _showLocalBluetoothOptions() {
+    SoundService().playClick();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryDark,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.6),
+              blurRadius: 25,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 48,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.bluetooth_searching_rounded, color: Colors.blueAccent, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تحدي البلوتوث المحلي 📡',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                    Text(
+                      'تنافس بدون إنترنت مع الأجهزة القريبة',
+                      style: TextStyle(color: Colors.white60, fontSize: 12, fontFamily: 'Cairo'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Option 1: Create Challenge (Host)
+            _buildLocalOptionCard(
+              icon: Icons.add_circle_outline_rounded,
+              title: 'إنشاء تحدي جديد (مضيف 👑)',
+              subtitle: 'كن القائد وحدد نوع الأسئلة وعددها',
+              color: AppTheme.accentColor,
+              onTap: () async {
+                Navigator.pop(ctx);
+                final granted = await _requestPermissions();
+                if (granted && mounted) {
+                  _navigateTo(const CreateChallengeScreen());
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Option 2: Join Challenge (Guest)
+            _buildLocalOptionCard(
+              icon: Icons.search_rounded,
+              title: 'البحث عن تحدي والانضمام (ضيف 🔍)',
+              subtitle: 'ابحث عن مجالس التحدي المجاورة وشارك فوراً',
+              color: const Color(0xFF00E676),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final granted = await _requestPermissions();
+                if (granted && mounted) {
+                  _navigateTo(const JoinChallengeScreen());
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocalOptionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        SoundService().playClick();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: color, size: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -107,17 +327,18 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                 
                 // Content
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // VS Icon
                         _buildVsIcon(),
                         
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 24),
                         
-                        // 1. Private Rooms (Code & WhatsApp Invite)
+                        // 1. Private Rooms (Code & WhatsApp Invite) - Zero Permission Barrier
                         _buildMenuButton(
                           icon: Icons.castle_rounded,
                           title: 'غرف التحدي الخاصة 🏰',
@@ -128,7 +349,7 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                         
                         const SizedBox(height: 16),
 
-                        // 2. Quick Matchmaking (Online Arena)
+                        // 2. Quick Matchmaking (Online Arena) - Zero Permission Barrier
                         _buildMenuButton(
                           icon: Icons.radar_rounded,
                           title: 'الميدان السريع المباشر ⚔️',
@@ -139,16 +360,16 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                         
                         const SizedBox(height: 16),
 
-                        // 3. Local Bluetooth Challenge (Offline Nearby)
+                        // 3. Local Bluetooth Challenge (Offline Nearby with Role Selection)
                         _buildMenuButton(
                           icon: Icons.bluetooth_searching_rounded,
                           title: 'تحدي البلوتوث المحلي 📡',
                           subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
                           color: Colors.blueAccent,
-                          onTap: () => _navigateTo(const CreateChallengeScreen()),
+                          onTap: _showLocalBluetoothOptions,
                         ),
                         
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 32),
                         
                         // Instructions
                         _buildInstructions(),
@@ -178,7 +399,7 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                 decoration: BoxDecoration(
                   gradient: AppTheme.goldGradient,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.3), blurRadius: 10)],
                 ),
                 child: const Icon(Icons.sports_kabaddi_rounded, color: AppTheme.primaryDark, size: 22),
               ),
@@ -203,9 +424,9 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.accentColor.withAlpha(40),
+                color: AppTheme.accentColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.accentColor.withAlpha(80)),
+                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.accentColor, size: 20),
             ),
@@ -223,13 +444,13 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            AppTheme.accentColor.withOpacity(0.3),
+            AppTheme.accentColor.withValues(alpha: 0.3),
             Colors.transparent,
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.3),
+            color: AppTheme.accentColor.withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -261,27 +482,24 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
     required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: () async {
+      onTap: () {
         SoundService().playClick();
-        final granted = await _requestPermissions();
-        if (granted) {
-          onTap();
-        }
+        onTap();
       },
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              color.withOpacity(0.2),
-              color.withOpacity(0.05),
+              color.withValues(alpha: 0.2),
+              color.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -292,7 +510,7 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 28),
@@ -315,13 +533,14 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                     subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios_rounded, color: color.withOpacity(0.5)),
+            Icon(Icons.arrow_forward_ios_rounded, color: color.withValues(alpha: 0.5)),
           ],
         ),
       ),
@@ -332,33 +551,34 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.white.withOpacity(0.5), size: 18),
+              Icon(Icons.info_outline, color: Colors.white.withValues(alpha: 0.5), size: 18),
               const SizedBox(width: 8),
               Text(
                 'كيفية التحدي',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontWeight: FontWeight.bold,
+                  fontFamily: 'Cairo',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            '• تأكد من تفعيل البلوتوث والموقع\n'
-            '• المضيف ينشئ الغرفة ويختار التحدي\n'
-            '• اللاعبون الآخرون يبحثون وينضمون',
+            '• غرف التحدي الخاصة والميدان السريع تعمل عبر الإنترنت مباشرة دون أذونات\n'
+            '• تحدي البلوتوث مخصص للتنافس المحلي بدون إنترنت في نفس المكان',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               height: 1.5,
+              fontFamily: 'Cairo',
             ),
           ),
         ],
