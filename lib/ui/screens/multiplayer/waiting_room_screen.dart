@@ -115,29 +115,38 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Title and Icon
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.goldGradient,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.goldGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+                  ),
+                  child: const Icon(Icons.people_rounded, color: AppTheme.primaryDark, size: 22),
                 ),
-                child: const Icon(Icons.people_rounded, color: AppTheme.primaryDark, size: 22),
-              ),
-              const SizedBox(width: 12),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppTheme.accentLight, AppTheme.accentColor],
-                ).createShader(bounds),
-                child: const Text(
-                  'غرفة الانتظار',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [AppTheme.accentLight, AppTheme.accentColor],
+                      ).createShader(bounds),
+                      child: const Text(
+                        'غرفة الانتظار',
+                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           // Exit button
           GestureDetector(
             onTap: () => _showExitDialog(),
@@ -168,21 +177,27 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildInfoItem(
-            icon: config.type == ChallengeType.bruteForce ? '🎲' : '📚',
-            label: config.type == ChallengeType.bruteForce 
-                ? 'القوة الغاشمة' 
-                : 'قسم محدد',
+          Expanded(
+            child: _buildInfoItem(
+              icon: config.type == ChallengeType.bruteForce ? '🎲' : '📚',
+              label: config.type == ChallengeType.bruteForce
+                  ? 'القوة الغاشمة'
+                  : 'قسم محدد',
+            ),
           ),
           Container(width: 1, height: 40, color: Colors.white24),
-          _buildInfoItem(
-            icon: '❓',
-            label: '${config.questionCount} سؤال',
+          Expanded(
+            child: _buildInfoItem(
+              icon: '❓',
+              label: '${config.questionCount} سؤال',
+            ),
           ),
           Container(width: 1, height: 40, color: Colors.white24),
-          _buildInfoItem(
-            icon: '⚡',
-            label: config.speedMode ? 'سرعة' : 'عادي',
+          Expanded(
+            child: _buildInfoItem(
+              icon: '⚡',
+              label: config.speedMode ? 'سرعة' : 'عادي',
+            ),
           ),
         ],
       ),
@@ -190,18 +205,25 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
   }
 
   Widget _buildInfoItem({required String icon, required String label}) {
-    return Column(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 24)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withOpacity(0.7),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 24)),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -212,7 +234,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.9,
+        mainAxisExtent: 206,
       ),
       itemCount: maxPlayers,
       itemBuilder: (context, index) {

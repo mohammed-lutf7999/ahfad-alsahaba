@@ -235,51 +235,61 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
       body: Container(
         decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
         child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Header
-              const Text(
-                'تحدي مباشر',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Cairo',
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 50),
-              
-              // Radar Visual
-              SizedBox(
-                height: 300,
-                width: 300,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Ripples
-                    ...List.generate(3, (index) {
-                      return AnimatedBuilder(
-                        animation: _radarController,
-                        builder: (context, child) {
-                          final progress = (_radarController.value + (index * 0.33)) % 1.0;
-                          return Opacity(
-                            opacity: 1.0 - progress,
-                            child: Container(
-                              width: 300 * progress,
-                              height: 300 * progress,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppTheme.accentColor.withValues(alpha: 0.5),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompactHeight = constraints.maxHeight < 680;
+              final radarSize = isCompactHeight ? 220.0 : 300.0;
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: (constraints.maxHeight - 32).clamp(0.0, double.infinity),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Header
+                      const Text(
+                        'تحدي مباشر',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Cairo',
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: isCompactHeight ? 24 : 40),
+                      
+                      // Radar Visual
+                      SizedBox(
+                        height: radarSize,
+                        width: radarSize,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Ripples
+                            ...List.generate(3, (index) {
+                              return AnimatedBuilder(
+                                animation: _radarController,
+                                builder: (context, child) {
+                                  final progress = (_radarController.value + (index * 0.33)) % 1.0;
+                                  return Opacity(
+                                    opacity: 1.0 - progress,
+                                    child: Container(
+                                      width: radarSize * progress,
+                                      height: radarSize * progress,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: AppTheme.accentColor.withValues(alpha: 0.5),
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }),
                     
                     // Center Icon
                     Container(
@@ -297,7 +307,7 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                 ),
               ),
               
-              const SizedBox(height: 50),
+              SizedBox(height: isCompactHeight ? 24 : 40),
               
               // Status Text
               Padding(
@@ -337,14 +347,17 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                             _startMatchmaking();
                           },
                           icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryDark),
-                          label: const Text(
-                            'إعادة المحاولة',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryDark,
-                              fontFamily: 'Cairo',
-                              fontSize: 16,
-                              height: 1.2,
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'إعادة المحاولة',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryDark,
+                                fontFamily: 'Cairo',
+                                fontSize: 16,
+                                height: 1.2,
+                              ),
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -361,14 +374,17 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                         child: OutlinedButton.icon(
                           onPressed: _startBotMatch,
                           icon: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-                          label: const Text(
-                            'تحدي الذكاء الاصطناعي 🤖',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontFamily: 'Cairo',
-                              fontSize: 16,
-                              height: 1.2,
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'تحدي الذكاء الاصطناعي 🤖',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFamily: 'Cairo',
+                                fontSize: 16,
+                                height: 1.2,
+                              ),
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -401,14 +417,17 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                     child: ElevatedButton.icon(
                       onPressed: _startBotMatch,
                       icon: const Icon(Icons.smart_toy_rounded, color: AppTheme.primaryDark),
-                      label: const Text(
-                        'تحدي الذكاء الاصطناعي 🤖',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryDark,
-                          fontFamily: 'Cairo',
-                          fontSize: 16,
-                          height: 1.2,
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'تحدي الذكاء الاصطناعي 🤖',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryDark,
+                            fontFamily: 'Cairo',
+                            fontSize: 16,
+                            height: 1.2,
+                          ),
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -432,7 +451,11 @@ class _LobbyScreenState extends State<LobbyScreen> with SingleTickerProviderStat
                   icon: const Icon(Icons.close, color: Colors.redAccent),
                   label: const Text('إلغاء', style: TextStyle(color: Colors.redAccent, fontSize: 16)),
                 ),
-            ],
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

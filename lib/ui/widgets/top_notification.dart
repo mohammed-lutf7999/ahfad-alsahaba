@@ -153,8 +153,6 @@ class _TopNotificationWidgetState extends State<_TopNotificationWidget>
 
   @override
   Widget build(BuildContext context) {
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-
     return Positioned(
       top: 0,
       left: 0,
@@ -174,12 +172,7 @@ class _TopNotificationWidgetState extends State<_TopNotificationWidget>
               },
               child: Container(
                 width: double.infinity,
-                padding: EdgeInsets.only(
-                  top: statusBarHeight + 12,
-                  bottom: 16,
-                  left: 20,
-                  right: 20,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,

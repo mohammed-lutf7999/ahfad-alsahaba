@@ -55,13 +55,15 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
             children: [
               Icon(Icons.bluetooth_disabled, color: Colors.orange, size: 28),
               SizedBox(width: 12),
-              Text(
-                'أذونات التقارب المحلي',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  'أذونات التقارب المحلي',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -166,86 +168,93 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 48,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Header
-            Row(
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
+              // Handle bar
+              Container(
+                width: 48,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.bluetooth_searching_rounded, color: Colors.blueAccent, size: 24),
                   ),
-                  child: const Icon(Icons.bluetooth_searching_rounded, color: Colors.blueAccent, size: 24),
-                ),
-                const SizedBox(width: 14),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'تحدي البلوتوث المحلي 📡',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Cairo',
-                      ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تحدي البلوتوث المحلي 📡',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          'تنافس بدون إنترنت مع الأجهزة القريبة',
+                          style: TextStyle(color: Colors.white60, fontSize: 12, fontFamily: 'Cairo'),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'تنافس بدون إنترنت مع الأجهزة القريبة',
-                      style: TextStyle(color: Colors.white60, fontSize: 12, fontFamily: 'Cairo'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
-            // Option 1: Create Challenge (Host)
-            _buildLocalOptionCard(
-              icon: Icons.add_circle_outline_rounded,
-              title: 'إنشاء تحدي جديد (مضيف 👑)',
-              subtitle: 'كن القائد وحدد نوع الأسئلة وعددها',
-              color: AppTheme.accentColor,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final granted = await _requestPermissions();
-                if (granted && mounted) {
-                  _navigateTo(const CreateChallengeScreen());
-                }
-              },
-            ),
-            const SizedBox(height: 12),
+              // Option 1: Create Challenge (Host)
+              _buildLocalOptionCard(
+                icon: Icons.add_circle_outline_rounded,
+                title: 'إنشاء تحدي جديد (مضيف 👑)',
+                subtitle: 'كن القائد وحدد نوع الأسئلة وعددها',
+                color: AppTheme.accentColor,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final granted = await _requestPermissions();
+                  if (granted && mounted) {
+                    _navigateTo(const CreateChallengeScreen());
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
 
-            // Option 2: Join Challenge (Guest)
-            _buildLocalOptionCard(
-              icon: Icons.search_rounded,
-              title: 'البحث عن تحدي والانضمام (ضيف 🔍)',
-              subtitle: 'ابحث عن مجالس التحدي المجاورة وشارك فوراً',
-              color: const Color(0xFF00E676),
-              onTap: () async {
-                Navigator.pop(ctx);
-                final granted = await _requestPermissions();
-                if (granted && mounted) {
-                  _navigateTo(const JoinChallengeScreen());
-                }
-              },
+              // Option 2: Join Challenge (Guest)
+              _buildLocalOptionCard(
+                icon: Icons.search_rounded,
+                title: 'البحث عن تحدي والانضمام (ضيف 🔍)',
+                subtitle: 'ابحث عن مجالس التحدي المجاورة وشارك فوراً',
+                color: const Color(0xFF00E676),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final granted = await _requestPermissions();
+                  if (granted && mounted) {
+                    _navigateTo(const JoinChallengeScreen());
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
             ),
-            const SizedBox(height: 16),
-          ],
+          ),
         ),
       ),
     );

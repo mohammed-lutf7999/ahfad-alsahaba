@@ -156,6 +156,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           backgroundColor: AppTheme.accentColor,
                           foregroundColor: AppTheme.primaryDark,
                           elevation: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                           shadowColor: AppTheme.accentColor.withOpacity(0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -167,6 +168,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Cairo',
+                            height: 1.2,
                           ),
                         ),
                       ),
@@ -200,38 +202,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           // Text Area
           Expanded(
             flex: 4,
-            child: Column(
-              children: [
-                ShaderMask(
-                   shaderCallback: (bounds) => const LinearGradient(
-                     colors: [Color(0xFFFFD700), Colors.white],
-                     begin: Alignment.topCenter,
-                     end: Alignment.bottomCenter,
-                   ).createShader(bounds),
-                   child: Text(
-                    item.title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Cairo',
-                      color: Colors.white, // Fallback
-                      height: 1.2,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ShaderMask(
+                     shaderCallback: (bounds) => const LinearGradient(
+                       colors: [Color(0xFFFFD700), Colors.white],
+                       begin: Alignment.topCenter,
+                       end: Alignment.bottomCenter,
+                     ).createShader(bounds),
+                     child: Text(
+                      item.title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                        color: Colors.white, // Fallback
+                        height: 1.2,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  item.description,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withOpacity(0.8),
-                    height: 1.5,
-                    fontFamily: 'Cairo', // Clean readable font for body
+                  const SizedBox(height: 16),
+                  Text(
+                    item.description,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white.withOpacity(0.8),
+                      height: 1.5,
+                      fontFamily: 'Cairo', // Clean readable font for body
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

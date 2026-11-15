@@ -292,96 +292,105 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // Main content
-            Center(
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_fadeAnimation, _scaleAnimation, _slideAnimation]),
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value,
-                    child: Transform.translate(
-                      offset: Offset(0, _slideAnimation.value),
-                      child: Transform.scale(
-                        scale: _scaleAnimation.value,
-                        child: child,
-                      ),
-                    ),
-                  );
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Animated logo with glow
-                    AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulseAnimation.value,
+            // Main content (protected from cutouts/system bars on compact screens)
+            SafeArea(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_fadeAnimation, _scaleAnimation, _slideAnimation]),
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: _fadeAnimation.value,
+                      child: Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: Transform.scale(
+                          scale: _scaleAnimation.value,
                           child: child,
-                        );
-                      },
-                      child: _buildLogo(),
-                    ),
-                    
-                    const SizedBox(height: 40),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Animated logo with glow
+                      AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _pulseAnimation.value,
+                            child: child,
+                          );
+                        },
+                        child: _buildLogo(),
+                      ),
 
-                    // App name with shimmer effect
-                    _buildAppName(),
+                      const SizedBox(height: 40),
 
-                    const SizedBox(height: 14),
+                      // App name with shimmer effect
+                      _buildAppName(),
 
-                    // Subtitle with elegant styling
-                    _buildSubtitle(),
-                    
-                    const SizedBox(height: 55),
+                      const SizedBox(height: 14),
 
-                    // Elegant loading indicator
-                    _buildLoadingIndicator(),
-                  ],
+                      // Subtitle with elegant styling
+                      _buildSubtitle(),
+
+                      const SizedBox(height: 55),
+
+                      // Elegant loading indicator
+                      _buildLoadingIndicator(),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            // Bottom branding
+            // Bottom branding (always clears gesture pill & 3-button nav bar on Android 15+)
             Positioned(
-              bottom: 45,
+              bottom: 0,
               left: 0,
               right: 0,
-              child: AnimatedBuilder(
-                animation: _fadeAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value * 0.9,
-                    child: child,
-                  );
-                },
-                child: Column(
-                  children: [
-                    // Bismillah
-                    ShaderMask(
-                      shaderCallback: (bounds) {
-                        return const LinearGradient(
-                          colors: [lightGold, imperialGold, lightGold],
-                        ).createShader(bounds);
-                      },
-                      child: const Text(
-                        '﷽',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w400,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: AnimatedBuilder(
+                    animation: _fadeAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _fadeAnimation.value * 0.9,
+                        child: child,
+                      );
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Bismillah
+                        ShaderMask(
+                          shaderCallback: (bounds) {
+                            return const LinearGradient(
+                              colors: [lightGold, imperialGold, lightGold],
+                            ).createShader(bounds);
+                          },
+                          child: const Text(
+                            '﷽',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'الإصدار ${AppConstants.appVersion}',
+                          style: TextStyle(
+                            color: imperialGold.withAlpha(120),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'الإصدار ${AppConstants.appVersion}',
-                      style: TextStyle(
-                        color: imperialGold.withAlpha(120),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

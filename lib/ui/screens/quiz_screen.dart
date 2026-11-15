@@ -188,9 +188,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       return Scaffold(
         body: Container(
           decoration: BoxDecoration(gradient: backgroundGradient),
-          child: const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+          child: const SafeArea(
+            child: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+              ),
             ),
           ),
         ),
@@ -244,10 +246,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 _initializeQuiz();
                               },
                               icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: const Text('إعادة المحاولة'),
+                              label: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'إعادة المحاولة',
+                                  style: TextStyle(height: 1.2),
+                                ),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
+                                  horizontal: 10,
                                   vertical: 8,
                                 ),
                               ),
@@ -261,10 +269,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 Navigator.pop(context);
                               },
                               icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                              label: const Text('العودة'),
+                              label: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'العودة',
+                                  style: TextStyle(height: 1.2),
+                                ),
+                              ),
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
+                                  horizontal: 10,
                                   vertical: 8,
                                 ),
                               ),
@@ -340,56 +354,73 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         ),
                         
                         // Lives Bar (Shattering Hearts)
-                        Row(
-                          children: List.generate(3, (index) {
-                            final isActive = index < _gameController.lives;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: _ShatteringHeart(isActive: isActive),
-                            );
-                          }),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(3, (index) {
+                                final isActive = index < _gameController.lives;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  child: _ShatteringHeart(isActive: isActive),
+                                );
+                              }),
+                            ),
+                          ),
                         ),
 
-                        // Timer (Smaller)
-                        Transform.scale(
-                          scale: 0.85, 
-                          child: ListenableBuilder(
-                            listenable: _timerController,
-                            builder: (context, _) => TimerWidget(
-                              remainingTime: _timerController.remainingTime,
-                              totalTime: _timerController.totalTime,
-                              isRunning: _timerController.isRunning,
+                        // Timer (Scaled safely inside layout constraints for 360dp)
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Transform.scale(
+                              scale: 0.85,
+                              child: ListenableBuilder(
+                                listenable: _timerController,
+                                builder: (context, _) => TimerWidget(
+                                  remainingTime: _timerController.remainingTime,
+                                  totalTime: _timerController.totalTime,
+                                  isRunning: _timerController.isRunning,
+                                ),
+                              ),
                             ),
                           ),
                         ),
 
                         // Score Area with Shine Effect
-                        AnimatedBuilder(
-                          animation: _successController,
-                           builder: (context, child) {
-                             final glow = _successController.value * 10;
-                             return Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                               decoration: BoxDecoration(
-                                  gradient: AppTheme.goldGradient,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.accentColor.withAlpha(80 + (100 * _successController.value).toInt()),
-                                      blurRadius: 8 + glow,
-                                      spreadRadius: _successController.value * 3
-                                    )
-                                  ],
-                               ),
-                               child: Row(
-                                 children: [
-                                   const Icon(Icons.stars_rounded, color: AppTheme.primaryDark, size: 18),
-                                   const SizedBox(width: 6),
-                                   Text('${_gameController.score}', style: const TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold)),
-                                 ],
-                               ),
-                             );
-                           },
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: AnimatedBuilder(
+                              animation: _successController,
+                               builder: (context, child) {
+                                 final glow = _successController.value * 10;
+                                 return Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                   decoration: BoxDecoration(
+                                      gradient: AppTheme.goldGradient,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.accentColor.withAlpha(80 + (100 * _successController.value).toInt()),
+                                          blurRadius: 8 + glow,
+                                          spreadRadius: _successController.value * 3
+                                        )
+                                      ],
+                                   ),
+                                   child: Row(
+                                     mainAxisSize: MainAxisSize.min,
+                                     children: [
+                                       const Icon(Icons.stars_rounded, color: AppTheme.primaryDark, size: 18),
+                                       const SizedBox(width: 6),
+                                       Text('${_gameController.score}', style: const TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold)),
+                                     ],
+                                   ),
+                                 );
+                               },
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -562,105 +593,123 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       barrierColor: Colors.black.withOpacity(0.9),
       transitionDuration: const Duration(milliseconds: 500),
       pageBuilder: (ctx, anim1, anim2) {
-        return Center(
-          child: ScaleTransition(
-            scale: CurvedAnimation(parent: anim1, curve: Curves.elasticOut),
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  // Purple Gradient (Dark to Light)
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF311B92), Color(0xFF673AB7)], // Deep Purple to Purple
-                    begin: Alignment.topCenter, 
-                    end: Alignment.bottomCenter
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF9575CD), width: 2),
-                  boxShadow: [BoxShadow(color: const Color(0xFF311B92).withOpacity(0.6), blurRadius: 40, spreadRadius: 5)],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Blinking Game Over Text
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 1.0, end: 0.5),
-                      duration: const Duration(seconds: 1),
-                      builder: (context, value, child) {
-                        return Opacity(opacity: value, child: child);
-                      },
-                      onEnd: () {}, // Loop handled by rebuilding widget tree usually, but for simple dialog this is okay-ish static. For loop, we need StatefulWidget.
-                      // Making it a simple static glow for now to avoid state complexity in dialog builder
-                      child: const Text(
-                        "حسرت المسابقة", 
-                        style: TextStyle(
-                          fontSize: 32, 
-                          fontWeight: FontWeight.bold, 
-                          color: Colors.white,
-                          shadows: [BoxShadow(color: Colors.white, blurRadius: 15, spreadRadius: 2)]
-                        )
+        return SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double dialogWidth =
+                  (constraints.maxWidth * 0.88).clamp(0.0, 380.0);
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: ScaleTransition(
+                    scale: CurvedAnimation(
+                        parent: anim1, curve: Curves.elasticOut),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: dialogWidth,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      // Purple Gradient (Dark to Light)
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF311B92), Color(0xFF673AB7)], // Deep Purple to Purple
+                        begin: Alignment.topCenter, 
+                        end: Alignment.bottomCenter
                       ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFF9575CD), width: 2),
+                      boxShadow: [BoxShadow(color: const Color(0xFF311B92).withOpacity(0.6), blurRadius: 40, spreadRadius: 5)],
                     ),
-                    const SizedBox(height: 10),
-                    // Gold Subtext
-                    const Text(
-                      "هل ترغب في إعادة المحاولة؟", 
-                      textAlign: TextAlign.center, 
-                      style: TextStyle(
-                        fontSize: 18, 
-                        color: Color(0xFFFFD700), // Gold
-                        height: 1.5,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Cairo' // Assuming default font supports Arabic.
-                      )
-                    ),
-                    const SizedBox(height: 30),
-                    Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context); // Close dialog
-                              _streak = 0;
-                              _isCompleting = false;
-                              setState(() => _isLoading = true);
-                              _initializeQuiz(); // Restart level
-                            },
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF7E57C2), // Lighter Purple
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                elevation: 8,
-                                shadowColor: const Color(0xFFFFD700).withOpacity(0.4), // Gold Shadow
-                            ),
-                            child: const Text("إعادة المحاولة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        // Blinking Game Over Text
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 1.0, end: 0.5),
+                          duration: const Duration(seconds: 1),
+                          builder: (context, value, child) {
+                            return Opacity(opacity: value, child: child);
+                          },
+                          onEnd: () {},
+                          child: const Text(
+                            "حسرت المسابقة", 
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 32, 
+                              fontWeight: FontWeight.bold, 
+                              color: Colors.white,
+                              shadows: [BoxShadow(color: Colors.white, blurRadius: 15, spreadRadius: 2)]
+                            )
                           ),
                         ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                                Navigator.pop(context); // Close dialog
-                                Navigator.pop(context); // Exit screen
-                            },
-                             style: OutlinedButton.styleFrom(
-                                backgroundColor: const Color(0xFF210857), // Very Dark Purple
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                side: const BorderSide(color: Color(0xFF9575CD), width: 1.5),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        const SizedBox(height: 10),
+                        // Gold Subtext
+                        const Text(
+                          "هل ترغب في إعادة المحاولة؟", 
+                          textAlign: TextAlign.center, 
+                          style: TextStyle(
+                            fontSize: 18, 
+                            color: Color(0xFFFFD700), // Gold
+                            height: 1.5,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Cairo'
+                          )
+                        ),
+                        const SizedBox(height: 30),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context); // Close dialog
+                                  _streak = 0;
+                                  _isCompleting = false;
+                                  setState(() => _isLoading = true);
+                                  _initializeQuiz(); // Restart level
+                                },
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF7E57C2), // Lighter Purple
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    elevation: 8,
+                                    shadowColor: const Color(0xFFFFD700).withOpacity(0.4), // Gold Shadow
+                                ),
+                                child: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text("إعادة المحاولة", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, height: 1.2)),
+                                ),
+                              ),
                             ),
-                            child: const Text("خروج", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                    Navigator.pop(context); // Close dialog
+                                    Navigator.pop(context); // Exit screen
+                                },
+                                 style: OutlinedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF210857), // Very Dark Purple
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    side: const BorderSide(color: Color(0xFF9575CD), width: 1.5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                child: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text("خروج", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, height: 1.2)),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
+          );
+            },
           ),
         );
       },

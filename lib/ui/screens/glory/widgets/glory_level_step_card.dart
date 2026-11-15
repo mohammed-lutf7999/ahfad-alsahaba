@@ -101,13 +101,16 @@ class GloryLevelStepCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                        child: Text(
-                          isFrameEquipped ? 'الإطار مُفعّل ✓' : 'تفعيل الإطار',
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10.5,
-                            height: 1.15,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isFrameEquipped ? 'الإطار مُفعّل ✓' : 'تفعيل الإطار',
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10.5,
+                              height: 1.15,
+                            ),
                           ),
                         ),
                       ),
@@ -199,7 +202,10 @@ class GloryLevelStepCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 'المستوى $level',
@@ -213,7 +219,6 @@ class GloryLevelStepCard extends StatelessWidget {
                                   height: 1.2,
                                 ),
                               ),
-                              const SizedBox(width: 6),
                               if (isCurrent)
                                 Container(
                                   padding: const EdgeInsets.symmetric(

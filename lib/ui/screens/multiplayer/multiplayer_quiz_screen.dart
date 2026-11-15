@@ -210,53 +210,55 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
         return Scaffold(
           body: Container(
             decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                   const Text(
-                     '🎉 أنهيت التحدي!',
-                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                   ),
-                   const SizedBox(height: 20),
-                   Container(
-                     padding: const EdgeInsets.all(20),
-                     margin: const EdgeInsets.symmetric(horizontal: 40),
-                     decoration: BoxDecoration(
-                       color: Colors.white.withOpacity(0.1),
-                       borderRadius: BorderRadius.circular(20),
-                       border: Border.all(color: AppTheme.accentColor.withOpacity(0.5)),
+            child: SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                     const Text(
+                       '🎉 أنهيت التحدي!',
+                       style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                      ),
-                     child: Column(
-                       children: [
-                         Text(
-                           '${player.score} نقطة',
-                           style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
-                         ),
-                         const SizedBox(height: 10),
-                         Text(
-                           '${player.correctAnswers} إجابة صحيحة',
-                           style: const TextStyle(color: Colors.white70),
-                         ),
-                       ],
+                     const SizedBox(height: 20),
+                     Container(
+                       padding: const EdgeInsets.all(20),
+                       margin: const EdgeInsets.symmetric(horizontal: 40),
+                       decoration: BoxDecoration(
+                         color: Colors.white.withOpacity(0.1),
+                         borderRadius: BorderRadius.circular(20),
+                         border: Border.all(color: AppTheme.accentColor.withOpacity(0.5)),
+                       ),
+                       child: Column(
+                         children: [
+                           Text(
+                             '${player.score} نقطة',
+                             style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
+                           ),
+                           const SizedBox(height: 10),
+                           Text(
+                             '${player.correctAnswers} إجابة صحيحة',
+                             style: const TextStyle(color: Colors.white70),
+                           ),
+                         ],
+                       ),
                      ),
-                   ),
-                   const SizedBox(height: 40),
-                   const CircularProgressIndicator(color: AppTheme.accentColor),
-                   const SizedBox(height: 16),
-                   const Text(
-                     'بانتظار انتهاء باقي اللاعبين لعرض الترتيب...',
-                     style: TextStyle(color: Colors.white54),
-                     textAlign: TextAlign.center,
-                   ),
-                ],
+                     const SizedBox(height: 40),
+                     const CircularProgressIndicator(color: AppTheme.accentColor),
+                     const SizedBox(height: 16),
+                     const Text(
+                       'بانتظار انتهاء باقي اللاعبين لعرض الترتيب...',
+                       style: TextStyle(color: Colors.white54),
+                       textAlign: TextAlign.center,
+                     ),
+                  ],
+                ),
               ),
             ),
           ),
         );
       }
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
       );
     }
     

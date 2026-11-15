@@ -157,52 +157,55 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
             ],
           ),
         ),
-        body: Column(
-          children: [
-            // 1. Royal Wallet & Active Customization Header
-            _buildWalletHeader(
-              customTheme: customTheme,
-              levelInfo: levelInfo,
-              equippedFrame: equippedFrame,
-              customTitle: profile?.effectiveTitle,
-              coins: coins,
-              gems: gems,
-              winStreak: winStreak,
-            ),
-
-            // 2. 4 Category Tabs
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildCatalogList(
-                    key: const Key('store_tab_themes'),
-                    category: StoreItemCategory.theme,
-                    customTheme: customTheme,
-                    playerLevel: levelInfo.level,
-                  ),
-                  _buildCatalogList(
-                    key: const Key('store_tab_frames'),
-                    category: StoreItemCategory.frame,
-                    customTheme: customTheme,
-                    playerLevel: levelInfo.level,
-                  ),
-                  _buildCatalogList(
-                    key: const Key('store_tab_titles'),
-                    category: StoreItemCategory.title,
-                    customTheme: customTheme,
-                    playerLevel: levelInfo.level,
-                  ),
-                  _buildCatalogList(
-                    key: const Key('store_tab_powerups'),
-                    category: StoreItemCategory.powerup,
-                    customTheme: customTheme,
-                    playerLevel: levelInfo.level,
-                  ),
-                ],
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              // 1. Royal Wallet & Active Customization Header
+              _buildWalletHeader(
+                customTheme: customTheme,
+                levelInfo: levelInfo,
+                equippedFrame: equippedFrame,
+                customTitle: profile?.effectiveTitle,
+                coins: coins,
+                gems: gems,
+                winStreak: winStreak,
               ),
-            ),
-          ],
+
+              // 2. 4 Category Tabs
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildCatalogList(
+                      key: const Key('store_tab_themes'),
+                      category: StoreItemCategory.theme,
+                      customTheme: customTheme,
+                      playerLevel: levelInfo.level,
+                    ),
+                    _buildCatalogList(
+                      key: const Key('store_tab_frames'),
+                      category: StoreItemCategory.frame,
+                      customTheme: customTheme,
+                      playerLevel: levelInfo.level,
+                    ),
+                    _buildCatalogList(
+                      key: const Key('store_tab_titles'),
+                      category: StoreItemCategory.title,
+                      customTheme: customTheme,
+                      playerLevel: levelInfo.level,
+                    ),
+                    _buildCatalogList(
+                      key: const Key('store_tab_powerups'),
+                      category: StoreItemCategory.powerup,
+                      customTheme: customTheme,
+                      playerLevel: levelInfo.level,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -434,7 +437,10 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -461,7 +467,6 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
                       ),
                     ),
                     if (isOwned && !isEquipped) ...[
-                      const SizedBox(width: 6),
                       const Text(
                         'مملوك ✓',
                         style: TextStyle(
@@ -481,35 +486,41 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
           const SizedBox(width: 10),
 
           // Action Button (Rule 6: vertical padding 8)
-          SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              key: Key('store_action_${item.id}'),
-              onPressed: isEquipped ? null : () => _handleItemAction(item),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isOwned
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF3C644),
-                foregroundColor: isOwned
-                    ? Colors.white
-                    : const Color(0xFF140B29),
-                disabledBackgroundColor: Colors.black.withValues(alpha: 0.35),
-                disabledForegroundColor: const Color(0xFF6EE7B7),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 112),
+            child: SizedBox(
+              height: 44,
+              child: ElevatedButton(
+                key: Key('store_action_${item.id}'),
+                onPressed: isEquipped ? null : () => _handleItemAction(item),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isOwned
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFF3C644),
+                  foregroundColor: isOwned
+                      ? Colors.white
+                      : const Color(0xFF140B29),
+                  disabledBackgroundColor: Colors.black.withValues(alpha: 0.35),
+                  disabledForegroundColor: const Color(0xFF6EE7B7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                buttonText,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.w900,
-                  fontSize: 11.5,
-                  height: 1.2,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11.5,
+                      height: 1.2,
+                    ),
+                  ),
                 ),
               ),
             ),

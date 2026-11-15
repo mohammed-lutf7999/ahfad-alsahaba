@@ -459,12 +459,15 @@ class _GameMatchResultDialogContentState
                     Icon(Icons.door_back_door_outlined,
                         color: Colors.white60, size: 18),
                     SizedBox(width: 6),
-                    Text(
-                      'غادر الخصم شاشة النزال أو انتهى الوقت',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontFamily: 'Cairo',
+                    Flexible(
+                      child: Text(
+                        'غادر الخصم شاشة النزال أو انتهى الوقت',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
                     ),
                   ],
@@ -496,13 +499,16 @@ class _GameMatchResultDialogContentState
                     ),
                     onPressed: _handleRematchLaunch,
                     icon: const Icon(Icons.sports_kabaddi, size: 18),
-                    label: const Text(
-                      'قبول النزال ⚔️',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        fontFamily: 'Cairo',
-                        height: 1.2,
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'قبول النزال ⚔️',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          fontFamily: 'Cairo',
+                          height: 1.2,
+                        ),
                       ),
                     ),
                   ),
@@ -544,6 +550,7 @@ class _GameMatchResultDialogContentState
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor,
                 foregroundColor: AppTheme.primaryDark,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -561,12 +568,18 @@ class _GameMatchResultDialogContentState
                     ),
                   ),
                   SizedBox(width: 10),
-                  Text(
-                    'جاري تجهيز ساحة المعركة...',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Cairo',
-                      color: AppTheme.primaryDark,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'جاري تجهيز ساحة المعركة...',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                          color: AppTheme.primaryDark,
+                          height: 1.2,
+                        ),
+                      ),
                     ),
                   ),
                 ],

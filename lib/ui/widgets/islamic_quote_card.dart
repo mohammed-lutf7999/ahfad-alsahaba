@@ -62,138 +62,153 @@ class _IslamicQuoteCardState extends State<IslamicQuoteCard> {
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Pull bar
-              Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: customTheme.sovereignAccent.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Title badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.auto_stories_rounded,
-                    color: customTheme.sovereignAccent,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'قَبَسٌ مِن نُورِ السَّلَف • ${quote.title}',
-                    style: TextStyle(
-                      color: customTheme.sovereignAccent,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Full quote text
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: customTheme.sovereignAccent.withValues(alpha: 0.2),
+                // Pull bar
+                Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: customTheme.sovereignAccent.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                child: Text(
-                  '« ${quote.text} »',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15.5,
-                    height: 1.65,
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 18),
 
-              // Author & reference
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '— ${quote.author}',
-                    style: TextStyle(
+                // Title badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.auto_stories_rounded,
                       color: customTheme.sovereignAccent,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Cairo',
+                      size: 18,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '(${quote.reference})',
-                    style: TextStyle(
-                      color: customTheme.textMuted,
-                      fontSize: 12,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-
-              // Action buttons (Copy quote)
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    SoundService().playClick();
-                    Clipboard.setData(
-                      ClipboardData(
-                        text: '« ${quote.text} »\n— ${quote.author} (${quote.reference})\nعبر تطبيق: معركة أحفاد الصحابة',
-                      ),
-                    );
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text(
-                          'تم نسخ الحكمة المباركة بنجاح 📋',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'Cairo'),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'قَبَسٌ مِن نُورِ السَّلَف • ${quote.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: customTheme.sovereignAccent,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
                         ),
-                        backgroundColor: customTheme.surfaceCard,
-                        duration: const Duration(seconds: 2),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: customTheme.sovereignAccent,
-                    foregroundColor: AppTheme.primaryDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Full quote text
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: customTheme.sovereignAccent.withValues(alpha: 0.2),
+                    ),
                   ),
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text(
-                    'نسخ الحكمة المباركة',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                  child: Text(
+                    '« ${quote.text} »',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15.5,
+                      height: 1.65,
                       fontFamily: 'Cairo',
-                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+
+                // Author & reference
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '— ${quote.author}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: customTheme.sovereignAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '(${quote.reference})',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: customTheme.textMuted,
+                          fontSize: 12,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+
+                // Action buttons (Copy quote)
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      SoundService().playClick();
+                      Clipboard.setData(
+                        ClipboardData(
+                          text: '« ${quote.text} »\n— ${quote.author} (${quote.reference})\nعبر تطبيق: معركة أحفاد الصحابة',
+                        ),
+                      );
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                            'تم نسخ الحكمة المباركة بنجاح 📋',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontFamily: 'Cairo'),
+                          ),
+                          backgroundColor: customTheme.surfaceCard,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: customTheme.sovereignAccent,
+                      foregroundColor: AppTheme.primaryDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text(
+                      'نسخ الحكمة المباركة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            ),
           ),
         );
       },

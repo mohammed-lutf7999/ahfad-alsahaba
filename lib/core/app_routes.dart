@@ -109,8 +109,9 @@ class AppRoutes {
         return _slideRoute(const KnightsStoreScreen(), settings);
       default:
         return MaterialPageRoute(
-          builder: (_) =>
-              const Scaffold(body: Center(child: Text('صفحة غير موجودة'))),
+          builder: (_) => const Scaffold(
+            body: SafeArea(child: Center(child: Text('صفحة غير موجودة'))),
+          ),
         );
     }
   }

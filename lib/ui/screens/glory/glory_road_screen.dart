@@ -170,28 +170,31 @@ class _GloryRoadScreenState extends State<GloryRoadScreen>
             ],
           ),
         ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // TAB 1: 100-Level Mastery Ladder
-            _buildLevelsRoadTab(
-              customTheme: customTheme,
-              levelInfo: levelInfo,
-              equippedFrame: equippedFrame,
-              customTitle: profile?.effectiveTitle,
-              coins: coins,
-              winStreak: winStreak,
-              playerName: profile?.name ?? 'فارس المعرفة',
-            ),
+        body: SafeArea(
+          top: false,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // TAB 1: 100-Level Mastery Ladder
+              _buildLevelsRoadTab(
+                customTheme: customTheme,
+                levelInfo: levelInfo,
+                equippedFrame: equippedFrame,
+                customTitle: profile?.effectiveTitle,
+                coins: coins,
+                winStreak: winStreak,
+                playerName: profile?.name ?? 'فارس المعرفة',
+              ),
 
-            // TAB 2: 6 Historic Competitive Arenas
-            GloryArenasRoadTab(
-              customTheme: customTheme,
-              currentArena: arenaInfo,
-              trophies: trophies,
-              winStreak: winStreak,
-            ),
-          ],
+              // TAB 2: 6 Historic Competitive Arenas
+              GloryArenasRoadTab(
+                customTheme: customTheme,
+                currentArena: arenaInfo,
+                trophies: trophies,
+                winStreak: winStreak,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -255,18 +255,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (mounted) setState(() {});
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryDark.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.swap_horiz_rounded, color: Colors.white70, size: 18),
-                        SizedBox(width: 8),
-                        Text('تبديل السجل', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      ],
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.swap_horiz_rounded, color: Colors.white70, size: 18),
+                          SizedBox(width: 8),
+                          Text('تبديل السجل', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -284,18 +287,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (mounted) setState(() {});
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     decoration: BoxDecoration(
                       gradient: AppTheme.goldGradient,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.edit_rounded, color: AppTheme.primaryDark, size: 18),
-                        SizedBox(width: 8),
-                        Text('تعديل', style: TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.edit_rounded, color: AppTheme.primaryDark, size: 18),
+                          SizedBox(width: 8),
+                          Text('تعديل', style: TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -465,8 +471,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Icon(icon, color: AppTheme.accentDark, size: 22),
           ),
           const SizedBox(width: 14),
-          Expanded(child: Text(title, textAlign: TextAlign.right, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryDark))),
-          Text(value, style: TextStyle(fontSize: 14, color: AppTheme.accentDark)),
+          Flexible(
+            flex: 2,
+            fit: FlexFit.loose,
+            child: Text(
+              title,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryDark),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.left,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, color: AppTheme.accentDark),
+            ),
+          ),
         ],
       ),
     );
@@ -480,7 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [const Icon(Icons.warning_rounded, color: AppTheme.errorColor), const SizedBox(width: 8), Text('تأكيد إعادة التعيين', style: TextStyle(color: AppTheme.primaryDark))],
+          children: [const Icon(Icons.warning_rounded, color: AppTheme.errorColor), const SizedBox(width: 8), const Flexible(child: Text('تأكيد إعادة التعيين', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.primaryDark)))],
         ),
         content: Text('سيتم حذف جميع بيانات التقدم والنقاط. هل أنت متأكد؟', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
@@ -517,7 +543,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             const Icon(Icons.privacy_tip_rounded, color: AppTheme.accentColor),
             const SizedBox(width: 8),
-            Text('سياسة الخصوصية وأمان البيانات', style: TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold)),
+            const Flexible(
+              child: Text(
+                'سياسة الخصوصية وأمان البيانات',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -565,7 +597,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             const Icon(Icons.delete_forever_rounded, color: AppTheme.errorColor),
             const SizedBox(width: 8),
-            Text('تأكيد حذف الحساب والبيانات', style: TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold)),
+            const Flexible(
+              child: Text(
+                'تأكيد حذف الحساب والبيانات',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.primaryDark, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: Text(

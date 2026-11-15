@@ -54,7 +54,7 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
     
     if (result == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
       );
     }
     
@@ -123,7 +123,7 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
-                      height: 240, // Height for compact Rank Cards
+                      height: 274, // Ample headroom for ranked ResultCard on compact/large font views
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         scrollDirection: Axis.horizontal,

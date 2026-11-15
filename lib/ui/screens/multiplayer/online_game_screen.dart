@@ -585,14 +585,16 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       return Scaffold(
         body: Container(
           decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
-          child: const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text('جاري تحميل الأسئلة...', style: TextStyle(color: Colors.white70)),
-              ],
+          child: const SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text('جاري تحميل الأسئلة...', style: TextStyle(color: Colors.white70)),
+                ],
+              ),
             ),
           ),
         ),
@@ -603,19 +605,21 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       return Scaffold(
         body: Container(
           decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 60, color: Colors.red),
-                const SizedBox(height: 16),
-                const Text('لا توجد أسئلة', style: TextStyle(color: Colors.white, fontSize: 20)),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('عودة'),
-                ),
-              ],
+          child: SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text('لا توجد أسئلة', style: TextStyle(color: Colors.white, fontSize: 20)),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('عودة'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

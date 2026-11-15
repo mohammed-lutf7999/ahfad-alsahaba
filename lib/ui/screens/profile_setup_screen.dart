@@ -379,11 +379,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
               color: AppTheme.primaryDark,
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -439,16 +441,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
               height: 24,
               errorBuilder: (_, __, ___) => const Icon(Icons.login_rounded, color: Colors.white),
             ),
-            label: const Text(
-              'تسجيل الدخول بحساب Google',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Cairo',
+            label: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'تسجيل الدخول بحساب Google',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Cairo',
+                  height: 1.2,
+                ),
               ),
             ),
             style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               side: BorderSide(color: Colors.white.withOpacity(0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),

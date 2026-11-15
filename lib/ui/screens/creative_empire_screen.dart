@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/app_theme.dart';
 import '../../core/size_config.dart';
 import '../../data/models/empire_model.dart';
 import '../../data/local/empire_data.dart';
@@ -44,27 +46,32 @@ class _CreativeEmpireScreenState extends State<CreativeEmpireScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: _backgroundColor,
-        floatingActionButton: FloatingActionButton(
-          onPressed: _toggleTheme,
-          backgroundColor: _goldColor,
-          child: Icon(_isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: Colors.black87),
-        ),
-        body: Stack(
-          children: [
-            // 1. Background
-            if (_isDarkMode) const _LegendaryBackground() else const _LightBackground(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _isDarkMode
+          ? AppTheme.royalOverlayStyle
+          : AppTheme.lightSurfaceOverlayStyle,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: _backgroundColor,
+          floatingActionButton: FloatingActionButton(
+            onPressed: _toggleTheme,
+            backgroundColor: _goldColor,
+            child: Icon(_isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: Colors.black87),
+          ),
+          body: Stack(
+            children: [
+              // 1. Background (Edge-to-Edge full bleed)
+              if (_isDarkMode) const _LegendaryBackground() else const _LightBackground(),
 
-            // 2. Main Content
-            CustomScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // Header Spacer
-                SliverToBoxAdapter(child: SizedBox(height: getProportionateScreenHeight(40))),
+              // 2. Main Content protected from notch, status bar, and system nav bar
+              SafeArea(
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    // Header Spacer
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
                 // Back Button
                 SliverToBoxAdapter(
@@ -171,10 +178,12 @@ class _CreativeEmpireScreenState extends State<CreativeEmpireScreen> with Ticker
                   ),
                 ),
 
-                SliverToBoxAdapter(child: SizedBox(height: getProportionateScreenHeight(80))),
-              ],
-            ),
-          ],
+                    SliverToBoxAdapter(child: SizedBox(height: getProportionateScreenHeight(40))),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -326,8 +335,10 @@ class _DesignerIdentityImperial extends StatelessWidget {
            ),
            const SizedBox(height: 24),
            // Actions
-           Row(
-             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+           Wrap(
+             alignment: WrapAlignment.center,
+             spacing: 10,
+             runSpacing: 10,
              children: [
                _ImperialSocialBtn(Icons.email_rounded, "Email", "mailto:dia666111@gmail.com", isDark),
                _ImperialSocialBtn(Icons.call_rounded, "WhatsApp", "https://wa.me/967778537999", isDark),
@@ -410,23 +421,25 @@ class _ImperialPavilion extends StatelessWidget {
                   child: Icon(section.icon, color: section.color, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      section.title,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Cairo',
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        section.title,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
-                    ),
-                    Text(
-                      section.subtitle,
-                      style: TextStyle(color: section.color.withOpacity(0.8), fontSize: 12),
-                    ),
-                  ],
+                      Text(
+                        section.subtitle,
+                        style: TextStyle(color: section.color.withOpacity(0.8), fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -592,78 +605,88 @@ class _ProjectPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: MediaQuery.of(context).size.width * 0.85,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222222) : Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: color, width: 2),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 40, spreadRadius: 5),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-             padding: const EdgeInsets.all(20),
-             decoration: BoxDecoration(
-               color: color.withOpacity(0.1),
-               shape: BoxShape.circle,
-             ),
-             child: Icon(project.icon, size: 60, color: color),
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: (MediaQuery.sizeOf(context).width * 0.88).clamp(260.0, 420.0),
+          maxHeight: MediaQuery.sizeOf(context).height * 0.84,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF222222) : Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: color, width: 2),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 40, spreadRadius: 5),
+            ],
           ),
-          const SizedBox(height: 20),
-          Text(
-            project.name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontFamily: 'Cairo',
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                   padding: const EdgeInsets.all(20),
+                   decoration: BoxDecoration(
+                     color: color.withOpacity(0.1),
+                     shape: BoxShape.circle,
+                   ),
+                   child: Icon(project.icon, size: 60, color: color),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  project.name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                   decoration: BoxDecoration(
+                     color: color,
+                     borderRadius: BorderRadius.circular(20)
+                   ),
+                  child: Text(
+                    project.shortDesc,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Divider(height: 40),
+                Text(
+                  project.fullDesc,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? Colors.white.withOpacity(0.8) : Colors.black87,
+                    height: 1.6,
+                    fontSize: 16,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 5,
+                    ),
+                    child: const Text("إغلاق", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, height: 1.2)),
+                  ),
+                )
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-             decoration: BoxDecoration(
-               color: color,
-               borderRadius: BorderRadius.circular(20)
-             ),
-            child: Text(
-              project.shortDesc,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const Divider(height: 40),
-          Text(
-            project.fullDesc,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isDark ? Colors.white.withOpacity(0.8) : Colors.black87,
-              height: 1.6,
-              fontSize: 16,
-              fontFamily: 'Cairo',
-            ),
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 5,
-              ),
-              child: const Text("إغلاق", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          )
-        ],
+        ),
       ),
     );
   }
@@ -689,28 +712,35 @@ class _TeamMemberTile extends StatelessWidget {
   void _showBio(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151515) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           border: const Border(top: BorderSide(color: Color(0xFFFFD700), width: 3)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            imagePath != null
-                ? CircleAvatar(radius: 40, backgroundImage: AssetImage(imagePath!))
-                : CircleAvatar(radius: 40, backgroundColor: isDark ? Colors.white10 : Colors.black12, child: Icon(icon, color: Colors.orange, size: 30)),
-            const SizedBox(height: 16),
-            Text(name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87, fontFamily: 'Cairo')),
-            Text(role, style: TextStyle(fontSize: 14, color: isDark ? Colors.amber : Colors.deepOrange)),
-            const SizedBox(height: 24),
-            Text(details, textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, height: 1.6, fontSize: 16)),
-            const SizedBox(height: 40),
-          ],
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                imagePath != null
+                    ? CircleAvatar(radius: 40, backgroundImage: AssetImage(imagePath!))
+                    : CircleAvatar(radius: 40, backgroundColor: isDark ? Colors.white10 : Colors.black12, child: Icon(icon, color: Colors.orange, size: 30)),
+                const SizedBox(height: 16),
+                Text(name, textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87, fontFamily: 'Cairo')),
+                Text(role, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: isDark ? Colors.amber : Colors.deepOrange)),
+                const SizedBox(height: 24),
+                Text(details, textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, height: 1.6, fontSize: 16)),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
         ),
       ),
     );

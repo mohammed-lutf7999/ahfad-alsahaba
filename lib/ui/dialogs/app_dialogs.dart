@@ -33,11 +33,17 @@ class AppDialogs {
         );
       },
       pageBuilder: (context, anim1, anim2) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.86,
+        return SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double dialogWidth = (constraints.maxWidth * 0.88).clamp(0.0, 380.0);
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: dialogWidth,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
               decoration: BoxDecoration(
                 color: customTheme.surfaceCard,
@@ -205,6 +211,10 @@ class AppDialogs {
                 ],
               ),
             ),
+          ),
+        ),
+        );
+            },
           ),
         );
       },

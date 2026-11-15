@@ -154,13 +154,19 @@ class _PrivateRoomHubScreenState extends State<PrivateRoomHubScreen> {
                       icon: const Icon(Icons.arrow_back_ios_new_rounded,
                           color: Colors.white70),
                     ),
-                    const Text(
-                      'غرف التحدي الخاصة ⚔️',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Cairo',
+                    const Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'غرف التحدي الخاصة ⚔️',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 48), // Balance
@@ -322,13 +328,16 @@ class _PrivateRoomHubScreenState extends State<PrivateRoomHubScreen> {
                       ),
                     )
                   : const Icon(Icons.castle_rounded, size: 20),
-              label: Text(
-                _isCreatingRoom ? 'جاري إنشاء الغرفة...' : 'إنشاء غرفة خاصة 🏰',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  fontFamily: 'Cairo',
-                  height: 1.2,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _isCreatingRoom ? 'جاري إنشاء الغرفة...' : 'إنشاء غرفة خاصة 🏰',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontFamily: 'Cairo',
+                    height: 1.2,
+                  ),
                 ),
               ),
             ),
@@ -415,7 +424,7 @@ class _PrivateRoomHubScreenState extends State<PrivateRoomHubScreen> {
                   ),
                 ),
 
-                // Styled Visual PIN Boxes
+                // Styled Visual PIN Boxes (Expanded prevents 360dp horizontal overflow)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(6, (index) {
@@ -423,33 +432,34 @@ class _PrivateRoomHubScreenState extends State<PrivateRoomHubScreen> {
                     final digit = index < text.length ? text[index] : '';
                     final isFocused = index == text.length;
 
-                    return Container(
-                      width: 42,
-                      height: 50,
-                      margin: EdgeInsets.only(
-                        left: index == 3 ? 12 : 4,
-                        right: index == 2 ? 12 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isFocused
-                              ? AppTheme.accentColor
-                              : (digit.isNotEmpty
-                                  ? AppTheme.accentColor.withValues(alpha: 0.6)
-                                  : Colors.white24),
-                          width: isFocused ? 2.0 : 1.0,
+                    return Expanded(
+                      child: Container(
+                        height: 50,
+                        margin: EdgeInsets.only(
+                          left: index == 3 ? 8 : 3,
+                          right: index == 2 ? 8 : 3,
                         ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          digit,
-                          style: const TextStyle(
-                            color: AppTheme.accentColor,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Cairo',
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isFocused
+                                ? AppTheme.accentColor
+                                : (digit.isNotEmpty
+                                    ? AppTheme.accentColor.withValues(alpha: 0.6)
+                                    : Colors.white24),
+                            width: isFocused ? 2.0 : 1.0,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            digit,
+                            style: const TextStyle(
+                              color: AppTheme.accentColor,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Cairo',
+                            ),
                           ),
                         ),
                       ),
@@ -508,13 +518,16 @@ class _PrivateRoomHubScreenState extends State<PrivateRoomHubScreen> {
                       ),
                     )
                   : const Icon(Icons.sports_kabaddi_rounded, size: 20),
-              label: Text(
-                _isJoiningRoom ? 'جاري الانضمام...' : 'دخول المعركة الآن ⚔️',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  fontFamily: 'Cairo',
-                  height: 1.2,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _isJoiningRoom ? 'جاري الانضمام...' : 'دخول المعركة الآن ⚔️',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontFamily: 'Cairo',
+                    height: 1.2,
+                  ),
                 ),
               ),
             ),

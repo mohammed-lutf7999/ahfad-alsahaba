@@ -102,6 +102,7 @@ class _ResultCardState extends State<ResultCard> with SingleTickerProviderStateM
           
           // Avatar with Rank Badge
           Stack(
+            clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
             children: [
               Container(
@@ -172,11 +173,11 @@ class _ResultCardState extends State<ResultCard> with SingleTickerProviderStateM
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatItem('✔️', '${widget.player.correctAnswers}', 'إجابة صحيحة', Colors.green[800]!),
+                Expanded(child: _buildStatItem('✔️', '${widget.player.correctAnswers}', 'إجابة صحيحة', Colors.green[800]!)),
                 Container(height: 30, width: 1, color: Colors.white30),
-                _buildStatItem('✖️', '$wrongAnswers', 'إجابة خاطئة', Colors.red[800]!),
+                Expanded(child: _buildStatItem('✖️', '$wrongAnswers', 'إجابة خاطئة', Colors.red[800]!)),
                 Container(height: 30, width: 1, color: Colors.white30),
-                _buildStatItem('⏱️', '${(widget.player.totalTimeMs / 1000).toStringAsFixed(1)}s', 'الوقت الكلي', AppTheme.primaryDark),
+                Expanded(child: _buildStatItem('⏱️', '${(widget.player.totalTimeMs / 1000).toStringAsFixed(1)}s', 'الوقت الكلي', AppTheme.primaryDark)),
               ],
             ),
           ),
@@ -291,12 +292,16 @@ class _ResultCardState extends State<ResultCard> with SingleTickerProviderStateM
   
   Widget _buildMiniStat(String icon, String value) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(icon, style: const TextStyle(fontSize: 12)),
         const SizedBox(width: 2),
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        Flexible(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
         ),
       ],
     );

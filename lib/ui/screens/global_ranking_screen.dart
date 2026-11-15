@@ -171,130 +171,137 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen> with TickerPr
         ),
         body: Stack(
           children: [
-            // Background Effects
+            // Background Effects (full-bleed edge-to-edge behind system nav bar)
              const Positioned.fill(child: _StarfieldBackground()),
-            
-            // Offline Status Banner
-            if (_isOffline)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade700,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'لا يوجد اتصال بالإنترنت - يتم عرض بيانات مؤقتة',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'Cairo',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            // Login prompt if not logged in for global tab - REMOVED to allow viewing
-            /* 
-            if (!isLoggedIn)
-              Positioned(...)
-            */
-            
-            // Add top padding when offline banner is shown
-            Padding(
-              padding: EdgeInsets.only(top: _isOffline ? 40 : 0),
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildList(_localRanks, isGlobal: false),
-                StreamBuilder<List<RankEntry>>(
-                  stream: LeaderboardService().getLeaderboardStream(limit: 50),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      // Check for network errors
-                      final error = snapshot.error.toString();
-                      final isNetworkError = error.contains('SocketException') || 
-                                           error.contains('RealtimeSubscribeException') ||
-                                           error.contains('Failed host lookup');
-                      
-                      if (isNetworkError || _isOffline) {
-                        return Center(
-                          child: Column(
+
+            Positioned.fill(
+              child: SafeArea(
+                top: false,
+                child: Stack(
+                  children: [
+                    // Offline Status Banner
+                    if (_isOffline)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade700,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.wifi_off_rounded, size: 64, color: Colors.white.withValues(alpha: 0.3)),
-                              const SizedBox(height: 16),
-                              const Text(
-                                '  انت غير متصل بالانترنت يا بطل',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontFamily: 'Cairo',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'يرجى التحقق من الاتصال لعرض التصنيف العالمي',
-                                style: TextStyle(color: Colors.white38, fontSize: 12, fontFamily: 'Cairo'),
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _isLoading = true;
-                                  });
-                                  _loadGlobalRanks(); // Retry logic
-                                },
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text('إعادة المحاولة'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFD700),
-                                  foregroundColor: Colors.black,
+                            children: const [
+                              Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'لا يوجد اتصال بالإنترنت - يتم عرض بيانات مؤقتة',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Cairo',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }
-                      
-                      return Center(child: Text('حدث خطأ غير متوقع', style: const TextStyle(color: Colors.white54)));
-                    }
-                    
-                    if (snapshot.connectionState == ConnectionState.waiting || _isLoading) {
-                      if (_globalRanks.isNotEmpty) {
-                         // Show cached data while connecting
-                         return _buildList(_globalRanks, isGlobal: true);
-                      }
-                      return const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700)));
-                    }
-                    
-                    final ranks = snapshot.data ?? [];
-                    if (ranks.isEmpty) {
-                      return _buildEmptyState();
-                    }
-                    
-                    return _buildList(ranks, isGlobal: true);
-                  },
+                        ),
+                      ),
+
+                    // Add top padding when offline banner is shown
+                    Padding(
+                      padding: EdgeInsets.only(top: _isOffline ? 40 : 0),
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildList(_localRanks, isGlobal: false),
+                          StreamBuilder<List<RankEntry>>(
+                            stream: LeaderboardService().getLeaderboardStream(limit: 50),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                // Check for network errors
+                                final error = snapshot.error.toString();
+                                final isNetworkError = error.contains('SocketException') ||
+                                                     error.contains('RealtimeSubscribeException') ||
+                                                     error.contains('Failed host lookup');
+
+                                if (isNetworkError || _isOffline) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.wifi_off_rounded, size: 64, color: Colors.white.withValues(alpha: 0.3)),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          '  انت غير متصل بالانترنت يا بطل',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontFamily: 'Cairo',
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'يرجى التحقق من الاتصال لعرض التصنيف العالمي',
+                                          style: TextStyle(color: Colors.white38, fontSize: 12, fontFamily: 'Cairo'),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        ElevatedButton.icon(
+                                          onPressed: () {
+                                            setState(() {
+                                              _isLoading = true;
+                                            });
+                                            _loadGlobalRanks(); // Retry logic
+                                          },
+                                          icon: const Icon(Icons.refresh_rounded),
+                                          label: const Text('إعادة المحاولة'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFFFD700),
+                                            foregroundColor: Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return Center(child: Text('حدث خطأ غير متوقع', style: const TextStyle(color: Colors.white54)));
+                              }
+
+                              if (snapshot.connectionState == ConnectionState.waiting || _isLoading) {
+                                if (_globalRanks.isNotEmpty) {
+                                   // Show cached data while connecting
+                                   return _buildList(_globalRanks, isGlobal: true);
+                                }
+                                return const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700)));
+                              }
+
+                              final ranks = snapshot.data ?? [];
+                              if (ranks.isEmpty) {
+                                return _buildEmptyState();
+                              }
+
+                              return _buildList(ranks, isGlobal: true);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                ],
               ),
             ),
           ],

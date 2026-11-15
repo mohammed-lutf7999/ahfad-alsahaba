@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
@@ -141,13 +142,29 @@ class _ResultScreenState extends State<ResultScreen>
     }
   }
 
+  final List<Timer> _pendingTimers = [];
+  final List<Completer<bool>> _pendingDelayCompleters = [];
+
+  Future<bool> _cancellableDelay(Duration duration) {
+    final completer = Completer<bool>();
+    _pendingDelayCompleters.add(completer);
+    late final Timer timer;
+    timer = Timer(duration, () {
+      _pendingTimers.remove(timer);
+      _pendingDelayCompleters.remove(completer);
+      if (!completer.isCompleted) {
+        completer.complete(true);
+      }
+    });
+    _pendingTimers.add(timer);
+    return completer.future;
+  }
+
   void _startAnimations() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    if (!mounted) return;
+    if (!await _cancellableDelay(const Duration(milliseconds: 150)) || !mounted) return;
     _scoreController.forward();
     
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
+    if (!await _cancellableDelay(const Duration(milliseconds: 300)) || !mounted) return;
     _starsController.forward();
     
     if (isPassed) {
@@ -163,8 +180,7 @@ class _ResultScreenState extends State<ResultScreen>
   Future<void> _runPostResultChecks() async {
     final snapshot = widget.preProgressionSnapshot;
     if (snapshot != null) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
+      if (!await _cancellableDelay(const Duration(milliseconds: 600)) || !mounted) return;
       await ProgressionService.instance.checkAndTriggerCelebrations(
         context,
         before: snapshot,
@@ -192,8 +208,7 @@ class _ResultScreenState extends State<ResultScreen>
     );
     
     // Show pending achievement popups
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
+    if (!await _cancellableDelay(const Duration(milliseconds: 900)) || !mounted) return;
     await _showNextAchievementPopup();
   }
   
@@ -204,14 +219,23 @@ class _ResultScreenState extends State<ResultScreen>
     if (achievement != null) {
       await AchievementPopup.show(context, achievement);
       // Show next one after a delay
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
+      if (!await _cancellableDelay(const Duration(milliseconds: 500)) || !mounted) return;
       await _showNextAchievementPopup();
     }
   }
 
   @override
   void dispose() {
+    for (final timer in List<Timer>.from(_pendingTimers)) {
+      timer.cancel();
+    }
+    _pendingTimers.clear();
+    for (final completer in List<Completer<bool>>.from(_pendingDelayCompleters)) {
+      if (!completer.isCompleted) {
+        completer.complete(false);
+      }
+    }
+    _pendingDelayCompleters.clear();
     _confettiController.dispose();
     _scoreController.dispose();
     _pulseController.dispose();
@@ -302,10 +326,10 @@ class _ResultScreenState extends State<ResultScreen>
               ),
             ),
             
-            // Share Button
+            // Share Button (respect horizontal display cutout insets as well)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 10,
-              left: 20,
+              top: MediaQuery.paddingOf(context).top + 10,
+              left: MediaQuery.paddingOf(context).left + 16,
               child: isPassed ? _buildShareButton() : const SizedBox.shrink(),
             ),
           ],
@@ -378,9 +402,11 @@ Future<void> _captureAndShare() async {
     }
   } catch (e) {
     debugPrint("Error capturing screenshot: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("حدث خطأ أثناء المشاركة")),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("حدث خطأ أثناء المشاركة")),
+      );
+    }
   } finally {
     if (mounted) {
       setState(() {
@@ -493,21 +519,23 @@ Future<void> _captureAndShare() async {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Score Circle
-            Flexible(
-              flex: 3,
-              child: ResultScoreGauge(
-                scoreAnimation: _scoreAnimation,
-                pulseAnimation: _pulseController,
-                isPassed: isPassed,
-                isSmall: isSmall,
-              ),
-            ),
-            
-            SizedBox(height: isSmall ? 12 : 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Score Circle
+                  ResultScoreGauge(
+                    scoreAnimation: _scoreAnimation,
+                    pulseAnimation: _pulseController,
+                    isPassed: isPassed,
+                    isSmall: isSmall,
+                  ),
+                  
+                  SizedBox(height: isSmall ? 12 : 18),
 
             // Divider
             Container(
@@ -539,6 +567,9 @@ Future<void> _captureAndShare() async {
             // Buttons
             _buildButtons(isSmall),
           ],
+        ),
+            ),
+          ),
         ),
       ),
     );
@@ -579,6 +610,7 @@ Future<void> _captureAndShare() async {
         Row(
           children: [
             Expanded(
+              flex: 2,
               child: OutlinedButton.icon(
                 onPressed: () {
                   SoundService().playClick();
@@ -593,9 +625,15 @@ Future<void> _captureAndShare() async {
                   }
                 },
                 icon: Icon(Icons.grid_view_rounded, size: isSmall ? 16 : 18, color: AppTheme.accentDark),
-                label: Text('المستويات', style: TextStyle(fontSize: isSmall ? 12 : 13, color: AppTheme.accentDark)),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'المستويات',
+                    style: TextStyle(fontSize: isSmall ? 12 : 13, color: AppTheme.accentDark, height: 1.2),
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: isSmall ? 8 : 10),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: isSmall ? 8 : 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   side: BorderSide(color: AppTheme.accentColor.withAlpha(150), width: 1.5),
                 ),
@@ -603,7 +641,7 @@ Future<void> _captureAndShare() async {
             ),
             const SizedBox(width: 10),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -629,17 +667,20 @@ Future<void> _captureAndShare() async {
                     isNextLevelUnlocked ? Icons.arrow_forward_rounded : Icons.refresh_rounded,
                     size: isSmall ? 16 : 18,
                   ),
-                  label: Text(
-                    isNextLevelUnlocked
-                        ? 'المستوى التالي'
-                        : (isPassed ? 'إعادة المستوى' : 'حاول مرة أخرى'),
-                    style: TextStyle(fontSize: isSmall ? 10 : 12, fontWeight: FontWeight.bold),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isNextLevelUnlocked
+                          ? 'المستوى التالي'
+                          : (isPassed ? 'إعادة المستوى' : 'حاول مرة أخرى'),
+                      style: TextStyle(fontSize: isSmall ? 11 : 12.5, fontWeight: FontWeight.bold, height: 1.2),
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                     foregroundColor: AppTheme.primaryDark,
-                    padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 12),
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: isSmall ? 8 : 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

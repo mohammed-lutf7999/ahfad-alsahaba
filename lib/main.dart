@@ -12,13 +12,14 @@ import 'data/services/progression_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Apply non-blocking system chrome styles & orientation lock immediately
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
+  // Enable edge-to-edge globally and apply icon/contrast styling without deprecated
+  // statusBarColor / systemNavigationBarColor setters (Android 15+ SDK 35 compliant).
+  unawaited(
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge).catchError((Object e) {
+      debugPrint('setEnabledSystemUIMode error: $e');
+    }),
   );
+  SystemChrome.setSystemUIOverlayStyle(AppTheme.royalOverlayStyle);
   unawaited(
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,

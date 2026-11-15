@@ -21,11 +21,29 @@ class QuizReviewDialog {
       pageBuilder: (ctx, anim1, anim2) {
         return ScaleTransition(
           scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
-          child: Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.92,
-              height: MediaQuery.of(context).size.height * 0.82,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: LayoutBuilder(
+                builder: (context, safeConstraints) {
+                  final double cappedMaxWidth =
+                      safeConstraints.maxWidth.clamp(0.0, 440.0);
+                  final double dialogWidth =
+                      (safeConstraints.maxWidth * 0.96).clamp(
+                    cappedMaxWidth < 260.0 ? cappedMaxWidth : 260.0,
+                    cappedMaxWidth,
+                  );
+                  final double cappedMaxHeight =
+                      safeConstraints.maxHeight.clamp(0.0, 680.0);
+                  final double dialogHeight =
+                      (safeConstraints.maxHeight * 0.90).clamp(
+                    cappedMaxHeight < 320.0 ? cappedMaxHeight : 320.0,
+                    cappedMaxHeight,
+                  );
+                  return Center(
+                    child: Container(
+                      width: dialogWidth,
+                      height: dialogHeight,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topCenter,
@@ -81,25 +99,30 @@ class QuizReviewDialog {
                               ),
                             ),
                           ),
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.rate_review_rounded,
-                                color: AppTheme.primaryDark,
-                                size: 24,
+                          const Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.rate_review_rounded,
+                                    color: AppTheme.primaryDark,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'مراجعة الإجابات',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryDark,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Cairo',
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 10),
-                              Text(
-                                'مراجعة الإجابات',
-                                style: TextStyle(
-                                  color: AppTheme.primaryDark,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Cairo',
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                           const SizedBox(width: 40),
                         ],
@@ -279,8 +302,10 @@ class QuizReviewDialog {
 
                                 // Copy and Share Actions
                                 const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 12,
+                                  runSpacing: 8,
                                   children: [
                                     // Copy
                                     GestureDetector(
@@ -352,7 +377,6 @@ class QuizReviewDialog {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
 
                                     // Share
                                     GestureDetector(
@@ -413,6 +437,10 @@ class QuizReviewDialog {
                     ),
                   ],
                 ),
+              ),
+            ),
+          );
+                },
               ),
             ),
           ),

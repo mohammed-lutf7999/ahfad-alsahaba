@@ -1,7 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme/app_custom_theme.dart';
 
 class AppTheme {
+  /// Edge-to-Edge overlay style for dark royal screens (Android 15+ compliant).
+  /// Leaves `statusBarColor` & `systemNavigationBarColor` unset so Flutter's
+  /// PlatformPlugin does not invoke deprecated Window color setters on API 35+.
+  static const SystemUiOverlayStyle royalOverlayStyle = SystemUiOverlayStyle(
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarContrastEnforced: false,
+  );
+
+  /// Edge-to-Edge overlay style for light-surface screens (dark icons).
+  static const SystemUiOverlayStyle lightSurfaceOverlayStyle = SystemUiOverlayStyle(
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarContrastEnforced: false,
+  );
   // Imperial Gold & Purple color palette
   static const Color primaryColor = Color(0xFF2D1B4E); // Royal Purple
   static const Color primaryLight = Color(0xFF4A3070); // Light Purple
@@ -156,6 +174,7 @@ class AppTheme {
         foregroundColor: textLight,
         elevation: 0,
         centerTitle: true,
+        systemOverlayStyle: royalOverlayStyle,
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,

@@ -56,7 +56,7 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> with SingleTickerPr
 
   Rect? _getRect(GlobalKey key) {
     final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return null;
+    if (renderBox == null || !renderBox.hasSize) return null;
     final offset = renderBox.localToGlobal(Offset.zero);
     return offset & renderBox.size;
   }
@@ -66,6 +66,12 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> with SingleTickerPr
     // Determine target rect
     // If key is not found (e.g. widget not rendered yet or off screen), we might skip or show default center
     Rect? targetRect = _getRect(_currentStep.key);
+    if (targetRect == null &&
+        _currentStep.key.currentContext?.findRenderObject() != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
     
     // Safety fallback
     targetRect ??= Rect.fromCenter(
@@ -139,45 +145,60 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> with SingleTickerPr
               if (rect == null) return const SizedBox.shrink();
 
               // Calculate best position for text (Top or Bottom)
-              final screenSize = MediaQuery.of(context).size;
+              final screenSize = MediaQuery.sizeOf(context);
+              final screenPadding = MediaQuery.paddingOf(context);
               final bool showBelow = rect.bottom < screenSize.height * 0.6;
-              
+              final double safeLeft = screenPadding.left + 12 > 24.0 ? screenPadding.left + 12 : 24.0;
+              final double safeRight = screenPadding.right + 12 > 24.0 ? screenPadding.right + 12 : 24.0;
+
               return Positioned(
-                top: showBelow ? rect.bottom + 24 : null,
-                bottom: !showBelow ? (screenSize.height - rect.top) + 24 : null,
-                left: 24,
-                right: 24,
+                top: showBelow
+                    ? (rect.bottom + 24 > screenPadding.top + 8 ? rect.bottom + 24 : screenPadding.top + 8)
+                    : null,
+                bottom: !showBelow
+                    ? ((screenSize.height - rect.top) + 24 > screenPadding.bottom + 80
+                        ? (screenSize.height - rect.top) + 24
+                        : screenPadding.bottom + 80)
+                    : null,
+                left: safeLeft,
+                right: safeRight,
                 child: _buildTooltip(context, showBelow),
               );
             },
           ),
           
-          // 4. Controls (Bottom)
+          // 4. Controls (Bottom - protected from system navigation bar & cutouts)
           Positioned(
-            bottom: 40,
+            bottom: 0,
             left: 20,
             right: 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: widget.onSkipped,
-                  child: const Text('تخطي', style: TextStyle(color: Colors.white70)),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: widget.onSkipped,
+                      child: const Text('تخطي', style: TextStyle(color: Colors.white70)),
+                    ),
+                    ElevatedButton(
+                      onPressed: _nextStep,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        foregroundColor: AppTheme.primaryDark,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                      child: Text(
+                        _currentIndex == widget.steps.length - 1 ? 'ابدأ' : 'التالي',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
-                ElevatedButton(
-                  onPressed: _nextStep,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
-                    foregroundColor: AppTheme.primaryDark,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  child: Text(
-                    _currentIndex == widget.steps.length - 1 ? 'ابدأ' : 'التالي',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],

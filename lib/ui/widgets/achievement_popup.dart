@@ -224,23 +224,26 @@ class _AchievementPopupState extends State<AchievementPopup>
             ),
           ),
           
-          // Main popup isolated in RepaintBoundary
-          Center(
-            child: RepaintBoundary(
-              child: AnimatedBuilder(
-              animation: Listenable.merge([
-                _glowAnimation, 
-                _bounceAnimation, 
-                _iconScaleAnimation,
-                _rotateController,
-                _pulseAnimation,
-              ]),
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _bounceAnimation.value,
-                  child: Container(
-                    width: 320,
-                    margin: const EdgeInsets.all(20),
+          // Main popup isolated in RepaintBoundary & SafeArea
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                  animation: Listenable.merge([
+                    _glowAnimation, 
+                    _bounceAnimation, 
+                    _iconScaleAnimation,
+                    _rotateController,
+                    _pulseAnimation,
+                  ]),
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _bounceAnimation.value,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        margin: const EdgeInsets.all(20),
                     child: Stack(
                       clipBehavior: Clip.none,
                       alignment: Alignment.topCenter,
@@ -531,9 +534,11 @@ class _AchievementPopupState extends State<AchievementPopup>
                 );
               },
             ),
-            ),
           ),
-        ],
+        ),
+      ),
+    ),
+  ],
       ),
     );
   }
