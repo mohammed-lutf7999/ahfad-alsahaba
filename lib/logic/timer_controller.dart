@@ -6,10 +6,12 @@ import '../core/app_constants.dart';
 
 class TimerController extends ChangeNotifier {
   Timer? _timer;
+  Timer? _freezeTimer;
   int _remainingTime = AppConstants.defaultQuestionTime;
   int _totalTime = AppConstants.defaultQuestionTime;
   bool _isRunning = false;
   VoidCallback? _onTimeUp;
+  void Function(int)? _onTick;
 
   int get remainingTime => _remainingTime;
   int get totalTime => _totalTime;
@@ -23,7 +25,10 @@ class TimerController extends ChangeNotifier {
 
   void startTimer({VoidCallback? onTimeUp, void Function(int)? onTick}) {
     _onTimeUp = onTimeUp;
+    _onTick = onTick;
     _timer?.cancel(); // Cancel any existing timer before starting a new one
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     _remainingTime = _totalTime;
     _isRunning = true;
     notifyListeners();
@@ -31,7 +36,7 @@ class TimerController extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingTime > 0) {
         _remainingTime--;
-        onTick?.call(_remainingTime); // Call onTick callback
+        _onTick?.call(_remainingTime); // Call onTick callback
         notifyListeners();
       } else {
         _timer?.cancel();
@@ -44,22 +49,49 @@ class TimerController extends ChangeNotifier {
 
   void stopTimer() {
     _timer?.cancel();
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     _isRunning = false;
     notifyListeners();
   }
 
   void pauseTimer() {
     _timer?.cancel();
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     _isRunning = false;
     notifyListeners();
   }
 
+  /// Freezes the countdown timer for [duration] and automatically resumes if [shouldResume] returns true.
+  /// Properly cancelled on [stopTimer], [resetTimer], [startTimer], or [dispose].
+  void freezeTimer({
+    Duration duration = const Duration(seconds: 15),
+    bool Function()? shouldResume,
+  }) {
+    _timer?.cancel();
+    _freezeTimer?.cancel();
+    _isRunning = false;
+    notifyListeners();
+
+    _freezeTimer = Timer(duration, () {
+      _freezeTimer = null;
+      if (shouldResume == null || shouldResume()) {
+        resumeTimer();
+      }
+    });
+  }
+
   void resumeTimer() {
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     if (!_isRunning && _remainingTime > 0) {
       _isRunning = true;
+      notifyListeners();
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_remainingTime > 0) {
           _remainingTime--;
+          _onTick?.call(_remainingTime);
           notifyListeners();
         } else {
           stopTimer();
@@ -71,6 +103,8 @@ class TimerController extends ChangeNotifier {
 
   void resetTimer() {
     _timer?.cancel();
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     _remainingTime = _totalTime;
     _isRunning = false;
     notifyListeners();
@@ -88,6 +122,8 @@ class TimerController extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _freezeTimer?.cancel();
+    _freezeTimer = null;
     super.dispose();
   }
 }

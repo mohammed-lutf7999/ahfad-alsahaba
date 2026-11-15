@@ -86,89 +86,94 @@ class _HomeLogoWithEffectsState extends State<HomeLogoWithEffects>
       child: AnimatedScale(
         scale: _scale,
         duration: const Duration(milliseconds: 100),
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // 1. Solar Rays (Background)
-              RotationTransition(
-                turns: _rotationController,
-                child: _SolarRays(size: size),
-              ),
+        child: RepaintBoundary(
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. Solar Rays (Background)
+                RotationTransition(
+                  turns: _rotationController,
+                  child: _SolarRays(size: size),
+                ),
 
-              // 2. Gold Particles (Falling/Floating)
-              Positioned.fill(
-                child: AmbientGoldParticles(animation: _particleController),
-              ),
+                // 2. Gold Particles (Falling/Floating)
+                Positioned.fill(
+                  child: AmbientGoldParticles(animation: _particleController),
+                ),
 
-              // 3. Main Logo with Breathing Glow
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  final glowValue = _pulseController.value;
-                  final double innerSize = size * 0.66;
-                  return Container(
-                    width: innerSize,
-                    height: innerSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppTheme.goldGradient,
-                      boxShadow: [
-                        // Bloom/Glow Effect
-                        BoxShadow(
-                          color: AppTheme.accentColor.withValues(alpha: 0.4 * _intensity),
-                          blurRadius: (30 + (20 * glowValue * _intensity)) * (size / 180),
-                          spreadRadius: 5 + (10 * glowValue),
+                // 3. Main Logo with Breathing Glow
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    final glowValue = _pulseController.value;
+                    final double innerSize = size * 0.66;
+                    return Container(
+                      width: innerSize,
+                      height: innerSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: AppTheme.goldGradient,
+                        boxShadow: [
+                          // Bloom/Glow Effect
+                          BoxShadow(
+                            color: AppTheme.accentColor.withValues(alpha: 0.4 * _intensity),
+                            blurRadius: (30 + (20 * glowValue * _intensity)) * (size / 180),
+                            spreadRadius: 5 + (10 * glowValue),
+                          ),
+                          // Inner "Hot" Glow
+                          BoxShadow(
+                            color: Colors.orangeAccent.withValues(alpha: 0.3 * _intensity),
+                            blurRadius: 15,
+                            spreadRadius: -2,
+                          ),
+                        ],
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          width: 1.5,
                         ),
-                        // Inner "Hot" Glow
-                        BoxShadow(
-                          color: Colors.orangeAccent.withValues(alpha: 0.3 * _intensity),
-                          blurRadius: 15,
-                          spreadRadius: -2,
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 1.5,
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: Center(
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        height: size * 0.66,
+                        width: size * 0.66,
+                        cacheWidth: 256,
+                        cacheHeight: 256,
+                        fit: BoxFit.cover,
                       ),
                     ),
-                    child: Center(
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          height: innerSize,
-                          width: innerSize,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              // 4. Interaction Flash (Overlay)
-              AnimatedOpacity(
-                opacity: _intensity > 1.0 ? 0.3 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  width: size * 0.66,
-                  height: size * 0.66,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white,
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ],
+
+                // 4. Interaction Flash (Overlay)
+                AnimatedOpacity(
+                  opacity: _intensity > 1.0 ? 0.3 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    width: size * 0.66,
+                    height: size * 0.66,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white,
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/app_constants.dart';
 import '../../core/app_theme.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
@@ -37,6 +39,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   late Animation<Offset> _slideAnimation;
 
   bool _isLoading = true;
+  bool _isCompleting = false;
 
   @override
   void initState() {
@@ -54,14 +57,17 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initializeQuiz() async {
+    _isCompleting = false;
     _gameController.initializeCategories();
     await _gameController.loadQuestionsForLevel(widget.categoryId, widget.levelNumber);
     _timerController.initialize();
 
     if (mounted) {
       setState(() => _isLoading = false);
-      _animationController.forward();
-      _startTimer();
+      if (_gameController.currentQuestion != null) {
+        _animationController.forward(from: 0);
+        _startTimer();
+      }
     }
   }
 
@@ -105,14 +111,25 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     setState(() => _gameController.answerQuestion(selectedIndex));
 
-    // Handle Lives Logic
-    if (_gameController.lives == 0) {
+    final isLastQuestion = _gameController.isLastQuestion;
+    final totalQuestions = _gameController.currentQuestions.length;
+    final currentPercentage = totalQuestions > 0
+        ? (_gameController.correctAnswers / totalQuestions) * 100
+        : 0.0;
+    final hasPassedOnLastQuestion =
+        isLastQuestion && currentPercentage >= AppConstants.passingScore;
+
+    // Handle Lives Logic (allow completing level if last question is reached with a passing score)
+    if (_gameController.lives == 0 && !hasPassedOnLastQuestion) {
       _showGameOverDialog();
     } else {
-        if (_gameController.lives == 1) {
-            _showWarningToast();
-        }
-        Future.delayed(const Duration(milliseconds: 1500), () { if (mounted) _nextQuestion(); });
+      if (_gameController.lives == 1 && !isLastQuestion) {
+        _showWarningToast();
+      }
+      final delayMs = isLastQuestion ? 800 : 1200;
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (mounted) _nextQuestion();
+      });
     }
   }
 
@@ -129,17 +146,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _completeQuiz() async {
+    if (_isCompleting) return;
+    _isCompleting = true;
+    _timerController.stopTimer();
+    SoundService().stopTimerTick();
+
     final preSnapshot = ProgressionService.instance.captureSnapshot();
     await _gameController.completeLevel();
     if (_gameController.score > 0) {
       SoundService().playLevelComplete();
-    }
-
-    if (mounted) {
-      await ProgressionService.instance.checkAndTriggerCelebrations(
-        context,
-        before: preSnapshot,
-      );
     }
 
     if (mounted) {
@@ -149,7 +164,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         'totalScore': _gameController.score,
         'categoryId': widget.categoryId,
         'levelId': widget.levelId,
+        'levelNumber': widget.levelNumber,
         'userAnswers': _gameController.userAnswers,
+        'preSnapshot': preSnapshot,
       });
     }
   }
@@ -165,11 +182,102 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _gameController.currentQuestion == null) {
+    final backgroundGradient = AppCustomTheme.of(context).backgroundGradient;
+
+    if (_isLoading) {
       return Scaffold(
         body: Container(
-          decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
-          child: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor))),
+          decoration: BoxDecoration(gradient: backgroundGradient),
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_gameController.error != null || _gameController.currentQuestion == null) {
+      return Scaffold(
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(gradient: backgroundGradient),
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.cardGradient,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppTheme.accentColor, width: 1.5),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: AppTheme.errorColor,
+                        size: 56,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _gameController.error ?? 'تعذّر تحميل أسئلة هذا المستوى',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                SoundService().playClick();
+                                setState(() => _isLoading = true);
+                                _initializeQuiz();
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('إعادة المحاولة'),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                SoundService().playClick();
+                                Navigator.pop(context);
+                              },
+                              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                              label: const Text('العودة'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -514,8 +622,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
-                                Navigator.pop(context); // Close dialog
-                                _initializeQuiz(); // Restart level
+                              Navigator.pop(context); // Close dialog
+                              _streak = 0;
+                              _isCompleting = false;
+                              setState(() => _isLoading = true);
+                              _initializeQuiz(); // Restart level
                             },
                             style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF7E57C2), // Lighter Purple
@@ -604,9 +715,10 @@ class _ShatteringHeartState extends State<_ShatteringHeart> with SingleTickerPro
           return Icon(Icons.favorite_border_rounded, color: Colors.grey.withOpacity(0.5), size: 24);
         }
 
-        // Shake Effect
+        // Deterministic Shake Effect
+        final shakeDirection = math.sin(_controller.value * math.pi * 8);
         final offset = Offset(
-           (2 * (0.5 - (0.5 - _controller.value).abs())) * 5 * (isOddFrame ? 1 : -1),
+           (2 * (0.5 - (0.5 - _controller.value).abs())) * 5 * shakeDirection,
            0
         );
 
@@ -621,6 +733,4 @@ class _ShatteringHeartState extends State<_ShatteringHeart> with SingleTickerPro
       },
     );
   }
-  
-  bool get isOddFrame => DateTime.now().millisecond % 2 == 0;
 }

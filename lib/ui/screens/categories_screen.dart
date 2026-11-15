@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../logic/game_controller.dart';
 import '../../core/sound_service.dart';
@@ -42,7 +43,9 @@ class _CategoriesScreenState extends State<CategoriesScreen>
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -153,13 +156,18 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                               },
                               child: CategoryItem(
                                 category: category,
-                                onTap: () {
+                                onTap: () async {
                                   if (!category.isLocked) {
                                     SoundService().playClick();
-                                    Navigator.pushNamed(context, AppRoutes.levels, arguments: {
+                                    await Navigator.pushNamed(context, AppRoutes.levels, arguments: {
                                       'categoryId': category.id,
                                       'categoryName': category.name,
                                     });
+                                    if (mounted) {
+                                      setState(() {
+                                        _gameController.initializeCategories();
+                                      });
+                                    }
                                   }
                                 },
                               ),

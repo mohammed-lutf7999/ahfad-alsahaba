@@ -34,8 +34,14 @@ class CloudSyncService {
     }
   }
 
+  static const Duration _networkTimeout = Duration(seconds: 8);
+
   /// Sync complete profile data (including 100-Level Mastery, Economy & Inventory) to cloud.
-  Future<bool> syncProfileToCloud(PlayerProfile profile) async {
+  /// Set [syncInventory] to `false` when completing a game round where no inventory items changed.
+  Future<bool> syncProfileToCloud(
+    PlayerProfile profile, {
+    bool syncInventory = true,
+  }) async {
     if (!_isAuthenticated || _userId == null) {
       debugPrint('CloudSync: Not authenticated, skipping sync');
       return false;
@@ -49,7 +55,8 @@ class CloudSyncService {
           .from('user_progress')
           .select()
           .eq('user_id', _userId!)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(_networkTimeout);
 
       if (existing != null) {
         final cloudScore = (existing['total_score'] as num?)?.toInt() ?? 0;
@@ -103,30 +110,38 @@ class CloudSyncService {
           await _supabase
               .from('user_progress')
               .update(fullData)
-              .eq('user_id', _userId!);
+              .eq('user_id', _userId!)
+              .timeout(_networkTimeout);
         } on PostgrestException {
           await _supabase
               .from('user_progress')
               .update(baseData)
-              .eq('user_id', _userId!);
+              .eq('user_id', _userId!)
+              .timeout(_networkTimeout);
         }
         debugPrint(
           'CloudSync: Updated cloud progress (score: ${profile.totalScore}, level: ${levelInfo.level}, coins: ${profile.coins})',
         );
       } else {
         try {
-          await _supabase.from('user_progress').insert(fullData);
+          await _supabase
+              .from('user_progress')
+              .insert(fullData)
+              .timeout(_networkTimeout);
         } on PostgrestException {
-          await _supabase.from('user_progress').insert(baseData);
+          await _supabase
+              .from('user_progress')
+              .insert(baseData)
+              .timeout(_networkTimeout);
         }
         debugPrint('CloudSync: Created new cloud progress record');
       }
 
-      // Sync unlocked store items to `user_inventory`
-      await _syncInventoryToCloud(profile.unlockedItemIds);
-
-      // Also update leaderboard for global ranking & arena sync
-      await _updateLeaderboard(profile);
+      // Run inventory sync (if needed) and leaderboard update concurrently
+      await Future.wait([
+        if (syncInventory) _syncInventoryToCloud(profile.unlockedItemIds),
+        _updateLeaderboard(profile),
+      ]);
 
       return true;
     } catch (e) {
@@ -135,20 +150,32 @@ class CloudSyncService {
     }
   }
 
-  /// Syncs locally unlocked store items to `public.user_inventory`,
-  /// and removes consumed tactical power-ups so they never resurrect or block re-purchase.
+  /// Syncs locally unlocked store items to `public.user_inventory` in a single batch upsert,
+  /// and removes consumed tactical power-ups in a single batch delete.
   Future<void> _syncInventoryToCloud(List<String> unlockedItemIds) async {
     if (!_isAuthenticated || _userId == null) return;
 
     try {
-      for (final itemId in unlockedItemIds) {
-        await _supabase.from('user_inventory').upsert(
-          {
-            'user_id': _userId,
-            'item_id': itemId,
-          },
-          onConflict: 'user_id,item_id',
-        );
+      final uniqueIds = unlockedItemIds
+          .where((id) => id.trim().isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (uniqueIds.isNotEmpty) {
+        final rows = uniqueIds
+            .map((itemId) => {
+                  'user_id': _userId,
+                  'item_id': itemId,
+                })
+            .toList();
+
+        await _supabase
+            .from('user_inventory')
+            .upsert(
+              rows,
+              onConflict: 'user_id,item_id',
+            )
+            .timeout(_networkTimeout);
       }
 
       const consumablePowerups = [
@@ -156,14 +183,17 @@ class CloudSyncService {
         'powerup_insight',
         'powerup_xp_banner',
       ];
-      for (final powerupId in consumablePowerups) {
-        if (!unlockedItemIds.contains(powerupId)) {
-          await _supabase
-              .from('user_inventory')
-              .delete()
-              .eq('user_id', _userId!)
-              .eq('item_id', powerupId);
-        }
+      final consumedPowerups = consumablePowerups
+          .where((id) => !uniqueIds.contains(id))
+          .toList();
+
+      if (consumedPowerups.isNotEmpty) {
+        await _supabase
+            .from('user_inventory')
+            .delete()
+            .eq('user_id', _userId!)
+            .inFilter('item_id', consumedPowerups)
+            .timeout(_networkTimeout);
       }
     } catch (e) {
       // Non-fatal if migration 009 is not yet applied or item_id not in store_items
@@ -182,7 +212,8 @@ class CloudSyncService {
           .from('leaderboard')
           .select()
           .eq('user_id', _userId!)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(_networkTimeout);
 
       final currentScore = (existing?['score'] as num?)?.toInt() ?? 0;
       final newScore = math.max(profile.totalScore, currentScore);
@@ -219,31 +250,39 @@ class CloudSyncService {
           await _supabase
               .from('leaderboard')
               .update(fullLeaderboardData)
-              .eq('user_id', _userId!);
+              .eq('user_id', _userId!)
+              .timeout(_networkTimeout);
         } on PostgrestException {
           await _supabase
               .from('leaderboard')
               .update(baseLeaderboardData)
-              .eq('user_id', _userId!);
+              .eq('user_id', _userId!)
+              .timeout(_networkTimeout);
         }
         debugPrint(
           'CloudSync: Leaderboard updated - score: $newScore, level: ${levelInfo.level}, arena: ${arenaInfo.name}',
         );
       } else {
         try {
-          await _supabase.from('leaderboard').insert({
-            'user_id': _userId,
-            'email': user.email,
-            'country_code': 'YE',
-            ...fullLeaderboardData,
-          });
+          await _supabase
+              .from('leaderboard')
+              .insert({
+                'user_id': _userId,
+                'email': user.email,
+                'country_code': 'YE',
+                ...fullLeaderboardData,
+              })
+              .timeout(_networkTimeout);
         } on PostgrestException {
-          await _supabase.from('leaderboard').insert({
-            'user_id': _userId,
-            'email': user.email,
-            'country_code': 'YE',
-            ...baseLeaderboardData,
-          });
+          await _supabase
+              .from('leaderboard')
+              .insert({
+                'user_id': _userId,
+                'email': user.email,
+                'country_code': 'YE',
+                ...baseLeaderboardData,
+              })
+              .timeout(_networkTimeout);
         }
         debugPrint('CloudSync: Leaderboard entry created - score: $newScore');
       }
@@ -252,8 +291,45 @@ class CloudSyncService {
     }
   }
 
+  Future<Map<String, dynamic>?> _fetchLeaderboardRowSafe() async {
+    try {
+      return await _supabase
+          .from('leaderboard')
+          .select()
+          .eq('user_id', _userId!)
+          .maybeSingle()
+          .timeout(_networkTimeout);
+    } catch (e) {
+      debugPrint('CloudSync: Leaderboard fetch warning: $e');
+      return null;
+    }
+  }
+
+  Future<List<String>> _fetchUnlockedInventoryIdsSafe() async {
+    final List<String> unlockedItemIds = [
+      'theme_andalusian_gold',
+      'item_frame_wood',
+    ];
+    try {
+      final invRows = await _supabase
+          .from('user_inventory')
+          .select('item_id')
+          .eq('user_id', _userId!)
+          .timeout(_networkTimeout);
+      for (final row in (invRows as List<dynamic>)) {
+        final itemId = (row as Map<String, dynamic>)['item_id']?.toString();
+        if (itemId != null && !unlockedItemIds.contains(itemId)) {
+          unlockedItemIds.add(itemId);
+        }
+      }
+    } catch (e) {
+      debugPrint('CloudSync: Inventory fetch notice: $e');
+    }
+    return unlockedItemIds;
+  }
+
   /// Fetch complete profile data from cloud.
-  /// Reconciles `user_progress`, `leaderboard`, and `user_inventory` so no points or items are ever lost.
+  /// Reconciles `user_progress`, `leaderboard`, and `user_inventory` in parallel so no points or items are ever lost.
   Future<PlayerProfile?> fetchProfileFromCloud() async {
     if (!_isAuthenticated || _userId == null) {
       debugPrint('CloudSync: Not authenticated, cannot fetch');
@@ -263,46 +339,24 @@ class CloudSyncService {
     try {
       debugPrint('CloudSync: Fetching profile from cloud...');
 
-      final data = await _supabase
-          .from('user_progress')
-          .select()
-          .eq('user_id', _userId!)
-          .maybeSingle();
-
-      Map<String, dynamic>? lbData;
-      try {
-        lbData = await _supabase
-            .from('leaderboard')
+      final results = await Future.wait([
+        _supabase
+            .from('user_progress')
             .select()
             .eq('user_id', _userId!)
-            .maybeSingle();
-      } catch (e) {
-        debugPrint('CloudSync: Leaderboard fetch warning: $e');
-      }
+            .maybeSingle()
+            .timeout(_networkTimeout),
+        _fetchLeaderboardRowSafe(),
+        _fetchUnlockedInventoryIdsSafe(),
+      ]);
+
+      final data = results[0] as Map<String, dynamic>?;
+      final lbData = results[1] as Map<String, dynamic>?;
+      final unlockedItemIds = results[2] as List<String>;
 
       if (data == null && lbData == null) {
         debugPrint('CloudSync: No cloud data found for user');
         return null;
-      }
-
-      // Fetch unlocked store inventory items if available
-      final List<String> unlockedItemIds = [
-        'theme_andalusian_gold',
-        'item_frame_wood',
-      ];
-      try {
-        final invRows = await _supabase
-            .from('user_inventory')
-            .select('item_id')
-            .eq('user_id', _userId!);
-        for (final row in (invRows as List<dynamic>)) {
-          final itemId = (row as Map<String, dynamic>)['item_id']?.toString();
-          if (itemId != null && !unlockedItemIds.contains(itemId)) {
-            unlockedItemIds.add(itemId);
-          }
-        }
-      } catch (e) {
-        debugPrint('CloudSync: Inventory fetch notice: $e');
       }
 
       final lbScore = (lbData?['score'] as num?)?.toInt() ?? 0;

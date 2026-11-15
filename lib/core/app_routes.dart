@@ -15,6 +15,7 @@ import '../ui/screens/multiplayer/private_room_hub_screen.dart';
 import '../ui/screens/glory/glory_road_screen.dart';
 import '../ui/screens/store/knights_store_screen.dart';
 import '../data/models/player_profile_model.dart';
+import '../data/services/progression_service.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -71,7 +72,9 @@ class AppRoutes {
             totalScore: args['totalScore'],
             categoryId: args['categoryId'],
             levelId: args['levelId'],
+            levelNumber: args['levelNumber'] as int?,
             userAnswers: args['userAnswers'],
+            preProgressionSnapshot: args['preSnapshot'] as ProgressionSnapshot?,
           ),
           settings,
         );

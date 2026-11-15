@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/app_constants.dart';
 import '../../core/app_theme.dart';
+import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../data/models/level_model.dart';
 import '../../logic/game_controller.dart';
@@ -19,6 +22,7 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
   late GameController _gameController;
   late AnimationController _animationController;
   List<Level> _levels = [];
+  List<Animation<double>> _itemAnimations = [];
   bool _isLoading = true;
 
   @override
@@ -26,18 +30,38 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
     super.initState();
     _gameController = GameController();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
-    _loadLevels();
+    unawaited(_gameController.preloadCategory(widget.categoryId));
+    _loadLevels(animate: true);
   }
 
-  Future<void> _loadLevels() async {
+  Future<void> _loadLevels({bool animate = false}) async {
     _gameController.initializeCategories();
-    _levels = _gameController.getLevelsForCategory(widget.categoryId);
+    final loadedLevels = _gameController.getLevelsForCategory(widget.categoryId);
+    final count = loadedLevels.isEmpty ? 1 : loadedLevels.length;
+    final animations = List<Animation<double>>.generate(loadedLevels.length, (index) {
+      final start = ((1 / count) * index * 0.45).clamp(0.0, 0.85);
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Interval(start, 1.0, curve: Curves.easeOutCubic),
+        ),
+      );
+    });
+
     if (mounted) {
-      setState(() => _isLoading = false);
-      _animationController.forward();
+      setState(() {
+        _levels = loadedLevels;
+        _itemAnimations = animations;
+        _isLoading = false;
+      });
+      if (animate) {
+        _animationController.forward(from: 0);
+      } else if (_animationController.value < 1.0) {
+        _animationController.value = 1.0;
+      }
     }
   }
 
@@ -51,7 +75,9 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.imperialGradient),
+        decoration: BoxDecoration(
+          gradient: AppCustomTheme.of(context).backgroundGradient,
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -66,9 +92,7 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
                         crossAxisAlignment: CrossAxisAlignment.start, // Align to Right (Start in RTL)
                         children: [
                           Text(
-                            widget.categoryId == 'islamic_history' ? 'التاريخ الإسلامي' :
-                            widget.categoryId == 'quran' ? 'القرآن الكريم' :
-                            widget.categoryId == 'prophets' ? 'الأنبياء والرسل' : 'السيرة النبوية',
+                            AppConstants.getCategoryName(widget.categoryId),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -115,41 +139,42 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
                         physics: const BouncingScrollPhysics(),
                         itemBuilder: (context, index) {
                           final level = _levels[index];
-                          // Staggered Animation
-                          final Animation<double> animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                            CurvedAnimation(
-                              parent: _animationController,
-                              curve: Interval((1 / _levels.length) * index * 0.5, 1.0, curve: Curves.easeOutBack),
-                            ),
-                          );
+                          final animation = index < _itemAnimations.length
+                              ? _itemAnimations[index]
+                              : _animationController;
 
-                          return AnimatedBuilder(
-                            animation: animation,
-                            builder: (context, child) {
-                              return Transform.translate(
-                                offset: Offset(0, 50 * (1 - animation.value)),
-                                child: Opacity(
-                                  opacity: animation.value,
-                                  child: child,
+                          return RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: animation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(0, 40 * (1 - animation.value)),
+                                  child: FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: LevelItem(
+                                  level: level,
+                                  onTap: () async {
+                                    SoundService().playClick();
+                                    await Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.quiz,
+                                      arguments: {
+                                        'categoryId': widget.categoryId,
+                                        'levelId': level.id,
+                                        'levelNumber': level.levelNumber,
+                                      },
+                                    );
+                                    if (mounted) {
+                                      await _loadLevels(animate: false);
+                                    }
+                                  },
                                 ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 12), // Reduced spacing
-                              child: LevelItem(
-                                level: level,
-                                onTap: () {
-                                  SoundService().playClick(); // Click sound on Level Item
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.quiz,
-                                    arguments: {
-                                      'categoryId': widget.categoryId,
-                                      'levelId': level.id,
-                                      'levelNumber': level.levelNumber,
-                                    },
-                                  );
-                                },
                               ),
                             ),
                           );

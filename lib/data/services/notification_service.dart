@@ -2,13 +2,15 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/data/latest_10y.dart' as tz_data;
+import '../local/shared_prefs_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
   
   static bool _isInitialized = false;
+  static Future<void>? _initFuture;
 
   // معرف القناة (محدث)
   static const String _channelId = 'quiz_notifications_v3';
@@ -34,13 +36,19 @@ class NotificationService {
     },
   ];
 
-  static Future<void> init() async {
-    if (_isInitialized) return;
-    
+  static Future<void> init() {
+    if (_isInitialized) return Future<void>.value();
+    _initFuture ??= _initInternal().whenComplete(() {
+      _initFuture = null;
+    });
+    return _initFuture!;
+  }
+
+  static Future<void> _initInternal() async {
     try {
       tz_data.initializeTimeZones();
-      final String timeZoneName = 'Asia/Riyadh';
-      
+      const String timeZoneName = 'Asia/Riyadh';
+
       try {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
       } catch (e) {
@@ -73,9 +81,9 @@ class NotificationService {
       // طلب الأذونات
       await _requestPermissions();
 
-      // جدولة الإشعارات
+      // جدولة الإشعارات فقط إذا لم تكن مجدولة مسبقاً لتجنب تكرار مكالمات النظام
       await scheduleDailyNotifications();
-      
+
       _isInitialized = true;
       debugPrint('NotificationService Initialized Successfully ✅');
     } catch (e) {
@@ -127,14 +135,19 @@ class NotificationService {
     debugPrint('User tapped notification: ${response.payload}');
   }
 
-  static Future<void> scheduleDailyNotifications() async {
-    await cancelAllNotifications();
-    
+  static Future<void> scheduleDailyNotifications({bool force = false}) async {
+    if (!force && SharedPrefsService.areDailyNotificationsScheduled()) {
+      return;
+    }
+
+    await _notifications.cancelAll();
+
     // جدولة 3 إشعارات يومية
-    await _scheduleNotificationAt(hour: 14, minute: 0, id: 101); 
-    await _scheduleNotificationAt(hour: 17, minute: 0, id: 102); 
-    await _scheduleNotificationAt(hour: 21, minute: 0, id: 103); 
-    
+    await _scheduleNotificationAt(hour: 14, minute: 0, id: 101);
+    await _scheduleNotificationAt(hour: 17, minute: 0, id: 102);
+    await _scheduleNotificationAt(hour: 21, minute: 0, id: 103);
+
+    await SharedPrefsService.setDailyNotificationsScheduled(true);
     debugPrint('Daily notifications scheduled ✅');
   }
 
@@ -195,6 +208,7 @@ class NotificationService {
 
   static Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
+    await SharedPrefsService.setDailyNotificationsScheduled(false);
   }
 
   static Future<void> showTestNotification() async {

@@ -131,19 +131,14 @@ class HomeSpeedDial extends StatelessWidget {
               },
             ),
 
-            // Google Sign-In / Sign-Out Button
+            // Google Sign-In / Sign-Out Button (uses local crisp icon to avoid failing SVG network request)
             SpeedDialChild(
               child: AuthService().isLoggedIn
                   ? const Icon(Icons.logout_rounded, color: Colors.white, size: 22)
-                  : Image.network(
-                      'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                      width: 22,
-                      height: 22,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.person_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                  : const Icon(
+                      Icons.login_rounded,
+                      color: AppTheme.primaryDark,
+                      size: 22,
                     ),
               backgroundColor: AuthService().isLoggedIn
                   ? Colors.red.shade400

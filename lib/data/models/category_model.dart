@@ -69,5 +69,6 @@ class Category {
     );
   }
 
-  double get progressPercentage => unlockedLevels / totalLevels;
+  double get progressPercentage =>
+      totalLevels > 0 ? (unlockedLevels / totalLevels).clamp(0.0, 1.0) : 0.0;
 }

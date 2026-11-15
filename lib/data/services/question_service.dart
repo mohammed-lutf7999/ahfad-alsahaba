@@ -4,8 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/question_model.dart';
 
+Map<String, dynamic> _decodeQuestionJson(String jsonString) {
+  return jsonDecode(jsonString) as Map<String, dynamic>;
+}
+
 /// Service for loading questions from JSON files
-/// Implements caching to avoid reloading files
+/// Implements caching and background-isolate JSON decoding
 class QuestionService {
   // Singleton pattern
   static final QuestionService _instance = QuestionService._internal();
@@ -15,12 +19,35 @@ class QuestionService {
   // Cache for loaded category data
   final Map<String, dynamic> _cache = {};
 
-  // Loading state tracking
-  bool _isLoading = false;
-  String? _currentLoadingCategory;
-  
+  // Coalesces concurrent loads/preloads for the same category
+  final Map<String, Future<void>> _inFlightLoads = {};
+
   // Random generator for shuffling
   final Random _random = Random();
+
+  Future<void> _ensureCategoryLoaded(String categoryId) async {
+    if (_cache.containsKey(categoryId)) return;
+
+    final existingFuture = _inFlightLoads[categoryId];
+    if (existingFuture != null) {
+      await existingFuture;
+      return;
+    }
+
+    final loadFuture = () async {
+      final jsonString = await rootBundle.loadString(
+        'assets/questions/$categoryId.json',
+      );
+      _cache[categoryId] = await compute(_decodeQuestionJson, jsonString);
+    }();
+
+    _inFlightLoads[categoryId] = loadFuture;
+    try {
+      await loadFuture;
+    } finally {
+      _inFlightLoads.remove(categoryId);
+    }
+  }
 
   /// Load questions for a specific level from a category
   /// Returns a list of Question objects
@@ -28,30 +55,10 @@ class QuestionService {
     required String categoryId,
     required int levelNumber,
   }) async {
-    // Wait if another load is in progress for the same category
-    while (_isLoading && _currentLoadingCategory == categoryId) {
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
-
-    // Check cache first
-    if (!_cache.containsKey(categoryId)) {
-      _isLoading = true;
-      _currentLoadingCategory = categoryId;
-
-      try {
-        // Load JSON file from assets
-        final jsonString = await rootBundle.loadString(
-          'assets/questions/$categoryId.json',
-        );
-        _cache[categoryId] = jsonDecode(jsonString);
-      } catch (e) {
-        _isLoading = false;
-        _currentLoadingCategory = null;
-        throw Exception('Failed to load questions for $categoryId: $e');
-      }
-
-      _isLoading = false;
-      _currentLoadingCategory = null;
+    try {
+      await _ensureCategoryLoaded(categoryId);
+    } catch (e) {
+      throw Exception('Failed to load questions for $categoryId: $e');
     }
 
     // Extract questions for the specified level
@@ -105,17 +112,11 @@ class QuestionService {
 
   /// Load all questions from all levels for a specific category
   Future<List<Question>> loadAllQuestionsForCategory(String categoryId) async {
-    // Check cache first
-    if (!_cache.containsKey(categoryId)) {
-      try {
-        final jsonString = await rootBundle.loadString(
-          'assets/questions/$categoryId.json',
-        );
-        _cache[categoryId] = jsonDecode(jsonString);
-      } catch (e) {
-        debugPrint('❌ Failed to load questions for $categoryId: $e');
-        return [];
-      }
+    try {
+      await _ensureCategoryLoaded(categoryId);
+    } catch (e) {
+      debugPrint('❌ Failed to load questions for $categoryId: $e');
+      return [];
     }
 
     final data = _cache[categoryId];
@@ -164,15 +165,10 @@ class QuestionService {
 
   /// Get the total number of questions for a category
   Future<int> getTotalQuestionsForCategory(String categoryId) async {
-    if (!_cache.containsKey(categoryId)) {
-      try {
-        final jsonString = await rootBundle.loadString(
-          'assets/questions/$categoryId.json',
-        );
-        _cache[categoryId] = jsonDecode(jsonString);
-      } catch (e) {
-        return 0;
-      }
+    try {
+      await _ensureCategoryLoaded(categoryId);
+    } catch (e) {
+      return 0;
     }
 
     final data = _cache[categoryId];
@@ -212,15 +208,10 @@ class QuestionService {
     return _cache.containsKey(categoryId);
   }
 
-  /// Preloads a category into cache if not already loaded
+  /// Preloads a category into cache in background isolate if not already loaded
   Future<void> preloadCategory(String categoryId) async {
-    if (_cache.containsKey(categoryId)) return;
-
     try {
-      final jsonString = await rootBundle.loadString(
-        'assets/questions/$categoryId.json',
-      );
-      _cache[categoryId] = jsonDecode(jsonString);
+      await _ensureCategoryLoaded(categoryId);
     } catch (e) {
       debugPrint('Error preloading category $categoryId: $e');
     }

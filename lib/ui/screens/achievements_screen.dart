@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/sound_service.dart';
@@ -25,15 +26,25 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     _CategoryTab('كمال', AchievementCategory.perfection, Icons.check_circle_rounded),
     _CategoryTab('سرعة', AchievementCategory.speed, Icons.flash_on_rounded),
     _CategoryTab('مثابرة', AchievementCategory.dedication, Icons.local_fire_department_rounded),
+    _CategoryTab('نقاط', AchievementCategory.points, Icons.stars_rounded),
   ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    AchievementService.instance.reconcileAchievements();
     AchievementService.instance.addListener(_onServiceChanged);
     ProfileService.instance.addListener(_onServiceChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(_reconcileAndMarkSeen());
+      }
+    });
+  }
+
+  Future<void> _reconcileAndMarkSeen() async {
+    await AchievementService.instance.reconcileAchievements();
+    await AchievementService.instance.markAllUnlockedAsSeen();
   }
 
   void _onServiceChanged() {
@@ -92,39 +103,46 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Title and Icon
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.goldGradient,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+              // Title and Icon (Expanded protects narrow 360dp devices from overflow)
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.goldGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+                      ),
+                      child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryDark, size: 22),
                     ),
-                    child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryDark, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [AppTheme.accentLight, AppTheme.accentColor],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'الإنجازات',
-                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [AppTheme.accentLight, AppTheme.accentColor],
+                            ).createShader(bounds),
+                            child: const Text(
+                              'الإنجازات',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Text(
+                            '$unlocked / $total',
+                            style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(180)),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '$unlocked / $total',
-                        style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(180)),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               // Back button
               GestureDetector(
                 onTap: () {

@@ -135,6 +135,8 @@ class ConfettiPainter extends CustomPainter {
   final List<ConfettiParticle> particles;
   final double progress;
   final Size screenSize;
+  final Paint _paint = Paint()..style = PaintingStyle.fill;
+  final Path _starPath = Path();
 
   ConfettiPainter({
     required this.particles,
@@ -147,9 +149,7 @@ class ConfettiPainter extends CustomPainter {
     for (var p in particles) {
       final x = p.x * screenSize.width;
       final y = (p.y + progress * p.speed * 3) % 1.2 * screenSize.height - screenSize.height * 0.1;
-      final paint = Paint()
-        ..color = p.color
-        ..style = PaintingStyle.fill;
+      _paint.color = p.color;
 
       canvas.save();
       canvas.translate(x, y);
@@ -157,26 +157,26 @@ class ConfettiPainter extends CustomPainter {
 
       if (p.shape == 0) {
         // Circle
-        canvas.drawCircle(Offset.zero, p.size / 2, paint);
+        canvas.drawCircle(Offset.zero, p.size / 2, _paint);
       } else if (p.shape == 1) {
         // Rectangle
         canvas.drawRect(
           Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
-          paint,
+          _paint,
         );
       } else {
         // Star
-        final path = Path();
+        _starPath.reset();
         for (int i = 0; i < 5; i++) {
           final a = (i * 4 * math.pi / 5) - math.pi / 2;
           if (i == 0) {
-            path.moveTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2);
+            _starPath.moveTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2);
           } else {
-            path.lineTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2);
+            _starPath.lineTo(math.cos(a) * p.size / 2, math.sin(a) * p.size / 2);
           }
         }
-        path.close();
-        canvas.drawPath(path, paint);
+        _starPath.close();
+        canvas.drawPath(_starPath, _paint);
       }
 
       canvas.restore();
@@ -184,7 +184,10 @@ class ConfettiPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(ConfettiPainter oldDelegate) => true;
+  bool shouldRepaint(ConfettiPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.particles != particles ||
+      oldDelegate.screenSize != screenSize;
 }
 
 /// ودجت نثار احتفالي كامل مع RepaintBoundary جاهز للاستخدام الفوري

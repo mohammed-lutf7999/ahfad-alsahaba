@@ -66,14 +66,13 @@ class _HomeScreenState extends State<HomeScreen>
     AchievementService.instance.addListener(_onProfileChanged);
     AuthService().addListener(_onProfileChanged);
     
-    // Reconcile and check achievements
-    AchievementService.instance.reconcileAchievements();
-
-    // Load quotes
+    // Load quotes asynchronously off the critical startup build path
     _loadQuotes();
 
-    // Check Tutorial
+    // Defer post-frame tutorial & achievement reconciliation until frame 1 is painted
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AchievementService.instance.reconcileAchievements();
       _checkTutorial();
     });
   }
@@ -251,63 +250,73 @@ class _HomeScreenState extends State<HomeScreen>
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      profile.name,
-                      style: const TextStyle(
-                        color: AppTheme.accentColor,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 130),
+                      child: Text(
+                        profile.name,
+                        style: const TextStyle(
+                          color: AppTheme.accentColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  LevelBadgeWidget(
-                    levelInfo: profile.levelInfo,
-                    customTitle: profile.effectiveTitle,
-                    isCompact: true,
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    LevelBadgeWidget(
+                      levelInfo: profile.levelInfo,
+                      customTitle: profile.effectiveTitle,
+                      isCompact: true,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.stars_rounded, color: AppTheme.accentLight, size: 13),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${profile.totalScore}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.stars_rounded, color: AppTheme.accentLight, size: 13),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${profile.totalScore}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '🪙 ${profile.coins}',
-                    style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 10),
+                    Text(
+                      '🪙 ${profile.coins}',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD700),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '💎 ${profile.gems}',
-                    style: const TextStyle(
-                      color: Colors.cyanAccent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    Text(
+                      '💎 ${profile.gems}',
+                      style: const TextStyle(
+                        color: Colors.cyanAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

@@ -1,7 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/quote_model.dart';
+
+List<Quote> _parseQuotesJson(String jsonString) {
+  final Map<String, dynamic> jsonData =
+      json.decode(jsonString) as Map<String, dynamic>;
+  return (jsonData['quotes'] as List<dynamic>)
+      .map((q) => Quote.fromJson(Map<String, dynamic>.from(q as Map)))
+      .toList();
+}
 
 /// خدمة إدارة المقولات
 class QuoteService {
@@ -15,23 +24,27 @@ class QuoteService {
   List<Quote> _allQuotes = [];
   List<Quote> _dailyQuotes = [];
   final Random _random = Random();
+  Future<void>? _inFlightLoad;
   
-  /// تحميل المقولات من ملف JSON
-  Future<void> loadQuotes() async {
-    if (_allQuotes.isNotEmpty) return;
-    
+  /// تحميل المقولات من ملف JSON في خلفية Isolate لتفادي تعطيل واجهة المستخدم
+  Future<void> loadQuotes() {
+    if (_allQuotes.isNotEmpty) return Future<void>.value();
+    _inFlightLoad ??= _loadQuotesInternal().whenComplete(() {
+      _inFlightLoad = null;
+    });
+    return _inFlightLoad!;
+  }
+
+  Future<void> _loadQuotesInternal() async {
     try {
-      final String jsonString = await rootBundle.loadString('assets/data/salaf_quotes.json');
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
-      
-      _allQuotes = (jsonData['quotes'] as List)
-          .map((q) => Quote.fromJson(q))
-          .toList();
-          
+      final String jsonString =
+          await rootBundle.loadString('assets/data/salaf_quotes.json');
+      _allQuotes = await compute(_parseQuotesJson, jsonString);
+
       // اختيار 3 مقولات عشوائية لليوم
       _selectDailyQuotes();
     } catch (e) {
-      print('Error loading quotes: $e');
+      debugPrint('Error loading quotes: $e');
       _allQuotes = [];
     }
   }

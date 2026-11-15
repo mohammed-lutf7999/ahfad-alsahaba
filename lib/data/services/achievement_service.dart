@@ -60,7 +60,10 @@ class AchievementService extends ChangeNotifier {
     _pendingUnlocks.addAll(newlyUnlocked);
 
     if (newlyUnlocked.isNotEmpty) {
-      await ProfileService.instance.saveActiveProfileAndSync();
+      await ProfileService.instance.saveActiveProfileLocally(
+        triggerBackgroundSync: true,
+        syncInventory: false,
+      );
       SoundService().playRankUp();
       notifyListeners();
     }
@@ -183,9 +186,12 @@ class AchievementService extends ChangeNotifier {
     // إضافة للقائمة المنتظرة للعرض
     _pendingUnlocks.addAll(newlyUnlocked);
     
-    // حفظ التغييرات
+    // حفظ التغييرات محلياً فوراً ومزامنتها في الخلفية بدون حجب الواجهة
     if (newlyUnlocked.isNotEmpty) {
-      await ProfileService.instance.saveActiveProfileAndSync();
+      await ProfileService.instance.saveActiveProfileLocally(
+        triggerBackgroundSync: true,
+        syncInventory: false,
+      );
       SoundService().playRankUp();
       notifyListeners();
     }
@@ -201,7 +207,6 @@ class AchievementService extends ChangeNotifier {
     final newlyUnlocked = <Achievement>[];
     final categoryId = data['categoryId'] as String;
     final perfectScore = data['perfectScore'] as bool;
-    final score = data['score'] as int;
 
     // حساب المستويات المكتملة
     final completedLevels = _countCompletedLevels(profile);
@@ -245,8 +250,8 @@ class AchievementService extends ChangeNotifier {
       newlyUnlocked.addAll(_checkAndUnlock(profile, achievementId, categoryLevels));
     }
 
-    // === إنجازات النقاط ===
-    final totalScore = profile.totalScore + score;
+    // === إنجازات النقاط (النقاط أضيفت بالفعل في completeLevel إلى profile.totalScore) ===
+    final totalScore = profile.totalScore;
     newlyUnlocked.addAll(_checkAndUnlock(profile, 'beginner_points', totalScore));
     newlyUnlocked.addAll(_checkAndUnlock(profile, 'rich_points', totalScore));
     newlyUnlocked.addAll(_checkAndUnlock(profile, 'king_points', totalScore));
@@ -366,16 +371,45 @@ class AchievementService extends ChangeNotifier {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  /// تحديد أن الإنجاز تمت مشاهدته
+  /// تحديد أن الإنجاز تمت مشاهدته بتحديث متفائل فوري (0ms) ومزامنة خلفية
   Future<void> markAsSeen(String achievementId) async {
     final profile = ProfileService.instance.activeProfile;
     if (profile == null) return;
 
     final progress = profile.getAchievementProgress(achievementId);
+    if (progress.hasBeenSeen) return;
+
     progress.hasBeenSeen = true;
-    
-    await ProfileService.instance.saveActiveProfileAndSync();
     notifyListeners();
+
+    await ProfileService.instance.saveActiveProfileLocally(
+      triggerBackgroundSync: true,
+      syncInventory: false,
+    );
+  }
+
+  /// تعليم جميع الإنجازات المفتوحة غير المشاهدة دفعة واحدة عند فتح شاشة الإنجازات (Optimistic Batch Ack)
+  Future<void> markAllUnlockedAsSeen() async {
+    final profile = ProfileService.instance.activeProfile;
+    if (profile == null) return;
+
+    bool hasChanges = false;
+    for (final progress in profile.achievementProgress.values) {
+      if (progress.isUnlocked && !progress.hasBeenSeen) {
+        progress.hasBeenSeen = true;
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) return;
+
+    // تحديث الواجهة وإخفاء الشارة فوراً قبل أي حفظ أو شبكة
+    notifyListeners();
+
+    await ProfileService.instance.saveActiveProfileLocally(
+      triggerBackgroundSync: true,
+      syncInventory: false,
+    );
   }
 }
 

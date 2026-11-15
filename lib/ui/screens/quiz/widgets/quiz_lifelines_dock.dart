@@ -54,8 +54,12 @@ class QuizLifelinesDock extends StatelessWidget {
               onTap: () {
                 if (gameController.hasUsedTimeFreeze || gameController.isAnswered) return;
                 SoundService().playHintUse();
+                SoundService().stopTimerTick();
                 gameController.useTimeFreeze();
-                timerController.pauseTimer();
+                timerController.freezeTimer(
+                  duration: const Duration(seconds: 15),
+                  shouldResume: () => !gameController.isAnswered,
+                );
                 onStateChanged();
 
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -73,13 +77,6 @@ class QuizLifelinesDock extends StatelessWidget {
                     ),
                   ),
                 );
-
-                // Auto resume after 15 seconds
-                Future.delayed(const Duration(seconds: 15), () {
-                  if (!gameController.isAnswered) {
-                    timerController.resumeTimer();
-                  }
-                });
               },
             ),
 
@@ -91,6 +88,8 @@ class QuizLifelinesDock extends StatelessWidget {
               isUsed: gameController.hasUsedSkip,
               onTap: () {
                 if (gameController.hasUsedSkip || gameController.isAnswered) return;
+                timerController.stopTimer();
+                SoundService().stopTimerTick();
                 SoundService().playHintUse();
                 gameController.useSkip();
                 onNextQuestion();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/player_profile_model.dart';
@@ -19,6 +20,9 @@ class ProfileService extends ChangeNotifier {
   List<PlayerProfile> _profiles = [];
   String? _activeProfileId;
   bool _isSyncing = false;
+  bool _isBackgroundSyncRunning = false;
+  bool _hasPendingBackgroundSync = false;
+  bool _pendingSyncInventory = false;
   
   /// Get all profiles
   List<PlayerProfile> get profiles => _profiles;
@@ -443,22 +447,71 @@ class ProfileService extends ChangeNotifier {
       notifyListeners();
       
       // Sync to cloud in background
-      _cloudSync.syncProfileToCloud(profile);
+      unawaited(syncActiveProfileInBackground(syncInventory: true));
     }
   }
   
-  /// Save and sync active profile - call after game completion
-  Future<void> saveActiveProfileAndSync() async {
+  /// Save active profile locally immediately (0ms network wait) and schedule coalesced background cloud sync.
+  Future<void> saveActiveProfileLocally({
+    bool triggerBackgroundSync = true,
+    bool syncInventory = false,
+  }) async {
     await _saveProfiles();
     notifyListeners();
-    
-    // Sync to cloud
-    final profile = activeProfile;
-    if (profile != null) {
-      await _cloudSync.syncProfileToCloud(profile);
-      await _saveProfiles();
-      notifyListeners();
+
+    if (triggerBackgroundSync) {
+      unawaited(syncActiveProfileInBackground(syncInventory: syncInventory));
     }
+  }
+
+  /// Coalesced background cloud sync so rapid consecutive saves (e.g., level complete + achievement unlock)
+  /// never collide or trigger redundant rebuild storms.
+  Future<void> syncActiveProfileInBackground({bool syncInventory = true}) async {
+    if (_isBackgroundSyncRunning) {
+      _hasPendingBackgroundSync = true;
+      _pendingSyncInventory = _pendingSyncInventory || syncInventory;
+      return;
+    }
+
+    _isBackgroundSyncRunning = true;
+    var currentSyncInventory = syncInventory;
+
+    try {
+      while (true) {
+        _hasPendingBackgroundSync = false;
+        _pendingSyncInventory = false;
+
+        final profile = activeProfile;
+        if (profile != null) {
+          final scoreBefore = profile.totalScore;
+          final highScoreBefore = profile.highScore;
+
+          await _cloudSync.syncProfileToCloud(
+            profile,
+            syncInventory: currentSyncInventory,
+          );
+
+          // Only re-save locally and notify if cloud reconciliation increased score/highScore
+          if (profile.totalScore != scoreBefore ||
+              profile.highScore != highScoreBefore) {
+            await _saveProfiles();
+            notifyListeners();
+          }
+        }
+
+        if (!_hasPendingBackgroundSync) break;
+        currentSyncInventory = _pendingSyncInventory;
+      }
+    } finally {
+      _isBackgroundSyncRunning = false;
+    }
+  }
+
+  /// Save and sync active profile - awaits local save and coalesced cloud sync.
+  Future<void> saveActiveProfileAndSync({bool syncInventory = true}) async {
+    await _saveProfiles();
+    notifyListeners();
+    await syncActiveProfileInBackground(syncInventory: syncInventory);
   }
   
   /// Delete a profile

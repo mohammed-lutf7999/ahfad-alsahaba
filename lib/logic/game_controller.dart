@@ -174,7 +174,6 @@ class GameController extends ChangeNotifier {
     _hasUsedFiftyFifty = false;
     _hasUsedSkip = false;
     _hasUsedTimeFreeze = false;
-    _hasUsedTimeFreeze = false;
     _hiddenOptionIndices = [];
     _userAnswers.clear();
     
@@ -238,35 +237,33 @@ class GameController extends ChangeNotifier {
 
   // Complete level
   Future<void> completeLevel() async {
-    if (_currentCategoryId == null || _currentLevelNumber == null) return;
+    if (_currentCategoryId == null ||
+        _currentLevelNumber == null ||
+        _currentQuestions.isEmpty) {
+      return;
+    }
     
     final profile = ProfileService.instance.activeProfile;
     if (profile == null) return;
 
     final percentage = (_correctAnswers / _currentQuestions.length) * 100;
-    int stars = 0;
-    if (percentage >= 90) {
-      stars = 3;
-    } else if (percentage >= 70) {
-      stars = 2;
-    } else if (percentage >= AppConstants.passingScore) {
-      stars = 1;
-    }
+    final stars = AppConstants.calculateStars(percentage);
 
     // Save level progress to profile
     profile.setLevelStars(_currentCategoryId!, _currentLevelNumber!, stars);
     profile.setLevelScore(_currentCategoryId!, _currentLevelNumber!, _score);
 
-    // Unlock next level ONLY if passed
+    // Unlock next level ONLY if passed (clamped at max levels per category = 10)
     if (percentage >= AppConstants.passingScore) {
       final currentUnlocked = profile.getCategoryUnlockedLevels(_currentCategoryId!);
-      if (_currentLevelNumber! >= currentUnlocked) {
-        profile.setCategoryUnlockedLevels(_currentCategoryId!, _currentLevelNumber! + 1);
+      final targetUnlocked = (_currentLevelNumber! + 1).clamp(1, AppConstants.levelsPerCategory);
+      if (targetUnlocked >= currentUnlocked) {
+        profile.setCategoryUnlockedLevels(_currentCategoryId!, targetUnlocked);
       }
     }
 
     // Apply progression outcome (XP + Arena coin reward + powerup_xp_banner if owned)
-    ProgressionService.instance.applyMatchOutcome(
+    final outcome = ProgressionService.instance.applyMatchOutcome(
       rawMatchScore: _score,
       correctAnswers: _correctAnswers,
       isWin: percentage >= AppConstants.passingScore,
@@ -274,8 +271,11 @@ class GameController extends ChangeNotifier {
       updateTrophies: false,
     );
     
-    // Save profile locally AND sync to cloud
-    await ProfileService.instance.saveActiveProfileAndSync();
+    // Save profile locally immediately (< 5ms) and sync to cloud in the background
+    await ProfileService.instance.saveActiveProfileLocally(
+      triggerBackgroundSync: true,
+      syncInventory: outcome.xpBannerConsumed || outcome.shieldConsumed,
+    );
 
     // Refresh categories with profile data
     initializeCategories();

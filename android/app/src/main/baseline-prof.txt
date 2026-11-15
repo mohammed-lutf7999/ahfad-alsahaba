@@ -1,0 +1,10 @@
+# Baseline Profile startup rules for ART Ahead-of-Time (AOT) pre-compilation
+HSPLcom/ahfad/alsahaba/battle/**->**(**)**
+Lcom/ahfad/alsahaba/battle/**;
+HSPLio/flutter/embedding/android/**->**(**)**
+Lio/flutter/embedding/android/**;
+HSPLio/flutter/embedding/engine/**->**(**)**
+Lio/flutter/embedding/engine/**;
+HSPLio/flutter/plugins/sharedpreferences/**->**(**)**
+Lio/flutter/plugins/sharedpreferences/**;
+

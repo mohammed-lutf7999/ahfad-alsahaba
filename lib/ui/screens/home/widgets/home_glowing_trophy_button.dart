@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/app_theme.dart';
@@ -28,6 +29,7 @@ class _HomeGlowingTrophyButtonState extends State<HomeGlowingTrophyButton>
   late Animation<double> _glowAnimation;
   late Animation<double> _wobbleAnimation;
   late Animation<double> _scaleAnimation;
+  Timer? _wobbleTimer;
 
   @override
   void initState() {
@@ -71,17 +73,18 @@ class _HomeGlowingTrophyButtonState extends State<HomeGlowingTrophyButton>
   }
 
   void _startPeriodicWobble() {
-    Future.delayed(const Duration(seconds: 3), () {
+    _wobbleTimer?.cancel();
+    _wobbleTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) {
-        _wobbleController.forward(from: 0).then((_) {
-          _startPeriodicWobble();
-        });
+        _wobbleController.forward(from: 0);
       }
     });
   }
 
   @override
   void dispose() {
+    _wobbleTimer?.cancel();
+    _wobbleTimer = null;
     _glowController.dispose();
     _wobbleController.dispose();
     _raysController.dispose();
@@ -90,116 +93,137 @@ class _HomeGlowingTrophyButtonState extends State<HomeGlowingTrophyButton>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_glowAnimation, _wobbleAnimation, _raysController]),
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _wobbleAnimation.value,
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: Container(
-              width: 48,
-              height: 48,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Rotating rays behind
-                  Transform.rotate(
-                    angle: _raysController.value * math.pi * 2,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            AppTheme.accentColor.withValues(alpha: 0.3 * _glowAnimation.value),
-                            AppTheme.accentColor.withValues(alpha: 0.1 * _glowAnimation.value),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                      child: CustomPaint(
-                        painter: _TrophyRaysPainter(
-                          color: AppTheme.accentColor.withValues(alpha: 0.5 * _glowAnimation.value),
-                        ),
-                      ),
-                    ),
-                  ),
+    final bool showBadge = widget.hasNotification && widget.notificationCount > 0;
 
-                  // Glowing background
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          AppTheme.accentColor.withValues(alpha: 0.2),
-                          AppTheme.accentColor.withValues(alpha: 0.05),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.accentColor.withValues(alpha: 0.4 * _glowAnimation.value),
-                          blurRadius: 12 * _glowAnimation.value,
-                          spreadRadius: 2 * _glowAnimation.value,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Trophy icon with scale
-                  Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: Icon(
-                      Icons.emoji_events_rounded,
-                      color: AppTheme.accentColor,
-                      size: 26,
-                      shadows: [
-                        Shadow(
-                          color: AppTheme.accentColor.withValues(alpha: 0.5),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Notification badge
-                  if (widget.hasNotification)
-                    Positioned(
-                      right: 4,
-                      top: 4,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_glowAnimation, _wobbleAnimation, _raysController]),
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: _wobbleAnimation.value,
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Rotating rays behind
+                    Transform.rotate(
+                      angle: _raysController.value * math.pi * 2,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: Colors.red,
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withValues(alpha: 0.5),
-                              blurRadius: 6,
-                            ),
-                          ],
+                          gradient: RadialGradient(
+                            colors: [
+                              AppTheme.accentColor.withValues(alpha: 0.3 * _glowAnimation.value),
+                              AppTheme.accentColor.withValues(alpha: 0.1 * _glowAnimation.value),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
                         ),
-                        child: Text(
-                          '${widget.notificationCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                        child: CustomPaint(
+                          painter: _TrophyRaysPainter(
+                            color: AppTheme.accentColor.withValues(alpha: 0.5 * _glowAnimation.value),
                           ),
                         ),
                       ),
                     ),
-                ],
+
+                    // Glowing background
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppTheme.accentColor.withValues(alpha: 0.2),
+                            AppTheme.accentColor.withValues(alpha: 0.05),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.accentColor.withValues(alpha: 0.4 * _glowAnimation.value),
+                            blurRadius: 12 * _glowAnimation.value,
+                            spreadRadius: 2 * _glowAnimation.value,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Trophy icon with scale
+                    Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: Icon(
+                        Icons.emoji_events_rounded,
+                        color: AppTheme.accentColor,
+                        size: 26,
+                        shadows: [
+                          Shadow(
+                            color: AppTheme.accentColor.withValues(alpha: 0.5),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Notification badge (auto-hides smoothly once viewed)
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        transitionBuilder: (child, anim) =>
+                            ScaleTransition(scale: anim, child: child),
+                        child: showBadge
+                            ? Container(
+                                key: ValueKey<int>(widget.notificationCount),
+                                constraints: const BoxConstraints(
+                                  minWidth: 18,
+                                  minHeight: 18,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withValues(alpha: 0.5),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  widget.notificationCount > 99
+                                      ? '99+'
+                                      : '${widget.notificationCount}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

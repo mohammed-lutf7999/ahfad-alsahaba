@@ -191,4 +191,18 @@ class SharedPrefsService {
     final prefs = await _instance;
     await prefs.setBool('profile_setup_complete', complete);
   }
+
+  // ============ NOTIFICATIONS ============
+
+  static const String _keyDailyNotificationsScheduled =
+      'daily_notifications_scheduled_v3';
+
+  static bool areDailyNotificationsScheduled() {
+    return _prefs?.getBool(_keyDailyNotificationsScheduled) ?? false;
+  }
+
+  static Future<void> setDailyNotificationsScheduled(bool scheduled) async {
+    final prefs = await _instance;
+    await prefs.setBool(_keyDailyNotificationsScheduled, scheduled);
+  }
 }

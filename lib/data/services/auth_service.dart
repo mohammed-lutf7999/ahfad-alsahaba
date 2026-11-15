@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_config.dart';
+import '../../core/startup_bootstrap.dart';
 import 'profile_service.dart';
 import 'multiplayer_service.dart';
 
@@ -35,23 +36,47 @@ class AuthService extends ChangeNotifier {
   factory AuthService() => _instance;
   
   AuthService._internal() {
-    // Listen to Supabase auth state changes
-    _supabase.auth.onAuthStateChange.listen((data) {
+    bindAuthStateListenerIfReady();
+  }
+
+  StreamSubscription<AuthState>? _authSubscription;
+
+  SupabaseClient? get _supabase {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Attaches the auth state listener once Supabase has finished initializing.
+  void bindAuthStateListenerIfReady() {
+    if (_authSubscription != null) return;
+    final client = _supabase;
+    if (client == null) return;
+
+    _authSubscription = client.auth.onAuthStateChange.listen((data) {
       debugPrint('Auth state changed: ${data.event}');
       notifyListeners();
     });
   }
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _authSubscription = null;
+    super.dispose();
+  }
 
-  /// Current authenticated user
-  User? get currentUser => _supabase.auth.currentUser;
+  /// Current authenticated user (null-safe if Supabase isn't initialized yet)
+  User? get currentUser => _supabase?.auth.currentUser;
 
   /// Check if user is logged in
   bool get isLoggedIn => currentUser != null;
 
   /// Stream of auth state changes
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  Stream<AuthState> get authStateChanges =>
+      _supabase?.auth.onAuthStateChange ?? const Stream<AuthState>.empty();
 
 
 
@@ -84,8 +109,14 @@ class AuthService extends ChangeNotifier {
         return AuthResult.error('فشل في استرجاع معلومات المصادقة');
       }
 
+      await StartupBootstrap.ensureSupabaseReady();
+      final client = _supabase;
+      if (client == null) {
+        return AuthResult.error('تعذر تهيئة خدمة المصادقة. تحقق من الاتصال بالإنترنت.');
+      }
+
       // Sign in to Supabase with the Google ID token (with timeout)
-      final AuthResponse response = await _supabase.auth.signInWithIdToken(
+      final AuthResponse response = await client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
@@ -155,8 +186,12 @@ class AuthService extends ChangeNotifier {
       
       int score = activeProfile?.totalScore ?? 0;
 
+      await StartupBootstrap.ensureSupabaseReady();
+      final client = _supabase;
+      if (client == null) return;
+
       // Check if user exists in leaderboard
-      final existing = await _supabase
+      final existing = await client
           .from('leaderboard')
           .select('id, score')
           .eq('user_id', user.id)
@@ -165,7 +200,7 @@ class AuthService extends ChangeNotifier {
       if (existing != null) {
         // Update profile data - keep higher score
         final currentScore = existing['score'] as int? ?? 0;
-        await _supabase
+        await client
             .from('leaderboard')
             .update({
               'display_name': displayName,
@@ -176,7 +211,7 @@ class AuthService extends ChangeNotifier {
             .eq('user_id', user.id);
       } else {
         // Create new leaderboard entry
-        await _supabase.from('leaderboard').insert({
+        await client.from('leaderboard').insert({
           'user_id': user.id,
           'display_name': displayName,
           'email': user.email,
@@ -199,9 +234,12 @@ class AuthService extends ChangeNotifier {
       if (user == null) return false;
 
       final activeProfile = ProfileService.instance.activeProfile;
+      await StartupBootstrap.ensureSupabaseReady();
+      final client = _supabase;
+      if (client == null) return false;
       
       // Get current score from cloud
-      final existing = await _supabase
+      final existing = await client
           .from('leaderboard')
           .select('score')
           .eq('user_id', user.id)
@@ -210,7 +248,7 @@ class AuthService extends ChangeNotifier {
       final cloudScore = existing?['score'] as int? ?? 0;
       final finalScore = newScore > cloudScore ? newScore : cloudScore;
       
-      await _supabase
+      await client
           .from('leaderboard')
           .upsert({
             'user_id': user.id,
@@ -232,7 +270,9 @@ class AuthService extends ChangeNotifier {
   /// Send welcome email via Edge Function
   Future<void> _sendWelcomeEmail(User user) async {
     try {
-      await _supabase.functions.invoke(
+      final client = _supabase;
+      if (client == null) return;
+      await client.functions.invoke(
         'welcome-email',
         body: {
           'email': user.email,
@@ -267,7 +307,7 @@ class AuthService extends ChangeNotifier {
       await googleSignIn.signOut();
       
       // Sign out from Supabase
-      await _supabase.auth.signOut();
+      await _supabase?.auth.signOut();
       
       // Notify listeners
       notifyListeners();
@@ -308,16 +348,18 @@ class AuthService extends ChangeNotifier {
   /// Delete user account and associated cloud data (Google Play Policy Compliance)
   Future<bool> deleteAccountAndData() async {
     try {
+      await StartupBootstrap.ensureSupabaseReady();
+      final client = _supabase;
       final user = currentUser;
-      if (user != null) {
+      if (user != null && client != null) {
         try {
-          await _supabase.from('user_progress').delete().eq('user_id', user.id);
+          await client.from('user_progress').delete().eq('user_id', user.id);
         } catch (_) {}
         try {
-          await _supabase.from('leaderboard').delete().eq('user_id', user.id);
+          await client.from('leaderboard').delete().eq('user_id', user.id);
         } catch (_) {}
         try {
-          await _supabase.from('matchmaking_queue').delete().eq('user_id', user.id);
+          await client.from('matchmaking_queue').delete().eq('user_id', user.id);
         } catch (_) {}
       }
 
@@ -329,7 +371,7 @@ class AuthService extends ChangeNotifier {
         await googleSignIn.signOut();
       } catch (_) {}
       try {
-        await _supabase.auth.signOut();
+        await client?.auth.signOut();
       } catch (_) {}
 
       notifyListeners();

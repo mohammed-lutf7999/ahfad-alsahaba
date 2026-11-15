@@ -61,76 +61,78 @@ class _RoyalBottomNavBarState extends State<RoyalBottomNavBar>
           alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: [
-            // 1. The Floating Frosted Glass Dock
+            // 1. The Floating Frosted Glass Dock (isolated in RepaintBoundary)
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(26),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: Container(
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: customTheme.deepBackground.withValues(alpha: 0.88),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: customTheme.sovereignAccent.withValues(alpha: 0.38),
-                        width: 1.2,
+              child: RepaintBoundary(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: Container(
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: customTheme.deepBackground.withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: customTheme.sovereignAccent.withValues(alpha: 0.38),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: customTheme.sovereignAccent.withValues(alpha: 0.1),
+                            blurRadius: 16,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                        BoxShadow(
-                          color: customTheme.sovereignAccent.withValues(alpha: 0.1),
-                          blurRadius: 16,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        // Tab 0: الرئيسية (Home)
-                        _buildNavItem(
-                          index: 0,
-                          label: 'الرئيسية',
-                          icon: Icons.castle_rounded,
-                          customTheme: customTheme,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          // Tab 0: الرئيسية (Home)
+                          _buildNavItem(
+                            index: 0,
+                            label: 'الرئيسية',
+                            icon: Icons.castle_rounded,
+                            customTheme: customTheme,
+                          ),
 
-                        // Tab 1: المكتبة (Library / Campaigns)
-                        _buildNavItem(
-                          index: 1,
-                          label: 'المكتبة',
-                          icon: Icons.menu_book_rounded,
-                          customTheme: customTheme,
-                          key: widget.libraryKey,
-                        ),
+                          // Tab 1: المكتبة (Library / Campaigns)
+                          _buildNavItem(
+                            index: 1,
+                            label: 'المكتبة',
+                            icon: Icons.menu_book_rounded,
+                            customTheme: customTheme,
+                            key: widget.libraryKey,
+                          ),
 
-                        // Gap for Center Elevated Button
-                        const SizedBox(width: 58),
+                          // Gap for Center Elevated Button
+                          const SizedBox(width: 58),
 
-                        // Tab 3: طريق المجد (Glory Road)
-                        _buildNavItem(
-                          index: 3,
-                          label: 'المجد',
-                          icon: Icons.military_tech_rounded,
-                          customTheme: customTheme,
-                        ),
+                          // Tab 3: طريق المجد (Glory Road)
+                          _buildNavItem(
+                            index: 3,
+                            label: 'المجد',
+                            icon: Icons.military_tech_rounded,
+                            customTheme: customTheme,
+                          ),
 
-                        // Tab 4: سوق الفرسان (Store)
-                        _buildNavItem(
-                          index: 4,
-                          label: 'المتجر',
-                          icon: Icons.storefront_rounded,
-                          customTheme: customTheme,
-                        ),
-                      ],
+                          // Tab 4: سوق الفرسان (Store)
+                          _buildNavItem(
+                            index: 4,
+                            label: 'المتجر',
+                            icon: Icons.storefront_rounded,
+                            customTheme: customTheme,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

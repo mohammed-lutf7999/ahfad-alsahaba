@@ -17,50 +17,52 @@ class TimerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: AppTheme.accentColor.withAlpha(80), width: 1.5),
-        boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(40), blurRadius: 8)],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: isRunning ? 1 : 0),
-            duration: const Duration(milliseconds: 500),
-            builder: (context, value, child) => Transform.rotate(
-              angle: value * 0.1,
-              child: Icon(Icons.timer_rounded, color: _getTimerColor(), size: 24),
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: AppTheme.accentColor.withAlpha(80), width: 1.5),
+          boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(40), blurRadius: 8)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: isRunning ? 1 : 0),
+              duration: const Duration(milliseconds: 500),
+              builder: (context, value, child) => Transform.rotate(
+                angle: value * 0.1,
+                child: Icon(Icons.timer_rounded, color: _getTimerColor(), size: 24),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          TweenAnimationBuilder<Color?>(
-            tween: ColorTween(end: _getTimerColor()),
-            duration: const Duration(milliseconds: 300),
-            builder: (context, color, child) {
-              // Blinking effect for last 5 seconds
-              return isRunning && remainingTime <= 5 
-                  ? TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 1.0, end: 0.2),
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeInOut,
-                      builder: (context, opacity, _) {
-                        return Opacity(
-                          opacity: (remainingTime % 2 == 0) ? opacity : 1.0,
-                          child: Text('$remainingTime', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.errorColor)),
-                        );
-                      },
-                      onEnd: () {}, 
-                    )
-                  : Text('$remainingTime', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color));
-            },
-          ),
-          const SizedBox(width: 3),
-          Text('ث', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-        ],
+            const SizedBox(width: 10),
+            TweenAnimationBuilder<Color?>(
+              tween: ColorTween(end: _getTimerColor()),
+              duration: const Duration(milliseconds: 300),
+              builder: (context, color, child) {
+                // Blinking effect for last 5 seconds
+                return isRunning && remainingTime <= 5 
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 1.0, end: 0.2),
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeInOut,
+                        builder: (context, opacity, _) {
+                          return Opacity(
+                            opacity: (remainingTime % 2 == 0) ? opacity : 1.0,
+                            child: Text('$remainingTime', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.errorColor)),
+                          );
+                        },
+                        onEnd: () {}, 
+                      )
+                    : Text('$remainingTime', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color));
+              },
+            ),
+            const SizedBox(width: 3),
+            Text('ث', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+          ],
+        ),
       ),
     );
   }

@@ -31,7 +31,8 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    int locked = widget.category.totalLevels - widget.category.unlockedLevels;
+    final int unlocked = widget.category.unlockedLevels.clamp(0, widget.category.totalLevels);
+    final int locked = (widget.category.totalLevels - unlocked).clamp(0, widget.category.totalLevels);
     
     return GestureDetector(
       onTapDown: (_) => _animationController.forward(),
@@ -78,7 +79,7 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildStatusChip(Icons.lock_open_rounded, '${widget.category.unlockedLevels}', AppTheme.successColor),
+                        _buildStatusChip(Icons.lock_open_rounded, '$unlocked', AppTheme.successColor),
                         _buildStatusChip(Icons.lock_rounded, '$locked', Colors.white.withAlpha(150)),
                       ],
                     ),

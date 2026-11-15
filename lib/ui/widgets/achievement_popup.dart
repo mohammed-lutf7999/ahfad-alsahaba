@@ -208,23 +208,26 @@ class _AchievementPopupState extends State<AchievementPopup>
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Confetti layer
-          AnimatedBuilder(
-            animation: _confettiController,
-            builder: (context, child) {
-              return CustomPaint(
-                size: screenSize,
-                painter: _ConfettiPainter(
-                  particles: _confetti,
-                  progress: _confettiController.value,
-                ),
-              );
-            },
+          // Confetti layer isolated in RepaintBoundary
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _confettiController,
+              builder: (context, child) {
+                return CustomPaint(
+                  size: screenSize,
+                  painter: _ConfettiPainter(
+                    particles: _confetti,
+                    progress: _confettiController.value,
+                  ),
+                );
+              },
+            ),
           ),
           
-          // Main popup
+          // Main popup isolated in RepaintBoundary
           Center(
-            child: AnimatedBuilder(
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
               animation: Listenable.merge([
                 _glowAnimation, 
                 _bounceAnimation, 
@@ -420,7 +423,7 @@ class _AchievementPopupState extends State<AchievementPopup>
                                     widget.onDismiss();
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         begin: Alignment.topLeft,
@@ -450,24 +453,26 @@ class _AchievementPopupState extends State<AchievementPopup>
                                         ),
                                       ],
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'رائـــع!',
-                                          style: TextStyle(
-                                            color: widget.achievement.rarity == AchievementRarity.legendary 
-                                                ? Colors.black 
-                                                : AppTheme.primaryDark,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 20,
-                                            fontFamily: 'Cairo',
-                                            letterSpacing: 2,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'رائـــع!',
+                                            style: TextStyle(
+                                              color: widget.achievement.rarity == AchievementRarity.legendary 
+                                                  ? Colors.black 
+                                                  : AppTheme.primaryDark,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 20,
+                                              fontFamily: 'Cairo',
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        const Text('🎉', style: TextStyle(fontSize: 24)),
-                                      ],
+                                          const SizedBox(width: 10),
+                                          const Text('🎉', style: TextStyle(fontSize: 24)),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -526,6 +531,7 @@ class _AchievementPopupState extends State<AchievementPopup>
                 );
               },
             ),
+            ),
           ),
         ],
       ),
@@ -537,6 +543,8 @@ class _AchievementPopupState extends State<AchievementPopup>
 class _ConfettiPainter extends CustomPainter {
   final List<_ConfettiPiece> particles;
   final double progress;
+  final Paint _paint = Paint()..style = PaintingStyle.fill;
+  final Path _starPath = Path();
 
   _ConfettiPainter({required this.particles, required this.progress});
 
@@ -557,22 +565,20 @@ class _ConfettiPainter extends CustomPainter {
       canvas.translate(x, y);
       canvas.rotate(rotation);
 
-      final paint = Paint()
-        ..color = p.color.withOpacity(opacity.clamp(0.0, 1.0))
-        ..style = PaintingStyle.fill;
+      _paint.color = p.color.withOpacity(opacity.clamp(0.0, 1.0));
 
       switch (p.shape) {
         case 0: // Circle
-          canvas.drawCircle(Offset.zero, p.size / 2, paint);
+          canvas.drawCircle(Offset.zero, p.size / 2, _paint);
           break;
         case 1: // Square
           canvas.drawRect(
             Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size),
-            paint,
+            _paint,
           );
           break;
         case 2: // Star shape
-          final path = Path();
+          _starPath.reset();
           for (int i = 0; i < 5; i++) {
             final angle = (i * 144 - 90) * math.pi / 180;
             final point = Offset(
@@ -580,13 +586,13 @@ class _ConfettiPainter extends CustomPainter {
               math.sin(angle) * p.size / 2,
             );
             if (i == 0) {
-              path.moveTo(point.dx, point.dy);
+              _starPath.moveTo(point.dx, point.dy);
             } else {
-              path.lineTo(point.dx, point.dy);
+              _starPath.lineTo(point.dx, point.dy);
             }
           }
-          path.close();
-          canvas.drawPath(path, paint);
+          _starPath.close();
+          canvas.drawPath(_starPath, _paint);
           break;
       }
 

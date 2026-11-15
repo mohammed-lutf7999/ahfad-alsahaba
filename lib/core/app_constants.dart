@@ -11,10 +11,40 @@ class AppConstants {
 
   // Level settings
   static const int questionsPerLevel = 10;
+  static const int levelsPerCategory = 10;
   static const int passingScore = 50; // percentage to pass level هنا تغيير نسبة الفتح للمستويات
 
+  /// Unified star calculation used across GameController and ResultScreen
+  static int calculateStars(double percentage) {
+    if (percentage >= 90) return 3;
+    if (percentage >= 70) return 2;
+    if (percentage >= passingScore) return 1;
+    return 0;
+  }
+
+  /// Unified Arabic display name for all category IDs
+  static String getCategoryName(String categoryId) {
+    switch (categoryId) {
+      case quranCategory:
+        return 'القرآن الكريم';
+      case hadithCategory:
+        return 'الحديث الشريف';
+      case fiqhCategory:
+        return 'الفقه الإسلامي';
+      case seerahCategory:
+        return 'السيرة النبوية';
+      case historyCategory:
+      case 'islamic_history':
+        return 'التاريخ الإسلامي';
+      case aqeedahCategory:
+        return 'العقيدة الإسلامية';
+      default:
+        return 'المسابقة الإسلامية';
+    }
+  }
+
   // Animation durations
-  static const int splashDuration = 2500; // milliseconds
+  static const int splashDuration = 0; // milliseconds (instant Local-First SWR launch)
   static const int transitionDuration = 300; // milliseconds
   static const int answerRevealDuration = 1500; // milliseconds
 
@@ -35,6 +65,6 @@ class AppConstants {
   // App & Developer info
   static const String appName = 'معركة أحفاد الصحابة';
   static const String storeTitle = 'معركة أحفاد الصحابة: مسابقات';
-  static const String appVersion = '1.0.15';
+  static const String appVersion = '1.0.16';
   static const String developerName = 'م. محمد لطف';
 }

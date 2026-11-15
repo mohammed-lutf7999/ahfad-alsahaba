@@ -30,84 +30,88 @@ class _QuestionCardState extends State<QuestionCard> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(2.5), // Border width
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22), // Matching inner radius + width roughly
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: const [
-                AppTheme.accentColor,
-                Color(0xFFFFD700), // Bright Gold
-                AppTheme.accentDark,
-                AppTheme.accentColor,
-                 Color(0xFFFFD700),
-              ],
-              stops: [
-                0.0,
-                0.25 + 0.25 * math.sin(_controller.value * 2 * math.pi),
-                0.5,
-                0.75 + 0.25 * math.cos(_controller.value * 2 * math.pi),
-                1.0,
-              ],
-              transform: GradientRotation(_controller.value * 2 * math.pi),
+              colors: [AppTheme.primaryLight, AppTheme.primaryColor, AppTheme.primaryDark],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.accentColor.withAlpha(50 + (20 * math.sin(_controller.value * 2 * math.pi)).toInt()),
-                blurRadius: 15,
-                spreadRadius: 1,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              Center(
+                child: Text(
+                  widget.questionText,
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, height: 1.5),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.accentColor.withAlpha(50)),
+                  ),
+                  child: Text(
+                    'الجواب الصحيح هو..؟',
+                    style: TextStyle(color: AppTheme.accentColor.withAlpha(230), fontSize: 12, fontWeight: FontWeight.normal),
+                  ),
+                ),
               ),
             ],
           ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        ),
+        builder: (context, child) {
+          final angle = _controller.value * 2 * math.pi;
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(2.5), // Border width
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              borderRadius: BorderRadius.circular(22),
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppTheme.primaryLight, AppTheme.primaryColor, AppTheme.primaryDark],
+                colors: const [
+                  AppTheme.accentColor,
+                  Color(0xFFFFD700), // Bright Gold
+                  AppTheme.accentDark,
+                  AppTheme.accentColor,
+                  Color(0xFFFFD700),
+                ],
+                stops: [
+                  0.0,
+                  0.25 + 0.25 * math.sin(angle),
+                  0.5,
+                  0.75 + 0.25 * math.cos(angle),
+                  1.0,
+                ],
+                transform: GradientRotation(angle),
               ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    widget.questionText,
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, height: 1.5),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accentColor.withAlpha(50)),
-                    ),
-                    child: Text(
-                      'الجواب الصحيح هو..؟',
-                      style: TextStyle(color: AppTheme.accentColor.withAlpha(230), fontSize: 12, fontWeight: FontWeight.normal),
-                    ),
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.accentColor.withAlpha(50 + (20 * math.sin(angle)).toInt()),
+                  blurRadius: 15,
+                  spreadRadius: 1,
                 ),
               ],
             ),
-          ),
-        );
-      },
+            child: child,
+          );
+        },
+      ),
     );
   }
 }

@@ -82,8 +82,9 @@ class ResultStatsRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: isSmall ? 10 : 11,
-            color: Colors.grey.shade400,
+            fontSize: isSmall ? 11 : 12,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w600,
             fontFamily: 'Cairo',
           ),
         ),

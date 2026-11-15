@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'package:screenshot/screenshot.dart';
 import '../../core/app_theme.dart';
+import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../core/app_constants.dart';
 import '../../core/sound_service.dart';
 import '../../core/share_service.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/services/achievement_service.dart';
+import '../../data/services/profile_service.dart';
+import '../../data/services/progression_service.dart';
 import '../widgets/achievement_popup.dart';
 import '../widgets/particles/unified_particle_system.dart';
 import 'result/widgets/quiz_review_dialog.dart';
@@ -21,7 +24,9 @@ class ResultScreen extends StatefulWidget {
   final int totalScore;
   final String categoryId;
   final String levelId;
-  final List<Map<String, dynamic>>? userAnswers; // Optional for backward compatibility, but we will pass it.
+  final int? levelNumber;
+  final List<Map<String, dynamic>>? userAnswers;
+  final ProgressionSnapshot? preProgressionSnapshot;
 
   const ResultScreen({
     super.key,
@@ -30,7 +35,9 @@ class ResultScreen extends StatefulWidget {
     required this.totalScore,
     required this.categoryId,
     required this.levelId,
+    this.levelNumber,
     this.userAnswers,
+    this.preProgressionSnapshot,
   });
 
   @override
@@ -56,13 +63,16 @@ class _ResultScreenState extends State<ResultScreen>
   final List<ConfettiParticle> _particles = [];
   final math.Random _random = math.Random();
 
-  double get percentage => widget.correctAnswers / widget.totalQuestions * 100;
+  double get percentage =>
+      widget.totalQuestions > 0 ? widget.correctAnswers / widget.totalQuestions * 100 : 0.0;
   bool get isPassed => percentage >= AppConstants.passingScore;
-  int get stars {
-    if (percentage >= 90) return 3;
-    if (percentage >= 70) return 2;
-    if (percentage >= 60) return 1;
-    return 0;
+  int get stars => AppConstants.calculateStars(percentage);
+
+  int get effectiveLevelNumber {
+    if (widget.levelNumber != null) return widget.levelNumber!;
+    final tail = int.tryParse(widget.levelId.split('_').last);
+    if (tail != null) return tail;
+    return int.tryParse(widget.levelId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
   }
 
   @override
@@ -133,9 +143,11 @@ class _ResultScreenState extends State<ResultScreen>
 
   void _startAnimations() async {
     await Future.delayed(const Duration(milliseconds: 150));
+    if (!mounted) return;
     _scoreController.forward();
     
     await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
     _starsController.forward();
     
     if (isPassed) {
@@ -144,13 +156,29 @@ class _ResultScreenState extends State<ResultScreen>
       _starWobbleController.repeat(reverse: true); // Start wobble
     }
     
-    // Check achievements after animations start
-    _checkAchievements();
+    // Sequentially present level-up celebration (if any) and then achievements
+    _runPostResultChecks();
+  }
+
+  Future<void> _runPostResultChecks() async {
+    final snapshot = widget.preProgressionSnapshot;
+    if (snapshot != null) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      await ProgressionService.instance.checkAndTriggerCelebrations(
+        context,
+        before: snapshot,
+      );
+    }
+
+    if (!mounted) return;
+    await _checkAchievements();
   }
   
   // Check and display unlocked achievements
   Future<void> _checkAchievements() async {
-    final levelNumber = int.tryParse(widget.levelId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+    if (!mounted) return;
+    final levelNumber = effectiveLevelNumber;
     
     await AchievementService.instance.checkAchievements(
       AchievementEvent.levelCompleted(
@@ -164,7 +192,8 @@ class _ResultScreenState extends State<ResultScreen>
     );
     
     // Show pending achievement popups
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
     await _showNextAchievementPopup();
   }
   
@@ -176,6 +205,7 @@ class _ResultScreenState extends State<ResultScreen>
       await AchievementPopup.show(context, achievement);
       // Show next one after a delay
       await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
       await _showNextAchievementPopup();
     }
   }
@@ -194,28 +224,31 @@ class _ResultScreenState extends State<ResultScreen>
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
+    final backgroundGradient = AppCustomTheme.of(context).backgroundGradient;
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          gradient: AppTheme.imperialGradient,
+          gradient: backgroundGradient,
         ),
         child: Screenshot(
           controller: _screenshotController,
           child: Container(
             decoration: _isSharing 
-              ? BoxDecoration(gradient: AppTheme.imperialGradient) 
+              ? BoxDecoration(gradient: backgroundGradient) 
               : null, // Ensure background is captured
             child: Stack(
               children: [
-                // Confetti animation
+                // Confetti animation isolated in its own RepaintBoundary
                 if (isPassed)
-                  CelebrationConfettiOverlay(
-                    animation: _confettiController,
-                    particles: _particles,
-                    screenSize: MediaQuery.of(context).size,
+                  RepaintBoundary(
+                    child: CelebrationConfettiOverlay(
+                      animation: _confettiController,
+                      particles: _particles,
+                      screenSize: MediaQuery.of(context).size,
+                    ),
                   ),
 
             SafeArea(
@@ -512,9 +545,14 @@ Future<void> _captureAndShare() async {
   }
 
   Widget _buildButtons(bool isSmall) {
-    final currentLevelNumber = int.tryParse(widget.levelId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+    final currentLevelNumber = effectiveLevelNumber;
+    final hasNextLevel = currentLevelNumber < AppConstants.levelsPerCategory;
     final nextLevelNumber = currentLevelNumber + 1;
-    final nextLevelId = 'level_$nextLevelNumber';
+    final nextLevelId = '${widget.categoryId}_level_$nextLevelNumber';
+    final currentCanonicalLevelId = '${widget.categoryId}_level_$currentLevelNumber';
+    final profile = ProfileService.instance.activeProfile;
+    final isNextLevelUnlocked = hasNextLevel &&
+        (isPassed || (profile?.isLevelUnlocked(widget.categoryId, nextLevelNumber) ?? false));
 
     return Column(
       children: [
@@ -529,7 +567,7 @@ Future<void> _captureAndShare() async {
               icon: Icon(Icons.visibility_rounded, size: isSmall ? 18 : 20, color: AppTheme.accentColor),
               label: Text('مراجعة الإجابات', style: TextStyle(fontSize: isSmall ? 14 : 16, color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
               style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 12),
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: isSmall ? 8 : 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 side: const BorderSide(color: AppTheme.accentColor, width: 2),
                 backgroundColor: AppTheme.accentColor.withOpacity(0.1),
@@ -544,16 +582,20 @@ Future<void> _captureAndShare() async {
               child: OutlinedButton.icon(
                 onPressed: () {
                   SoundService().playClick();
-                  Navigator.pushReplacementNamed(
-                    context,
-                    AppRoutes.levels,
-                    arguments: {'categoryId': widget.categoryId},
-                  );
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushReplacementNamed(
+                      context,
+                      AppRoutes.levels,
+                      arguments: {'categoryId': widget.categoryId},
+                    );
+                  }
                 },
                 icon: Icon(Icons.grid_view_rounded, size: isSmall ? 16 : 18, color: AppTheme.accentDark),
                 label: Text('المستويات', style: TextStyle(fontSize: isSmall ? 12 : 13, color: AppTheme.accentDark)),
                 style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 12),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: isSmall ? 8 : 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   side: BorderSide(color: AppTheme.accentColor.withAlpha(150), width: 1.5),
                 ),
@@ -573,19 +615,26 @@ Future<void> _captureAndShare() async {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     SoundService().playClick();
-                    Navigator.pushNamedAndRemoveUntil(
+                    Navigator.pushReplacementNamed(
                       context,
                       AppRoutes.quiz,
-                      (route) => route.settings.name == AppRoutes.home,
                       arguments: {
                         'categoryId': widget.categoryId,
-                        'levelId': isPassed ? nextLevelId : widget.levelId,
-                        'levelNumber': isPassed ? nextLevelNumber : currentLevelNumber,
+                        'levelId': isNextLevelUnlocked ? nextLevelId : currentCanonicalLevelId,
+                        'levelNumber': isNextLevelUnlocked ? nextLevelNumber : currentLevelNumber,
                       },
                     );
                   },
-                  icon: Icon(isPassed ? Icons.arrow_forward_rounded : Icons.refresh_rounded, size: isSmall ? 16 : 18),
-                  label: Text(isPassed ? 'المستوى التالي' : 'حاول مرة أخرى', style: TextStyle(fontSize: isSmall ? 10 : 12, fontWeight: FontWeight.bold)),
+                  icon: Icon(
+                    isNextLevelUnlocked ? Icons.arrow_forward_rounded : Icons.refresh_rounded,
+                    size: isSmall ? 16 : 18,
+                  ),
+                  label: Text(
+                    isNextLevelUnlocked
+                        ? 'المستوى التالي'
+                        : (isPassed ? 'إعادة المستوى' : 'حاول مرة أخرى'),
+                    style: TextStyle(fontSize: isSmall ? 10 : 12, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,

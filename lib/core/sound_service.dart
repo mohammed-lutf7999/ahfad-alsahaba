@@ -39,6 +39,14 @@ class SoundService {
   // Random number generator
   final _random = Random();
 
+  // Reusable audio player pool to eliminate per-click native player creation/disposal churn
+  static const int _poolSize = 4;
+  final List<AudioPlayer> _sfxPool = [];
+  int _sfxPoolIndex = 0;
+
+  // Dedicated player for long celebration fanfares so button clicks never cut them off
+  AudioPlayer? _celebrationPlayer;
+
   // Special player for looping sounds (like timer)
   AudioPlayer? _loopPlayer;
 
@@ -46,16 +54,39 @@ class SoundService {
   @visibleForTesting
   int rankUpPlayCount = 0;
 
+  bool _isCelebrationAsset(String assetPath) {
+    return assetPath == levelCompleteSound ||
+        assetPath == rankUpSound ||
+        assetPath == victorySound ||
+        assetPath == defeatSound;
+  }
+
+  AudioPlayer _nextSfxPlayer() {
+    if (_sfxPool.length < _poolSize) {
+      final player = AudioPlayer();
+      _sfxPool.add(player);
+      return player;
+    }
+    final player = _sfxPool[_sfxPoolIndex];
+    _sfxPoolIndex = (_sfxPoolIndex + 1) % _poolSize;
+    return player;
+  }
+
   Future<void> playSound(String assetPath, {double volume = 1.0}) async {
     if (!SharedPrefsService.getSoundEnabled()) return;
 
     try {
-      final player = AudioPlayer();
+      final AudioPlayer player;
+      if (_isCelebrationAsset(assetPath)) {
+        _celebrationPlayer ??= AudioPlayer();
+        player = _celebrationPlayer!;
+      } else {
+        player = _nextSfxPlayer();
+      }
+
+      await player.stop();
       await player.setVolume(volume);
       await player.play(AssetSource(assetPath));
-      player.onPlayerComplete.listen((event) {
-        player.dispose();
-      });
     } catch (e) {
       debugPrint('Error playing sound ($assetPath): $e');
     }
@@ -77,9 +108,9 @@ class SoundService {
   // --- Timer Methods ---
   Future<void> startTimerTick() async {
     if (!SharedPrefsService.getSoundEnabled()) return;
-    _loopPlayer?.dispose();
-    _loopPlayer = AudioPlayer();
     try {
+      _loopPlayer ??= AudioPlayer();
+      await _loopPlayer!.stop();
       await _loopPlayer!.setVolume(0.5);
       await _loopPlayer!.setReleaseMode(ReleaseMode.loop);
       await _loopPlayer!.play(AssetSource(timerTickSound));
@@ -91,8 +122,6 @@ class SoundService {
   Future<void> stopTimerTick() async {
     try {
       await _loopPlayer?.stop();
-      await _loopPlayer?.dispose();
-      _loopPlayer = null;
     } catch (e) {
       // Ignore
     }

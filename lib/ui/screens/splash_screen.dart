@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
+import '../../core/startup_bootstrap.dart';
 import '../../data/local/shared_prefs_service.dart';
+import '../../data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/models/achievement_model.dart';
@@ -109,81 +111,84 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  void _startAnimations() async {
+  void _startAnimations() {
     _mainController.forward();
     _rotationController.repeat();
     _pulseController.repeat(reverse: true);
     _shimmerController.repeat();
     _particleController.repeat();
 
-
-    await Future.delayed(const Duration(milliseconds: 3000));
-    
-    // Check login status before checking mounted to avoid async gaps in conditions
-    final bool isLoggedIn = await _isUserLoggedIn();
-    
-    if (mounted) {
-      // Check navigation flow:
-      // 1. First check if onboarding was seen
-      // 2. Then check if user is logged in (has active session)
-      // 3. Then check if profile exists locally
-      if (!SharedPrefsService.isOnboardingSeen()) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
-      } else if (isLoggedIn) {
-        // User is logged in - ALWAYS synchronize & merge cloud/local profile
-        // so that points and unlocked levels are never lost or stale on HomeScreen.
-        try {
-          final user = Supabase.instance.client.auth.currentUser;
-          if (user != null) {
-            final displayName = user.userMetadata?['full_name'] ?? 
-                              user.userMetadata?['name'] ?? 
-                              'لاعب';
-                              
-            await ProfileService.instance.createOrLoadProfileForUser(
-              userId: user.id,
-              displayName: displayName,
-            ).timeout(const Duration(seconds: 5));
-          }
-        } catch (e) {
-          debugPrint('Error loading/merging profile in splash: $e');
-        }
-        
-        try {
-          await AchievementService.instance.checkAchievements(AchievementEvent.appOpened());
-          await AchievementService.instance.reconcileAchievements();
-        } catch (e) {
-          debugPrint('Error reconciling achievements in splash: ');
-        }
-        
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        }
-      } else if (ProfileService.instance.hasProfiles) {
-        // Not logged in but has local profiles - go to home
-        try {
-          await AchievementService.instance.checkAchievements(AchievementEvent.appOpened());
-          await AchievementService.instance.reconcileAchievements();
-        } catch (e) {
-          debugPrint('Error reconciling achievements in splash: ');
-        }
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-      } else {
-        // No login and no profiles - show profile setup
-        Navigator.of(context).pushReplacementNamed(
-          AppRoutes.profileSetup,
-          arguments: {'isFirstTime': true},
-        );
+    // Instant Local-First SWR routing: route immediately after first frame without artificial 3000ms delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _resolveInitialNavigation();
       }
+    });
+  }
+
+  Future<void> _resolveInitialNavigation() async {
+    if (!mounted) return;
+
+    // 1. First-time user who has not completed onboarding -> go straight to onboarding (0ms)
+    if (!SharedPrefsService.isOnboardingSeen()) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
+      return;
+    }
+
+    // 2. Returning user with cached local profile -> open HomeScreen IMMEDIATELY (0ms network block)
+    // and run background SWR cloud merge & reconciliation per AGENTS.md Rule 3.
+    if (ProfileService.instance.hasProfiles) {
+      unawaited(_runLocalAndBackgroundReconciliation());
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      }
+      return;
+    }
+
+    // 3. No local profile yet (e.g., fresh install after onboarding or cleared cache):
+    // briefly check if a logged-in cloud account can restore progress cleanly.
+    await StartupBootstrap.ensureSupabaseReady()
+        .timeout(const Duration(seconds: 3), onTimeout: () => false);
+
+    final user = AuthService().currentUser;
+    if (user != null) {
+      try {
+        final displayName = user.userMetadata?['full_name'] ??
+            user.userMetadata?['name'] ??
+            'لاعب';
+        await ProfileService.instance
+            .createOrLoadProfileForUser(
+              userId: user.id,
+              displayName: displayName.toString(),
+            )
+            .timeout(const Duration(seconds: 4));
+      } catch (e) {
+        debugPrint('Error restoring profile in splash: $e');
+      }
+
+      unawaited(_runLocalAndBackgroundReconciliation());
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      }
+      return;
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.profileSetup,
+        arguments: {'isFirstTime': true},
+      );
     }
   }
 
-  /// Check if user has an active Supabase session
-  Future<bool> _isUserLoggedIn() async {
+  Future<void> _runLocalAndBackgroundReconciliation() async {
     try {
-      final session = Supabase.instance.client.auth.currentSession;
-      return session != null;
+      await AchievementService.instance
+          .checkAchievements(AchievementEvent.appOpened());
+      await AchievementService.instance.reconcileAchievements();
+      await StartupBootstrap.runBackgroundStartupSync();
     } catch (e) {
-      return false;
+      debugPrint('Error reconciling achievements/cloud in background: $e');
     }
   }
 
@@ -221,35 +226,40 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: Stack(
           children: [
-            // Animated particles background
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: ParticlePainter(
-                    particles: _particles,
-                    progress: _particleController.value,
-                  ),
-                  size: size,
-                );
-              },
-            ),
-
-            // Rotating geometric pattern
-            Center(
+            // Animated particles background (isolated in RepaintBoundary)
+            RepaintBoundary(
               child: AnimatedBuilder(
-                animation: _rotationController,
+                animation: _particleController,
                 builder: (context, child) {
-                  return Transform.rotate(
-                    angle: _rotationController.value * math.pi * 2,
-                    child: CustomPaint(
-                      painter: IslamicPatternPainter(
-                        color: imperialGold.withAlpha(20),
-                      ),
-                      size: Size(size.width * 1.5, size.width * 1.5),
+                  return CustomPaint(
+                    painter: ParticlePainter(
+                      particles: _particles,
+                      progress: _particleController.value,
                     ),
+                    size: size,
                   );
                 },
+              ),
+            ),
+
+            // Rotating geometric pattern (isolated in RepaintBoundary)
+            RepaintBoundary(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _rotationController,
+                  builder: (context, child) {
+                    return Transform.rotate(
+                      angle: _rotationController.value * math.pi * 2,
+                      child: child,
+                    );
+                  },
+                  child: CustomPaint(
+                    painter: IslamicPatternPainter(
+                      color: imperialGold.withAlpha(20),
+                    ),
+                    size: Size(size.width * 1.5, size.width * 1.5),
+                  ),
+                ),
               ),
             ),
 
@@ -441,6 +451,8 @@ class _SplashScreenState extends State<SplashScreen>
               'assets/images/logo.png',
               width: 100, // Slightly smaller than container to show inner rings if needed, or fill
               height: 100,
+              cacheWidth: 256,
+              cacheHeight: 256,
               fit: BoxFit.cover,
             ),
           ),
@@ -664,31 +676,32 @@ class Particle {
   });
 }
 
-// Particle painter
+// Particle painter (reuses Paint allocation instead of reallocating 35x/frame)
 class ParticlePainter extends CustomPainter {
   final List<Particle> particles;
   final double progress;
+  final Paint _paint = Paint()..style = PaintingStyle.fill;
 
   ParticlePainter({required this.particles, required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var particle in particles) {
+    for (final particle in particles) {
       final y = (particle.y + progress * particle.speed) % 1.0;
-      final paint = Paint()
-        ..color = _SplashScreenState.imperialGold.withAlpha((particle.opacity * 255).toInt())
-        ..style = PaintingStyle.fill;
+      _paint.color =
+          _SplashScreenState.imperialGold.withAlpha((particle.opacity * 255).toInt());
 
       canvas.drawCircle(
         Offset(particle.x * size.width, y * size.height),
         particle.size,
-        paint,
+        _paint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(ParticlePainter oldDelegate) => true;
+  bool shouldRepaint(ParticlePainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 // Islamic pattern painter

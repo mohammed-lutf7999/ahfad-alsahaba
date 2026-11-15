@@ -190,14 +190,19 @@ class PlayerProfile {
         .toList();
   }
 
-  /// Get category progress (unlocked levels)
+  /// Get category progress (unlocked levels, capped at 10)
   int getCategoryUnlockedLevels(String categoryId) {
-    return categoryProgress[categoryId] ?? 1;
+    final raw = categoryProgress[categoryId] ?? 1;
+    return raw.clamp(1, 10);
   }
 
-  /// Set category progress
+  /// Set category progress (clamped between 1 and 10)
   void setCategoryUnlockedLevels(String categoryId, int levels) {
-    categoryProgress[categoryId] = levels;
+    final current = categoryProgress[categoryId] ?? 1;
+    final clamped = levels.clamp(1, 10);
+    if (clamped >= current || categoryProgress[categoryId] == null || current > 10) {
+      categoryProgress[categoryId] = clamped;
+    }
     lastPlayedAt = DateTime.now();
   }
 
@@ -236,9 +241,10 @@ class PlayerProfile {
     return getLevelStars(categoryId, levelNumber) > 0;
   }
 
-  /// Check if level is unlocked
+  /// Check if level is unlocked (reconciling both categoryProgress and previous level completion)
   bool isLevelUnlocked(String categoryId, int levelNumber) {
-    if (levelNumber == 1) return true;
+    if (levelNumber <= 1) return true;
+    if (levelNumber <= getCategoryUnlockedLevels(categoryId)) return true;
     return isLevelCompleted(categoryId, levelNumber - 1);
   }
 
