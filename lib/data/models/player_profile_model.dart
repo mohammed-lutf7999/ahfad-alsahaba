@@ -1,15 +1,39 @@
 import 'dart:convert';
+import 'dart:math';
 import 'achievement_model.dart';
 import 'arena_model.dart';
 import 'player_level_model.dart';
 
 /// Represents a player profile with all associated data, level mastery, arena rank, and economy.
 class PlayerProfile {
+  static const String _codeAlphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  static final RegExp playerCodeRegex = RegExp(r'^SAH-[A-Z0-9]{4,8}$');
+
+  /// Validates that [code] conforms to the normalized `SAH-XXXX` identifier format.
+  static bool isValidPlayerCode(String? code) {
+    if (code == null) return false;
+    final normalized = code.trim().toUpperCase();
+    return normalized.length >= 8 &&
+        normalized.length <= 12 &&
+        playerCodeRegex.hasMatch(normalized);
+  }
+
+  /// Generates a short, human-readable player identifier (`SAH-XXXX`) without ambiguous glyphs.
+  static String generatePlayerCode() {
+    final rng = Random.secure();
+    final buf = StringBuffer('SAH-');
+    for (int i = 0; i < 4; i++) {
+      buf.write(_codeAlphabet[rng.nextInt(_codeAlphabet.length)]);
+    }
+    return buf.toString();
+  }
+
   final String id;
   String name;
   int avatarIndex; // Index of preset avatar (0-7)
   String? customAvatarPath; // Path to custom avatar image (future feature)
   String? linkedUserId; // Supabase user ID for account binding
+  String playerCode; // Unique short player identifier (SAH-XXXX)
   int totalScore;
   int highScore;
   DateTime createdAt;
@@ -47,6 +71,7 @@ class PlayerProfile {
     this.avatarIndex = 0,
     this.customAvatarPath,
     this.linkedUserId,
+    String? playerCode,
     this.totalScore = 0,
     this.highScore = 0,
     DateTime? createdAt,
@@ -65,7 +90,10 @@ class PlayerProfile {
     this.equippedFrame = 'frame_wood',
     this.equippedTitle,
     List<String>? unlockedItemIds,
-  })  : createdAt = createdAt ?? DateTime.now(),
+  })  : playerCode = isValidPlayerCode(playerCode)
+            ? playerCode!.trim().toUpperCase()
+            : generatePlayerCode(),
+        createdAt = createdAt ?? DateTime.now(),
         lastPlayedAt = lastPlayedAt ?? DateTime.now(),
         categoryProgress = categoryProgress ?? {},
         levelStars = levelStars ?? {},
@@ -91,6 +119,7 @@ class PlayerProfile {
     required String name,
     int avatarIndex = 0,
     String? linkedUserId,
+    String? playerCode,
   }) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     return PlayerProfile(
@@ -98,6 +127,7 @@ class PlayerProfile {
       name: name,
       avatarIndex: avatarIndex,
       linkedUserId: linkedUserId,
+      playerCode: playerCode,
     );
   }
 
@@ -109,6 +139,7 @@ class PlayerProfile {
       'avatarIndex': avatarIndex,
       'customAvatarPath': customAvatarPath,
       'linkedUserId': linkedUserId,
+      'playerCode': playerCode,
       'totalScore': totalScore,
       'highScore': highScore,
       'createdAt': createdAt.toIso8601String(),
@@ -139,6 +170,7 @@ class PlayerProfile {
       avatarIndex: json['avatarIndex'] as int? ?? 0,
       customAvatarPath: json['customAvatarPath'] as String?,
       linkedUserId: json['linkedUserId'] as String?,
+      playerCode: json['playerCode'] as String?,
       totalScore: json['totalScore'] as int? ?? 0,
       highScore: json['highScore'] as int? ?? 0,
       createdAt: json['createdAt'] != null
@@ -273,6 +305,7 @@ class PlayerProfile {
     int? avatarIndex,
     String? customAvatarPath,
     String? linkedUserId,
+    String? playerCode,
     int? totalScore,
     int? coins,
     int? gems,
@@ -289,6 +322,7 @@ class PlayerProfile {
       avatarIndex: avatarIndex ?? this.avatarIndex,
       customAvatarPath: customAvatarPath ?? this.customAvatarPath,
       linkedUserId: linkedUserId ?? this.linkedUserId,
+      playerCode: playerCode ?? this.playerCode,
       totalScore: totalScore ?? this.totalScore,
       highScore: highScore,
       createdAt: createdAt,

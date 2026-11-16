@@ -61,9 +61,30 @@ class ProfileService extends ChangeNotifier {
 
     // Rescue any legacy SharedPreferences progress into activeProfile if higher
     final current = activeProfile;
+    bool needsSave = false;
     if (current != null) {
       final didRescue = _mergeLegacySharedPrefsInto(current);
       if (didRescue) {
+        needsSave = true;
+      }
+
+      // Ensure legacy profiles upgraded without `playerCode` receive one persistent code
+      final storedDeviceCode = SharedPrefsService.getDevicePlayerCode();
+      final rawJson = SharedPrefsService.getProfilesJson();
+      final missingInStoredJson =
+          rawJson != null && !rawJson.contains('"playerCode"');
+      if (missingInStoredJson && storedDeviceCode != null) {
+        current.playerCode = storedDeviceCode;
+        needsSave = true;
+      } else {
+        if (storedDeviceCode == null) {
+          await SharedPrefsService.setDevicePlayerCode(current.playerCode);
+        }
+        if (missingInStoredJson) {
+          needsSave = true;
+        }
+      }
+      if (needsSave) {
         await _saveProfiles();
       }
     }
@@ -137,11 +158,16 @@ class ProfileService extends ChangeNotifier {
     
     if (existingScore > 0 || existingHighScore > 0) {
       debugPrint('Migrating existing progress to new profile...');
-      
+
+      final existingDeviceCode = SharedPrefsService.getDevicePlayerCode();
       final profile = PlayerProfile.create(
         name: 'لاعب 1',
         avatarIndex: 0,
+        playerCode: existingDeviceCode,
       );
+      if (existingDeviceCode == null) {
+        await SharedPrefsService.setDevicePlayerCode(profile.playerCode);
+      }
       _mergeLegacySharedPrefsInto(profile);
       
       _profiles = [profile];
@@ -165,10 +191,12 @@ class ProfileService extends ChangeNotifier {
     int avatarIndex = 0,
     String? linkedUserId,
   }) async {
+    final deviceCode = await SharedPrefsService.getOrCreateDevicePlayerCode();
     final profile = PlayerProfile.create(
       name: name,
       avatarIndex: avatarIndex,
       linkedUserId: linkedUserId,
+      playerCode: _profiles.isEmpty ? deviceCode : null,
     );
     _mergeLegacySharedPrefsInto(profile);
     _profiles.add(profile);
@@ -229,6 +257,12 @@ class ProfileService extends ChangeNotifier {
             await _cloudSync.syncProfileToCloud(cloudProfile);
           }
         } else {
+          final existingDeviceCode = SharedPrefsService.getDevicePlayerCode();
+          if (existingDeviceCode != null) {
+            cloudProfile.playerCode = existingDeviceCode;
+          } else {
+            await SharedPrefsService.setDevicePlayerCode(cloudProfile.playerCode);
+          }
           _profiles.add(cloudProfile);
         }
         
@@ -265,11 +299,16 @@ class ProfileService extends ChangeNotifier {
       }
       
       // No cloud or local data - create new profile
+      final existingDeviceCode = SharedPrefsService.getDevicePlayerCode();
       final newProfile = PlayerProfile.create(
         name: displayName,
         avatarIndex: avatarIndex,
         linkedUserId: userId,
+        playerCode: existingDeviceCode,
       );
+      if (existingDeviceCode == null) {
+        await SharedPrefsService.setDevicePlayerCode(newProfile.playerCode);
+      }
       _mergeLegacySharedPrefsInto(newProfile);
       
       _profiles.add(newProfile);
@@ -297,11 +336,16 @@ class ProfileService extends ChangeNotifier {
         return activeProfile!;
       }
 
+      final fallbackDeviceCode = SharedPrefsService.getDevicePlayerCode();
       final fallbackProfile = PlayerProfile.create(
         name: displayName,
         avatarIndex: avatarIndex,
         linkedUserId: userId,
+        playerCode: fallbackDeviceCode,
       );
+      if (fallbackDeviceCode == null) {
+        await SharedPrefsService.setDevicePlayerCode(fallbackProfile.playerCode);
+      }
       _mergeLegacySharedPrefsInto(fallbackProfile);
       _profiles.add(fallbackProfile);
       _activeProfileId = fallbackProfile.id;
@@ -313,6 +357,10 @@ class ProfileService extends ChangeNotifier {
   
   /// Merge two profiles, taking the best values from each
   void _mergeProfiles(PlayerProfile local, PlayerProfile cloud) {
+    // Preserve stable local playerCode so guest-to-Google sign-in keeps its ID
+    if (PlayerProfile.isValidPlayerCode(local.playerCode)) {
+      cloud.playerCode = local.playerCode;
+    }
     // Take higher scores
     if (local.totalScore > cloud.totalScore) {
       cloud.totalScore = local.totalScore;

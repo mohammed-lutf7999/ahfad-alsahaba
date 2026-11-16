@@ -10,10 +10,13 @@ import '../ui/screens/settings_screen.dart';
 import '../ui/screens/profile_setup_screen.dart';
 import '../ui/screens/profile_selector_screen.dart';
 import '../ui/screens/achievements_screen.dart';
+import '../ui/screens/library_screen.dart';
+import '../ui/screens/dynamic_event_detail_screen.dart';
 import '../ui/screens/multiplayer/challenge_menu_screen.dart';
 import '../ui/screens/multiplayer/private_room_hub_screen.dart';
 import '../ui/screens/glory/glory_road_screen.dart';
 import '../ui/screens/store/knights_store_screen.dart';
+import '../data/models/app_control_models.dart';
 import '../data/models/player_profile_model.dart';
 import '../data/services/progression_service.dart';
 
@@ -29,6 +32,8 @@ class AppRoutes {
   static const String profileSetup = '/profile-setup';
   static const String profileSelector = '/profile-selector';
   static const String achievements = '/achievements';
+  static const String library = '/library';
+  static const String dynamicEvent = '/dynamic-event';
   static const String challenge = '/challenge';
   static const String privateRoomHub = '/private-room-hub';
   static const String gloryRoad = '/glory-road';
@@ -45,16 +50,23 @@ class AppRoutes {
       case categories:
         return _slideRoute(const CategoriesScreen(), settings);
       case levels:
-        final args = settings.arguments as Map<String, dynamic>;
+        final args = settings.arguments;
+        if (args is! Map<String, dynamic> || args['categoryId'] == null) {
+          return _slideRoute(const CategoriesScreen(), settings);
+        }
         return _slideRoute(
           LevelsScreen(
             categoryId: args['categoryId'],
-
           ),
           settings,
         );
       case quiz:
-        final args = settings.arguments as Map<String, dynamic>;
+        final args = settings.arguments;
+        if (args is! Map<String, dynamic> ||
+            args['categoryId'] == null ||
+            args['levelId'] == null) {
+          return _slideRoute(const CategoriesScreen(), settings);
+        }
         return _slideRoute(
           QuizScreen(
             categoryId: args['categoryId'],
@@ -64,7 +76,10 @@ class AppRoutes {
           settings,
         );
       case result:
-        final args = settings.arguments as Map<String, dynamic>;
+        final args = settings.arguments;
+        if (args is! Map<String, dynamic>) {
+          return _fadeRoute(const HomeScreen(), settings);
+        }
         return _fadeRoute(
           ResultScreen(
             correctAnswers: args['correctAnswers'],
@@ -99,6 +114,14 @@ class AppRoutes {
         return _slideRoute(const ProfileSelectorScreen(), settings);
       case achievements:
         return _slideRoute(const AchievementsScreen(), settings);
+      case library:
+        return _slideRoute(const LibraryScreen(), settings);
+      case dynamicEvent:
+        final argEvent = settings.arguments;
+        if (argEvent is AppDynamicEvent) {
+          return _slideRoute(DynamicEventDetailScreen(event: argEvent), settings);
+        }
+        return _slideRoute(const HomeScreen(), settings);
       case challenge:
         return _slideRoute(const ChallengeMenuScreen(), settings);
       case privateRoomHub:

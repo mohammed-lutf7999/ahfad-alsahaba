@@ -3,6 +3,8 @@ import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import '../../../../core/app_routes.dart';
 import '../../../../core/app_theme.dart';
 import '../../../../core/sound_service.dart';
+import '../../../../data/models/app_control_models.dart';
+import '../../../../data/services/app_control_service.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../widgets/top_notification.dart';
 import '../../creative_empire_screen.dart';
@@ -23,46 +25,61 @@ class HomeSpeedDial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: SpeedDial(
-          key: challengeKey,
-          icon: Icons.keyboard_arrow_down_rounded,
-          activeIcon: Icons.close_rounded,
-          iconTheme: const IconThemeData(color: AppTheme.primaryDark, size: 20),
-          buttonSize: const Size(40, 40),
-          childrenButtonSize: const Size(44, 44),
-          backgroundColor: AppTheme.accentColor,
-          activeBackgroundColor: Colors.red.shade400,
-          elevation: 4,
-          overlayColor: Colors.black,
-          overlayOpacity: 0.3,
-          spacing: 8,
-          spaceBetweenChildren: 8,
-          direction: SpeedDialDirection.down,
-          animationDuration: const Duration(milliseconds: 150),
-          tooltip: '',
-          heroTag: 'speed-dial',
-          children: [
-            // Online Challenge Button
-            SpeedDialChild(
-              child: const Icon(
-                Icons.language_rounded,
-                color: AppTheme.primaryDark,
-                size: 22,
+    return ValueListenableBuilder<AppFeatureFlags>(
+      valueListenable: AppControlService.instance.featureFlagsNotifier,
+      builder: (context, flags, _) => Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: SpeedDial(
+            key: challengeKey,
+            icon: Icons.keyboard_arrow_down_rounded,
+            activeIcon: Icons.close_rounded,
+            iconTheme: const IconThemeData(color: AppTheme.primaryDark, size: 20),
+            buttonSize: const Size(40, 40),
+            childrenButtonSize: const Size(44, 44),
+            backgroundColor: AppTheme.accentColor,
+            activeBackgroundColor: Colors.red.shade400,
+            elevation: 4,
+            overlayColor: Colors.black,
+            overlayOpacity: 0.3,
+            spacing: 8,
+            spaceBetweenChildren: 8,
+            direction: SpeedDialDirection.down,
+            animationDuration: const Duration(milliseconds: 150),
+            tooltip: '',
+            heroTag: 'speed-dial',
+            children: [
+              // Online Challenge Button
+              SpeedDialChild(
+                child: Icon(
+                  flags.onlineMultiplayer
+                      ? Icons.language_rounded
+                      : Icons.lock_clock_rounded,
+                  color: flags.onlineMultiplayer
+                      ? AppTheme.primaryDark
+                      : Colors.white70,
+                  size: 22,
+                ),
+                backgroundColor: flags.onlineMultiplayer
+                    ? const Color(0xFF00E676)
+                    : Colors.blueGrey.shade700,
+                onTap: () {
+                  SoundService().playClick();
+                  if (!flags.onlineMultiplayer) {
+                    TopNotification.showError(
+                      context,
+                      'المباريات الأونلاين متوقفة مؤقتاً للصيانة ⚙️',
+                    );
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LobbyScreen()),
+                  );
+                },
               ),
-              backgroundColor: const Color(0xFF00E676),
-              onTap: () {
-                SoundService().playClick();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                );
-              },
-            ),
 
             // Challenge Button
             SpeedDialChild(
@@ -181,6 +198,7 @@ class HomeSpeedDial extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

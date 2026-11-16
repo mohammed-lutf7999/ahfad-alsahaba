@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_custom_theme.dart';
+import '../../../data/models/app_control_models.dart';
 import '../../../data/models/store_item_model.dart';
+import '../../../data/services/app_control_service.dart';
 import '../../../data/services/profile_service.dart';
 import '../../../data/services/progression_service.dart';
 import '../../../data/services/store_service.dart';
@@ -157,7 +159,90 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
             ],
           ),
         ),
-        body: SafeArea(
+        body: ValueListenableBuilder<AppFeatureFlags>(
+          valueListenable: AppControlService.instance.featureFlagsNotifier,
+          builder: (context, flags, _) {
+            if (!flags.knightsStore) {
+              return SafeArea(
+                top: false,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: customTheme.surfaceCard.withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: customTheme.sovereignAccent.withValues(
+                            alpha: 0.55,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.storefront_outlined,
+                            size: 52,
+                            color: customTheme.sovereignAccent,
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'سوق الفرسان مغلق مؤقتاً',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'يخضع المتجر حالياً لتحديثات وتجهيز مقتنيات جديدة بإذن الله.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13.5,
+                              height: 1.5,
+                              color: Colors.white.withValues(alpha: 0.8),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: customTheme.sovereignAccent,
+                                foregroundColor: const Color(0xFF0A1428),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(Icons.arrow_back_rounded),
+                              label: const Text(
+                                'العودة',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+            return SafeArea(
           top: false,
           child: Column(
             children: [
@@ -206,6 +291,8 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
               ),
             ],
           ),
+        );
+          },
         ),
       ),
     );

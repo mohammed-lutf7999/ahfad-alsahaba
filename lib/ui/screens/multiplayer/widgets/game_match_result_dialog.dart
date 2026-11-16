@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/app_theme.dart';
 import '../../../../core/sound_service.dart';
+import '../../../../data/services/app_control_service.dart';
 import '../../../../data/services/multiplayer_service.dart';
+import '../../../../data/services/profile_service.dart';
 
 enum RematchUIState {
   idle,
@@ -30,7 +32,10 @@ class GameMatchResultDialog {
     String? matchId,
     String? opponentId,
     bool isBot = false,
+    bool isGhost = false,
+    bool isFriendly = false,
     Function(MatchmakingResult newMatch)? onRematchAccepted,
+    Function(GhostMatchResult newGhostMatch)? onGhostRematchAccepted,
   }) {
     showDialog(
       context: context,
@@ -50,7 +55,10 @@ class GameMatchResultDialog {
         matchId: matchId,
         opponentId: opponentId,
         isBot: isBot,
+        isGhost: isGhost,
+        isFriendly: isFriendly,
         onRematchAccepted: onRematchAccepted,
+        onGhostRematchAccepted: onGhostRematchAccepted,
       ),
     );
   }
@@ -71,7 +79,10 @@ class _GameMatchResultDialogContent extends StatefulWidget {
   final String? matchId;
   final String? opponentId;
   final bool isBot;
+  final bool isGhost;
+  final bool isFriendly;
   final Function(MatchmakingResult newMatch)? onRematchAccepted;
+  final Function(GhostMatchResult newGhostMatch)? onGhostRematchAccepted;
 
   const _GameMatchResultDialogContent({
     required this.isWinner,
@@ -88,7 +99,10 @@ class _GameMatchResultDialogContent extends StatefulWidget {
     this.matchId,
     this.opponentId,
     this.isBot = false,
+    this.isGhost = false,
+    this.isFriendly = false,
     this.onRematchAccepted,
+    this.onGhostRematchAccepted,
   });
 
   @override
@@ -110,7 +124,7 @@ class _GameMatchResultDialogContentState
   }
 
   void _initRematchListener() {
-    if (widget.matchId == null || widget.isBot) return;
+    if (widget.matchId == null || widget.isBot || widget.isGhost) return;
 
     _rematchSubscription = MultiplayerService.instance
         .listenToRematchEvents(widget.matchId!)
@@ -168,6 +182,31 @@ class _GameMatchResultDialogContentState
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onRematchAccepted?.call(newMatch);
+      return;
+    }
+
+    if (widget.isGhost) {
+      setState(() => _rematchState = RematchUIState.launchingMatch);
+      if (AppControlService.instance.featureFlagsNotifier.value.ghostMatches) {
+        try {
+          final trophies =
+              ProfileService.instance.activeProfile?.trophies ?? 1000;
+          final ghostResult = await MultiplayerService.instance
+              .findOrCreateGhostMatch(trophies: trophies);
+          if (!mounted) return;
+          if (ghostResult.success && ghostResult.matchId != null) {
+            Navigator.of(context).pop();
+            widget.onGhostRematchAccepted?.call(ghostResult);
+            return;
+          }
+        } catch (e) {
+          debugPrint('Ghost rematch fallback to bot: $e');
+        }
+      }
+      final fallbackBot = await MultiplayerService.instance.createBotMatch();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onRematchAccepted?.call(fallbackBot);
       return;
     }
 
@@ -327,6 +366,30 @@ class _GameMatchResultDialogContentState
                   ),
               ],
             ),
+
+            if (widget.isFriendly) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.tealAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.tealAccent.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: const Text(
+                  'مباراة ودية — الكؤوس والدروع محمية 🛡️',
+                  style: TextStyle(
+                    color: Colors.tealAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Cairo',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
 
             if (widget.shieldConsumed || widget.xpBannerConsumed) ...[
               const SizedBox(height: 8),
@@ -640,9 +703,9 @@ class _GameMatchResultDialogContentState
                 ),
                 onPressed: _requestRematch,
                 icon: const Icon(Icons.replay_rounded, size: 20),
-                label: const Text(
-                  'طلب إعادة النزال ⚔️',
-                  style: TextStyle(
+                label: Text(
+                  widget.isGhost ? 'مباراة جديدة ⚔️' : 'طلب إعادة النزال ⚔️',
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                     fontFamily: 'Cairo',

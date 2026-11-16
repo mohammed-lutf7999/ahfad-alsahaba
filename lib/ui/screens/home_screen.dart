@@ -1,18 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../data/local/shared_prefs_service.dart';
 import '../../core/sound_service.dart';
+import '../../data/services/app_control_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../data/services/progression_service.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/quote_service.dart';
+import '../dialogs/app_control_dialogs.dart';
 import '../widgets/avatar_selector.dart';
 import '../widgets/animated_avatar_frame.dart';
 import '../widgets/level_badge_widget.dart';
 import '../widgets/islamic_quote_card.dart';
+import '../widgets/home_dynamic_event_banner.dart';
 import 'library_screen.dart';
 import 'glory/glory_road_screen.dart';
 import 'store/knights_store_screen.dart';
@@ -65,15 +69,50 @@ class _HomeScreenState extends State<HomeScreen>
     ProgressionService.instance.addListener(_onProfileChanged);
     AchievementService.instance.addListener(_onProfileChanged);
     AuthService().addListener(_onProfileChanged);
+    AppControlService.instance.featureFlagsNotifier.addListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.activeEventNotifier.addListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.releaseConfigNotifier.addListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.pendingAnnouncementsNotifier.addListener(
+      _onControlStateChanged,
+    );
     
     // Load quotes asynchronously off the critical startup build path
     _loadQuotes();
 
     // Defer post-frame tutorial & achievement reconciliation until frame 1 is painted
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       AchievementService.instance.reconcileAchievements();
-      _checkTutorial();
+      AppControlCoordinator.instance.markAppReadyForGates();
+      AppControlService.instance.refreshTimedVisualState();
+      unawaited(AppControlService.instance.syncPlayerDirectory());
+      final showedGate = await AppControlCoordinator.instance.checkAndPresent(
+        context,
+      );
+      if (!mounted || showedGate) return;
+      await _checkTutorial();
+    });
+  }
+
+  void _onControlStateChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final service = AppControlService.instance;
+    final hasPendingGate = service.releaseConfigNotifier.value.maintenanceMode ||
+        service.releaseConfigNotifier.value.isForceUpdateRequired(
+          service.effectiveBuildNumber,
+        ) ||
+        service.pendingAnnouncementsNotifier.value.isNotEmpty;
+    if (!hasPendingGate) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AppControlCoordinator.instance.checkAndPresent(context);
     });
   }
 
@@ -157,6 +196,18 @@ class _HomeScreenState extends State<HomeScreen>
     ProgressionService.instance.removeListener(_onProfileChanged);
     AchievementService.instance.removeListener(_onProfileChanged);
     AuthService().removeListener(_onProfileChanged);
+    AppControlService.instance.featureFlagsNotifier.removeListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.activeEventNotifier.removeListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.releaseConfigNotifier.removeListener(
+      _onControlStateChanged,
+    );
+    AppControlService.instance.pendingAnnouncementsNotifier.removeListener(
+      _onControlStateChanged,
+    );
     _controller.dispose();
     super.dispose();
   }
@@ -203,6 +254,15 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (index == 4) {
+      if (!AppControlService.instance.featureFlagsNotifier.value.knightsStore) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('سوق الفرسان مغلق مؤقتاً للصيانة والتحديث 🛡️'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
       // Knights Store
       await Navigator.push(
         context,
@@ -355,7 +415,15 @@ class _HomeScreenState extends State<HomeScreen>
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isVerySmall = constraints.maxHeight < 560;
+              final controlFlags =
+                  AppControlService.instance.featureFlagsNotifier.value;
+              final activeEvent =
+                  AppControlService.instance.activeEventNotifier.value;
+              final hasActiveBanner = controlFlags.showEventBanner &&
+                  activeEvent != null &&
+                  activeEvent.isCurrentlyActiveAt(DateTime.now().toUtc());
+              final isVerySmall =
+                  constraints.maxHeight < (hasActiveBanner ? 610 : 560);
 
               Widget content = Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -382,12 +450,17 @@ class _HomeScreenState extends State<HomeScreen>
                         position: _slideAnimation,
                         child: Center(
                           child: HomeLogoWithEffects(
-                            customSize: (constraints.maxHeight * 0.20).clamp(115.0, 138.0),
+                            customSize: (constraints.maxHeight *
+                                    (hasActiveBanner ? 0.16 : 0.20))
+                                .clamp(95.0, 138.0),
                           ),
                         ),
                       ),
                     ),
                   ),
+
+                  // 1.5 Dynamic Cloud Event Banner (0px when inactive/disabled)
+                  const HomeDynamicEventBanner(),
 
                   // 2. Compact Islamic Wisdom Capsule (92px)
                   if (_quotesLoaded && QuoteService.instance.dailyQuotes.isNotEmpty)

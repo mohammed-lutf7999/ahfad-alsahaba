@@ -1,5 +1,6 @@
 import '../../data/services/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_constants.dart';
 import '../../core/app_routes.dart';
@@ -28,6 +29,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    AdminService().refreshAdminStatus().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _loadSettings() {
@@ -244,7 +248,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          _buildPlayerCodeBanner(profile),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -307,6 +313,103 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerCodeBanner(PlayerProfile profile) {
+    final playerCode = profile.playerCode.trim().isNotEmpty
+        ? profile.playerCode.trim()
+        : (SharedPrefsService.getDevicePlayerCode() ?? 'SAH-0000');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryDark.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.accentColor.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        children: [
+          const Icon(
+            Icons.badge_outlined,
+            color: AppTheme.accentColor,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'كود اللاعب:',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: Colors.white70,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: SelectableText(
+              playerCode,
+              key: const Key('settings_player_code_text'),
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                color: AppTheme.accentLight,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+              maxLines: 1,
+            ),
+          ),
+          InkWell(
+            key: const Key('settings_copy_player_code_btn'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () async {
+              SoundService().playClick();
+              await Clipboard.setData(ClipboardData(text: playerCode));
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('تم نسخ كود اللاعب: $playerCode ✅'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.accentColor.withValues(alpha: 0.45),
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.copy_rounded,
+                    size: 14,
+                    color: AppTheme.accentColor,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'نسخ',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

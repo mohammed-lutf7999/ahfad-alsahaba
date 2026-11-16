@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/player_profile_model.dart';
 import '../models/question_model.dart';
 
 class SharedPrefsService {
@@ -9,8 +10,8 @@ class SharedPrefsService {
   static const String _keyVibrationEnabled = 'vibration_enabled';
   static const String _keyHasSeenTutorial = 'has_seen_tutorial';
 
-  static Future<void> init() async {
-    if (_prefs != null) return;
+  static Future<void> init({bool forceReload = false}) async {
+    if (_prefs != null && !forceReload) return;
     _prefs = await SharedPreferences.getInstance();
   }
 
@@ -204,5 +205,97 @@ class SharedPrefsService {
   static Future<void> setDailyNotificationsScheduled(bool scheduled) async {
     final prefs = await _instance;
     await prefs.setBool(_keyDailyNotificationsScheduled, scheduled);
+  }
+
+  // ============ APP CONTROL & PLAYER CODE CACHE ============
+
+  static const String _keyDevicePlayerCode = 'device_player_code';
+  static const String _keyCachedConfigVersion = 'cached_config_version';
+  static const String _keyCachedAppControlJson = 'cached_app_control_json';
+  static const String _keyLastAppControlSyncMs = 'last_app_control_sync_ms';
+  static const String _keySeenAnnouncementIds = 'seen_announcement_ids';
+  static const String _keyOptionalUpdateLastPromptMs =
+      'optional_update_last_prompt_ms';
+  static const String _keyLastDirectorySyncMs = 'last_directory_sync_ms';
+
+  static String? getDevicePlayerCode() {
+    final code = _prefs?.getString(_keyDevicePlayerCode);
+    return PlayerProfile.isValidPlayerCode(code) ? code!.trim().toUpperCase() : null;
+  }
+
+  static Future<void> setDevicePlayerCode(String code) async {
+    final normalized = code.trim().toUpperCase();
+    if (!PlayerProfile.isValidPlayerCode(normalized)) return;
+    final prefs = await _instance;
+    await prefs.setString(_keyDevicePlayerCode, normalized);
+  }
+
+  static Future<String> getOrCreateDevicePlayerCode() async {
+    final existing = getDevicePlayerCode();
+    if (existing != null) return existing;
+    final created = PlayerProfile.generatePlayerCode();
+    await setDevicePlayerCode(created);
+    return created;
+  }
+
+  static int getCachedConfigVersion() {
+    return _prefs?.getInt(_keyCachedConfigVersion) ?? 0;
+  }
+
+  static Future<void> setCachedConfigVersion(int version) async {
+    final prefs = await _instance;
+    await prefs.setInt(_keyCachedConfigVersion, version);
+  }
+
+  static String? getCachedAppControlJson() {
+    return _prefs?.getString(_keyCachedAppControlJson);
+  }
+
+  static Future<void> setCachedAppControlJson(String json) async {
+    final prefs = await _instance;
+    await prefs.setString(_keyCachedAppControlJson, json);
+  }
+
+  static int getLastAppControlSyncMs() {
+    return _prefs?.getInt(_keyLastAppControlSyncMs) ?? 0;
+  }
+
+  static Future<void> setLastAppControlSyncMs(int ms) async {
+    final prefs = await _instance;
+    await prefs.setInt(_keyLastAppControlSyncMs, ms);
+  }
+
+  static Set<String> getSeenAnnouncementIds() {
+    return (_prefs?.getStringList(_keySeenAnnouncementIds) ?? const <String>[])
+        .toSet();
+  }
+
+  static Future<void> markAnnouncementSeen(String announcementId) async {
+    final clean = announcementId.trim();
+    if (clean.isEmpty) return;
+    final prefs = await _instance;
+    final current = getSeenAnnouncementIds()..add(clean);
+    // Bound stored IDs cleanly to prevent unbounded SharedPreferences growth.
+    final list = current.toList();
+    final bounded = list.length > 100 ? list.sublist(list.length - 100) : list;
+    await prefs.setStringList(_keySeenAnnouncementIds, bounded);
+  }
+
+  static int getOptionalUpdateLastPromptMs() {
+    return _prefs?.getInt(_keyOptionalUpdateLastPromptMs) ?? 0;
+  }
+
+  static Future<void> setOptionalUpdateLastPromptMs(int ms) async {
+    final prefs = await _instance;
+    await prefs.setInt(_keyOptionalUpdateLastPromptMs, ms);
+  }
+
+  static int getLastDirectorySyncMs() {
+    return _prefs?.getInt(_keyLastDirectorySyncMs) ?? 0;
+  }
+
+  static Future<void> setLastDirectorySyncMs(int ms) async {
+    final prefs = await _instance;
+    await prefs.setInt(_keyLastDirectorySyncMs, ms);
   }
 }

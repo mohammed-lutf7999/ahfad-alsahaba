@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../core/app_constants.dart';
+import '../../../core/app_routes.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
+import '../../../data/models/app_control_models.dart';
+import '../../../data/services/app_control_service.dart';
 import '../../../data/services/nearby_service.dart';
 import 'create_challenge_screen.dart';
 import 'join_challenge_screen.dart';
@@ -339,50 +343,82 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // VS Icon
-                        _buildVsIcon(),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // 1. Private Rooms (Code & WhatsApp Invite) - Zero Permission Barrier
-                        _buildMenuButton(
-                          icon: Icons.castle_rounded,
-                          title: 'غرف التحدي الخاصة 🏰',
-                          subtitle: 'كود سداسي ودعوة الأصدقاء عبر واتساب',
-                          color: AppTheme.accentColor,
-                          onTap: () => _navigateTo(const PrivateRoomHubScreen()),
-                        ),
-                        
-                        const SizedBox(height: 16),
+                    child: ValueListenableBuilder<AppFeatureFlags>(
+                      valueListenable:
+                          AppControlService.instance.featureFlagsNotifier,
+                      builder: (context, flags, _) => Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // VS Icon
+                          _buildVsIcon(),
 
-                        // 2. Quick Matchmaking (Online Arena) - Zero Permission Barrier
-                        _buildMenuButton(
-                          icon: Icons.radar_rounded,
-                          title: 'الميدان السريع المباشر ⚔️',
-                          subtitle: 'مطابقة أونلاين فورية أو ضد البوت',
-                          color: AppTheme.accentLight,
-                          onTap: () => _navigateTo(const LobbyScreen()),
-                        ),
-                        
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
-                        // 3. Local Bluetooth Challenge (Offline Nearby with Role Selection)
-                        _buildMenuButton(
-                          icon: Icons.bluetooth_searching_rounded,
-                          title: 'تحدي البلوتوث المحلي 📡',
-                          subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
-                          color: Colors.blueAccent,
-                          onTap: _showLocalBluetoothOptions,
-                        ),
-                        
-                        const SizedBox(height: 32),
-                        
-                        // Instructions
-                        _buildInstructions(),
-                      ],
+                          // 1. Private Rooms (Code & WhatsApp Invite) - Zero Permission Barrier
+                          _buildMenuButton(
+                            icon: Icons.castle_rounded,
+                            title: 'غرف التحدي الخاصة 🏰',
+                            subtitle: flags.privateRooms
+                                ? 'كود سداسي ودعوة الأصدقاء عبر واتساب'
+                                : 'متوفرة قريباً — متوقفة مؤقتاً للصيانة 🔒',
+                            color: AppTheme.accentColor,
+                            isEnabled: flags.privateRooms,
+                            onTap: () => _handleGatedTap(
+                              isEnabled: flags.privateRooms,
+                              featureName: 'غرف التحدي الخاصة',
+                              onProceed: () =>
+                                  _navigateTo(const PrivateRoomHubScreen()),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // 2. Quick Matchmaking (Online Arena) - Zero Permission Barrier
+                          _buildMenuButton(
+                            icon: Icons.radar_rounded,
+                            title: 'الميدان السريع المباشر ⚔️',
+                            subtitle: flags.onlineMultiplayer
+                                ? 'مطابقة أونلاين فورية أو ضد البوت'
+                                : 'المباريات الأونلاين متوقفة مؤقتاً للصيانة 🔒',
+                            color: AppTheme.accentLight,
+                            isEnabled: flags.onlineMultiplayer,
+                            onTap: () => _handleGatedTap(
+                              isEnabled: flags.onlineMultiplayer,
+                              featureName: 'الميدان السريع الأونلاين',
+                              onProceed: () => _navigateTo(const LobbyScreen()),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // 3. Local Bluetooth Challenge (Offline Nearby with Role Selection)
+                          _buildMenuButton(
+                            icon: Icons.bluetooth_searching_rounded,
+                            title: 'تحدي البلوتوث المحلي 📡',
+                            subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
+                            color: Colors.blueAccent,
+                            onTap: _showLocalBluetoothOptions,
+                          ),
+
+                          if (flags.dailyChallenges) ...[
+                            const SizedBox(height: 16),
+
+                            // 4. Daily Seeded Challenge (Dynamic Cloud Flag)
+                            _buildMenuButton(
+                              icon: Icons.auto_awesome_rounded,
+                              title: 'التحدي اليومي المتجدد 🌟',
+                              subtitle: 'جولة يومية متجددة عبر السحابة والمواسم',
+                              color: const Color(0xFF10B981),
+                              onTap: _launchDailyChallenge,
+                            ),
+                          ],
+
+                          const SizedBox(height: 32),
+
+                          // Instructions
+                          _buildInstructions(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -401,29 +437,36 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Title and Icon
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.goldGradient,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.3), blurRadius: 10)],
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.goldGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.3), blurRadius: 10)],
+                  ),
+                  child: const Icon(Icons.sports_kabaddi_rounded, color: AppTheme.primaryDark, size: 22),
                 ),
-                child: const Icon(Icons.sports_kabaddi_rounded, color: AppTheme.primaryDark, size: 22),
-              ),
-              const SizedBox(width: 12),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppTheme.accentLight, AppTheme.accentColor],
-                ).createShader(bounds),
-                child: const Text(
-                  'وضع التحدي',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [AppTheme.accentLight, AppTheme.accentColor],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'وضع التحدي',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           // Back button
           GestureDetector(
             onTap: () {
@@ -483,74 +526,130 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
     );
   }
 
+  void _handleGatedTap({
+    required bool isEnabled,
+    required String featureName,
+    required VoidCallback onProceed,
+  }) {
+    if (!isEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$featureName متوقف مؤقتاً للصيانة والتحديث 🛡️'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    onProceed();
+  }
+
+  void _launchDailyChallenge() {
+    final categories = [
+      AppConstants.quranCategory,
+      AppConstants.hadithCategory,
+      AppConstants.fiqhCategory,
+      AppConstants.seerahCategory,
+      AppConstants.historyCategory,
+      AppConstants.aqeedahCategory,
+    ];
+    final now = DateTime.now();
+    final daySeed = now.year * 1000 + now.month * 31 + now.day;
+    final categoryId = categories[daySeed % categories.length];
+    final levelNumber = (daySeed % 10) + 1;
+
+    Navigator.pushNamed(
+      context,
+      AppRoutes.quiz,
+      arguments: {
+        'categoryId': categoryId,
+        'levelId': '${categoryId}_level_$levelNumber',
+        'levelNumber': levelNumber,
+      },
+    );
+  }
+
   Widget _buildMenuButton({
     required IconData icon,
     required String title,
     required String subtitle,
     required Color color,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
+    final effectiveColor = isEnabled ? color : Colors.blueGrey.shade300;
     return GestureDetector(
       onTap: () {
         SoundService().playClick();
         onTap();
       },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              color.withValues(alpha: 0.2),
-              color.withValues(alpha: 0.05),
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.72,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                effectiveColor.withValues(alpha: 0.2),
+                effectiveColor.withValues(alpha: 0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: effectiveColor.withValues(alpha: 0.4)),
+            boxShadow: [
+              BoxShadow(
+                color: effectiveColor.withValues(alpha: 0.2),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isEnabled ? icon : Icons.lock_clock_rounded,
+                  color: effectiveColor,
+                  size: 28,
+                ),
               ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontFamily: 'Cairo',
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: effectiveColor,
+                        fontFamily: 'Cairo',
+                      ),
                     ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontFamily: 'Cairo',
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontFamily: 'Cairo',
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.arrow_forward_ios_rounded, color: color.withValues(alpha: 0.5)),
-          ],
+              Icon(
+                isEnabled
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.lock_outline_rounded,
+                color: effectiveColor.withValues(alpha: 0.5),
+              ),
+            ],
+          ),
         ),
       ),
     );

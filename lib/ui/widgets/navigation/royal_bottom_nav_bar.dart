@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
+import '../../../data/models/app_control_models.dart';
+import '../../../data/services/app_control_service.dart';
 
 /// شريط التنقل السفلي الفاخر المخصص «خماسية الفرسان الإمبراطورية»
 /// جزيرة زجاجية عائمة متوافقة كلياً مع محرك الثيمات الأربعة
@@ -125,11 +127,17 @@ class _RoyalBottomNavBarState extends State<RoyalBottomNavBar>
                           ),
 
                           // Tab 4: سوق الفرسان (Store)
-                          _buildNavItem(
-                            index: 4,
-                            label: 'المتجر',
-                            icon: Icons.storefront_rounded,
-                            customTheme: customTheme,
+                          ValueListenableBuilder<AppFeatureFlags>(
+                            valueListenable: AppControlService
+                                .instance
+                                .featureFlagsNotifier,
+                            builder: (context, flags, _) => _buildNavItem(
+                              index: 4,
+                              label: flags.knightsStore ? 'المتجر' : 'مغلق',
+                              icon: Icons.storefront_rounded,
+                              customTheme: customTheme,
+                              isLocked: !flags.knightsStore,
+                            ),
                           ),
                         ],
                       ),
@@ -210,8 +218,9 @@ class _RoyalBottomNavBarState extends State<RoyalBottomNavBar>
     required IconData icon,
     required AppCustomTheme customTheme,
     Key? key,
+    bool isLocked = false,
   }) {
-    final bool isSelected = widget.currentIndex == index;
+    final bool isSelected = widget.currentIndex == index && !isLocked;
 
     return Expanded(
       child: GestureDetector(
@@ -232,12 +241,27 @@ class _RoyalBottomNavBarState extends State<RoyalBottomNavBar>
               AnimatedScale(
                 scale: isSelected ? 1.15 : 1.0,
                 duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  icon,
-                  size: isSelected ? 23 : 21,
-                  color: isSelected
-                      ? customTheme.sovereignAccent
-                      : Colors.white.withValues(alpha: 0.45),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: isSelected ? 23 : 21,
+                      color: isLocked
+                          ? Colors.white.withValues(alpha: 0.28)
+                          : isSelected
+                              ? customTheme.sovereignAccent
+                              : Colors.white.withValues(alpha: 0.45),
+                    ),
+                    if (isLocked) ...[
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 12,
+                        color: Colors.amberAccent.withValues(alpha: 0.7),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 3),
@@ -246,9 +270,11 @@ class _RoyalBottomNavBarState extends State<RoyalBottomNavBar>
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected
-                      ? customTheme.sovereignAccent
-                      : Colors.white.withValues(alpha: 0.5),
+                  color: isLocked
+                      ? Colors.white.withValues(alpha: 0.35)
+                      : isSelected
+                          ? customTheme.sovereignAccent
+                          : Colors.white.withValues(alpha: 0.5),
                   fontFamily: 'Cairo',
                   height: 1.1,
                 ),

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/services/achievement_service.dart';
+import '../data/services/admin_service.dart';
+import '../data/services/app_control_service.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/profile_service.dart';
 import 'supabase_config.dart';
@@ -85,8 +87,11 @@ class StartupBootstrap {
               displayName: displayName.toString(),
             )
             .timeout(const Duration(seconds: 6));
+        unawaited(AdminService().refreshAdminStatus());
       }
       await AchievementService.instance.reconcileAchievements();
+      unawaited(AppControlService.instance.syncPlayerDirectory());
+      unawaited(AppControlService.instance.syncControlState());
     } catch (e) {
       debugPrint('StartupBootstrap background sync notice: $e');
     }

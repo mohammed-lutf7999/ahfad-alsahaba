@@ -5,9 +5,11 @@ import 'core/app_theme.dart';
 import 'core/app_routes.dart';
 import 'core/startup_bootstrap.dart';
 import 'data/local/shared_prefs_service.dart';
+import 'data/services/app_control_service.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/profile_service.dart';
 import 'data/services/progression_service.dart';
+import 'ui/dialogs/app_control_dialogs.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +44,13 @@ void main() async {
     debugPrint('ProfileService init error: $e');
   }
 
+  // Hydrate App Control cache at 0ms from SharedPreferences (never blocks on network)
+  try {
+    await AppControlService.instance.initFromCache();
+  } catch (e) {
+    debugPrint('AppControlService initFromCache error: $e');
+  }
+
   // Start Supabase local session bootstrap concurrently (never blocks runApp / first frame)
   unawaited(StartupBootstrap.initSupabase());
 
@@ -60,12 +69,15 @@ class IslamicQuizApp extends StatefulWidget {
   State<IslamicQuizApp> createState() => _IslamicQuizAppState();
 }
 
-class _IslamicQuizAppState extends State<IslamicQuizApp> {
+class _IslamicQuizAppState extends State<IslamicQuizApp>
+    with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late String _activeThemeId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeThemeId = ProgressionService.instance.activeTheme.themeId;
     ProgressionService.instance.addListener(_onThemeCheck);
     ProfileService.instance.addListener(_onThemeCheck);
@@ -81,7 +93,25 @@ class _IslamicQuizAppState extends State<IslamicQuizApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      AppControlService.instance.refreshTimedVisualState();
+      if (!AppControlCoordinator.instance.isAppReadyForGates) return;
+      final navContext = _navigatorKey.currentState?.overlay?.context;
+      if (navContext != null && navContext.mounted) {
+        unawaited(
+          AppControlCoordinator.instance.checkAndPresent(
+            navContext,
+            allowOptionalUpdate: false,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     ProgressionService.instance.removeListener(_onThemeCheck);
     ProfileService.instance.removeListener(_onThemeCheck);
     super.dispose();
@@ -91,6 +121,7 @@ class _IslamicQuizAppState extends State<IslamicQuizApp> {
   Widget build(BuildContext context) {
     final activeCustomTheme = ProgressionService.instance.activeTheme;
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'معركة أحفاد الصحابة',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.getThemeFor(activeCustomTheme),

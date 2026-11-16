@@ -5,6 +5,7 @@ import '../../../core/theme/app_custom_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/models/player_level_model.dart';
 import '../../../data/models/arena_model.dart';
+import '../../../data/services/app_control_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/profile_service.dart';
 import '../../../data/services/progression_service.dart';
@@ -19,6 +20,7 @@ class VersusScreen extends StatefulWidget {
   final int seed;
   final bool isBot;
   final bool isGhost;
+  final bool isFriendly;
   final List<String>? questionIds;
   final List<Map<String, dynamic>>? ghostTimeline;
   final Map<String, dynamic>? initialOpponentData;
@@ -30,6 +32,7 @@ class VersusScreen extends StatefulWidget {
     required this.seed,
     this.isBot = false,
     this.isGhost = false,
+    this.isFriendly = false,
     this.questionIds,
     this.ghostTimeline,
     this.initialOpponentData,
@@ -221,6 +224,72 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
             ),
             onPressed: () async {
               Navigator.of(ctx).pop();
+              final profile = ProfileService.instance.activeProfile;
+              if (AppControlService
+                  .instance
+                  .featureFlagsNotifier
+                  .value
+                  .ghostMatches) {
+                try {
+                  final ghostResult = await MultiplayerService.instance
+                      .findOrCreateGhostMatch(
+                        trophies: profile?.trophies ?? 1000,
+                      )
+                      .timeout(const Duration(seconds: 4));
+                  if (ghostResult.success &&
+                      ghostResult.matchId != null &&
+                      mounted) {
+                    if (ghostResult.isHumanMatch) {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => VersusScreen(
+                            matchId: ghostResult.matchId!,
+                            opponentId: ghostResult.ghostUserId ?? '',
+                            seed: ghostResult.seed ?? 1000,
+                            isBot: false,
+                            isGhost: false,
+                            isFriendly: ghostResult.isFriendly,
+                            questionIds: ghostResult.questionIds,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    final ghostLevel = ghostResult.ghostLevel ?? 5;
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => VersusScreen(
+                          matchId: ghostResult.matchId!,
+                          opponentId: ghostResult.ghostUserId ??
+                              'ghost_${DateTime.now().millisecondsSinceEpoch}',
+                          seed: ghostResult.seed ?? 1000,
+                          isBot: false,
+                          isGhost: true,
+                          isFriendly: ghostResult.isFriendly,
+                          ghostTimeline: ghostResult.timeline,
+                          initialOpponentData: {
+                            'display_name':
+                                ghostResult.ghostName ?? 'فارس الأندلس',
+                            'avatar_index': ghostResult.ghostAvatarIndex ?? 0,
+                            'equipped_frame':
+                                ghostResult.ghostFrame ?? 'frame_wood',
+                            'player_level': ghostLevel,
+                            'trophies': ghostResult.ghostTrophies ?? 1000,
+                            'score': PlayerLevelInfo.cumulativeXpForLevel(
+                              ghostLevel,
+                            ),
+                          },
+                          questionIds: ghostResult.questionIds,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                } catch (e) {
+                  debugPrint('Versus timeout ghost fallback failed: $e');
+                }
+              }
+
               final botResult = await MultiplayerService.instance.createBotMatch();
               if (!mounted) return;
               Navigator.of(context).pushReplacement(
@@ -269,6 +338,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
           opponentAvatarIndex: (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0,
           isBot: widget.isBot,
           isGhost: widget.isGhost,
+          isFriendly: widget.isFriendly,
           ghostTimeline: widget.ghostTimeline,
           ghostFrame: _opponentData?['equipped_frame'] as String?,
           ghostLevel: (_opponentData?['player_level'] as num?)?.toInt(),
@@ -285,8 +355,11 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
     final myArena = ProgressionService.instance.currentArena;
 
     final oppScore = (_opponentData?['score'] as num?)?.toInt() ?? 0;
+    final oppLevelNum = (_opponentData?['player_level'] as num?)?.toInt();
     final oppTrophies = (_opponentData?['trophies'] as num?)?.toInt() ?? 1000;
-    final oppLevelInfo = PlayerLevelInfo.fromTotalScore(oppScore);
+    final oppLevelInfo = oppLevelNum != null && oppLevelNum > 0
+        ? PlayerLevelInfo.forMilestoneLevel(oppLevelNum)
+        : PlayerLevelInfo.fromTotalScore(oppScore);
     final oppArena = ArenaModel.fromTrophies(oppTrophies);
     final oppFrame =
         (_opponentData?['equipped_frame'] as String?) ?? oppLevelInfo.frameKey;
@@ -398,62 +471,90 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                    // Dedicated Central VS & Countdown Band (Zero Overlap!)
                    Container(
                      width: double.infinity,
-                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                      decoration: BoxDecoration(
                        color: Colors.black.withValues(alpha: 0.25),
                        border: const Border.symmetric(
                          horizontal: BorderSide(color: Colors.white12, width: 1),
                        ),
                      ),
-                     child: Row(
-                       mainAxisAlignment: MainAxisAlignment.center,
+                     child: Column(
+                       mainAxisSize: MainAxisSize.min,
                        children: [
-                         ScaleTransition(
-                           scale: _vsScale,
-                           child: Container(
-                             padding: const EdgeInsets.all(14),
+                         Row(
+                           mainAxisAlignment: MainAxisAlignment.center,
+                           children: [
+                             ScaleTransition(
+                               scale: _vsScale,
+                               child: Container(
+                                 padding: const EdgeInsets.all(14),
+                                 decoration: BoxDecoration(
+                                   shape: BoxShape.circle,
+                                   gradient: AppTheme.goldGradient,
+                                   boxShadow: [
+                                     BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15)
+                                   ],
+                                 ),
+                                 child: const Text(
+                                   'VS',
+                                   style: TextStyle(
+                                     color: AppTheme.primaryDark,
+                                     fontSize: 28,
+                                     fontWeight: FontWeight.w900,
+                                     fontStyle: FontStyle.italic,
+                                   ),
+                                 ),
+                               ),
+                             ),
+                             const SizedBox(width: 16),
+                             if (_bothReady)
+                               Text(
+                                 '$_countdown',
+                                 style: const TextStyle(
+                                   color: AppTheme.accentColor,
+                                   fontSize: 44,
+                                   fontWeight: FontWeight.bold,
+                                   shadows: [
+                                     Shadow(color: Colors.black, blurRadius: 10),
+                                   ],
+                                 ),
+                               )
+                             else if (_waitingForOpponent)
+                               const Flexible(
+                                 child: Text(
+                                   'في انتظار تأكيد الخصم...',
+                                   style: TextStyle(
+                                     color: Colors.white70,
+                                     fontSize: 16,
+                                     fontFamily: 'Cairo',
+                                   ),
+                                 ),
+                               ),
+                           ],
+                         ),
+                         if (widget.isFriendly) ...[
+                           const SizedBox(height: 6),
+                           Container(
+                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                              decoration: BoxDecoration(
-                               shape: BoxShape.circle,
-                               gradient: AppTheme.goldGradient,
-                               boxShadow: [
-                                 BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15)
-                               ],
+                               color: Colors.tealAccent.withValues(alpha: 0.14),
+                               borderRadius: BorderRadius.circular(14),
+                               border: Border.all(
+                                 color: Colors.tealAccent.withValues(alpha: 0.5),
+                               ),
                              ),
                              child: const Text(
-                               'VS',
+                               'مباراة ودية — الكؤوس والدروع محمية 🛡️',
                                style: TextStyle(
-                                 color: AppTheme.primaryDark,
-                                 fontSize: 28,
-                                 fontWeight: FontWeight.w900,
-                                 fontStyle: FontStyle.italic,
-                               ),
-                             ),
-                           ),
-                         ),
-                         const SizedBox(width: 16),
-                         if (_bothReady)
-                           Text(
-                             '$_countdown',
-                             style: const TextStyle(
-                               color: AppTheme.accentColor,
-                               fontSize: 44,
-                               fontWeight: FontWeight.bold,
-                               shadows: [
-                                 Shadow(color: Colors.black, blurRadius: 10),
-                               ],
-                             ),
-                           )
-                         else if (_waitingForOpponent)
-                           const Flexible(
-                             child: Text(
-                               'في انتظار تأكيد الخصم...',
-                               style: TextStyle(
-                                 color: Colors.white70,
-                                 fontSize: 16,
+                                 color: Colors.tealAccent,
+                                 fontSize: 12,
+                                 fontWeight: FontWeight.bold,
                                  fontFamily: 'Cairo',
                                ),
+                               textAlign: TextAlign.center,
                              ),
                            ),
+                         ],
                        ],
                      ),
                    ),
