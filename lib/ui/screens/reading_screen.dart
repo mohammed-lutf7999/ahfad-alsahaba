@@ -70,6 +70,19 @@ class ReadingScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         const Icon(Icons.format_quote_rounded, size: 40, color: AppTheme.accentColor),
+                        if (item.subtitle.trim().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            item.subtitle.trim(),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: const Color(0xFF2D1B4E).withValues(alpha: 0.72),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         Text(
                           item.content,
@@ -82,6 +95,29 @@ class ReadingScreen extends StatelessWidget {
                             fontFamily: 'Cairo', // Assuming Arabic font availability, else uses default
                           ),
                         ),
+                        if (item.sourceRef.trim().isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'المصدر: ${item.sourceRef.trim()}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF5B3A00),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 40),
                         Container(
                           width: 50, height: 4,

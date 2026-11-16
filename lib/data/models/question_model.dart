@@ -6,6 +6,8 @@ class Question {
   final List<String> options;
   final int correctAnswerIndex;
   final String? explanation;
+  final String syncScope;
+  final bool isVisible;
 
   Question({
     required this.id,
@@ -15,6 +17,8 @@ class Question {
     required this.options,
     required this.correctAnswerIndex,
     this.explanation,
+    this.syncScope = 'solo_only',
+    this.isVisible = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -26,6 +30,8 @@ class Question {
       'options': options,
       'correctAnswerIndex': correctAnswerIndex,
       'explanation': explanation,
+      'syncScope': syncScope,
+      'isVisible': isVisible,
     };
   }
 
@@ -38,6 +44,8 @@ class Question {
       options: List<String>.from(json['options']),
       correctAnswerIndex: json['correctAnswerIndex'],
       explanation: json['explanation'],
+      syncScope: json['syncScope'] ?? 'solo_only',
+      isVisible: json['isVisible'] ?? true,
     );
   }
 
@@ -49,6 +57,8 @@ class Question {
     List<String>? options,
     int? correctAnswerIndex,
     String? explanation,
+    String? syncScope,
+    bool? isVisible,
   }) {
     return Question(
       id: id ?? this.id,
@@ -58,6 +68,8 @@ class Question {
       options: options ?? this.options,
       correctAnswerIndex: correctAnswerIndex ?? this.correctAnswerIndex,
       explanation: explanation ?? this.explanation,
+      syncScope: syncScope ?? this.syncScope,
+      isVisible: isVisible ?? this.isVisible,
     );
   }
 }

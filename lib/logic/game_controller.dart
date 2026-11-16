@@ -3,9 +3,11 @@ import '../data/models/question_model.dart';
 import '../data/models/category_model.dart';
 import '../data/models/level_model.dart';
 import '../data/services/question_service.dart';
+import '../data/services/cms_cache_service.dart';
 import '../data/services/profile_service.dart';
 import '../data/services/progression_service.dart';
 import '../core/app_constants.dart';
+import '../core/cms_icon_registry.dart';
 
 class GameController extends ChangeNotifier {
   List<Category> _categories = [];
@@ -70,70 +72,123 @@ class GameController extends ChangeNotifier {
     return profile?.getCategoryUnlockedLevels(categoryId) ?? 1;
   }
 
-  // Initialize categories
+  // Initialize categories (merges built-in 6 categories with dynamic CMS categories)
   void initializeCategories() {
-    _categories = [
+    final defaults = <Category>[
       Category(
         id: AppConstants.quranCategory,
         name: 'القرآن الكريم',
         description: 'أسئلة عن القرآن الكريم وعلومه',
         icon: Icons.menu_book,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.quranCategory),
         color: const Color(0xFF1B5E20),
+        sortOrder: 10,
       ),
       Category(
         id: AppConstants.hadithCategory,
         name: 'الحديث الشريف',
         description: 'أسئلة عن الأحاديث النبوية',
         icon: Icons.format_quote,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.hadithCategory),
         color: const Color(0xFF0D47A1),
+        sortOrder: 20,
       ),
       Category(
         id: AppConstants.fiqhCategory,
         name: 'الفقه',
         description: 'أسئلة عن أحكام الفقه الإسلامي',
         icon: Icons.balance,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.fiqhCategory),
         color: const Color(0xFF4A148C),
+        sortOrder: 30,
       ),
       Category(
         id: AppConstants.seerahCategory,
         name: 'السيرة النبوية',
         description: 'أسئلة عن سيرة النبي ﷺ',
         icon: Icons.history_edu,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.seerahCategory),
         color: const Color(0xFFBF360C),
+        sortOrder: 40,
       ),
       Category(
         id: AppConstants.historyCategory,
         name: 'التاريخ الإسلامي',
         description: 'أسئلة عن تاريخ الحضارة الإسلامية',
         icon: Icons.castle,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.historyCategory),
         color: const Color(0xFF006064),
+        sortOrder: 50,
       ),
       Category(
         id: AppConstants.aqeedahCategory,
         name: 'العقيدة',
         description: 'أسئلة عن أصول العقيدة الإسلامية',
         icon: Icons.auto_awesome,
-        totalLevels: 10,
+        totalLevels: AppConstants.levelsPerCategory,
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.aqeedahCategory),
         color: const Color(0xFF311B92),
+        sortOrder: 60,
       ),
     ];
+
+    final cms = CmsCacheService.instance.snapshot;
+    final mergedById = <String, Category>{
+      for (final c in defaults) c.id: c,
+    };
+
+    for (final entry in cms.quizCategories.entries) {
+      final cloudCat = entry.value;
+      final base = mergedById[cloudCat.id];
+      final resolvedLevels = cloudCat.totalLevels;
+      mergedById[cloudCat.id] = Category(
+        id: cloudCat.id,
+        name: cloudCat.name.isNotEmpty ? cloudCat.name : (base?.name ?? cloudCat.id),
+        description: cloudCat.description.isNotEmpty
+            ? cloudCat.description
+            : (base?.description ?? ''),
+        icon: CmsIconRegistry.resolveIcon(
+          cloudCat.iconName,
+          fallback: base?.icon ?? Icons.quiz_rounded,
+        ),
+        totalLevels: resolvedLevels,
+        unlockedLevels: _getCategoryUnlockedLevels(cloudCat.id),
+        isLocked: cloudCat.isLocked,
+        color: CmsIconRegistry.parseHexColor(
+          cloudCat.colorHex,
+          fallback: base?.color ?? const Color(0xFF1B5E20),
+        ),
+        sortOrder: cloudCat.sortOrder,
+        isVisible: cloudCat.isVisible,
+      );
+    }
+
+    _categories = mergedById.values.where((c) => c.isVisible).toList()
+      ..sort((a, b) {
+        final cmp = a.sortOrder.compareTo(b.sortOrder);
+        return cmp != 0 ? cmp : a.id.compareTo(b.id);
+      });
     notifyListeners();
   }
 
   // Get levels for a category
   List<Level> getLevelsForCategory(String categoryId) {
-    final category = _categories.firstWhere((c) => c.id == categoryId);
+    final category = _categories.firstWhere(
+      (c) => c.id == categoryId,
+      orElse: () => Category(
+        id: categoryId,
+        name: CmsCacheService.instance.getCategoryDisplayName(categoryId),
+        description: '',
+        icon: Icons.quiz_rounded,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(categoryId),
+        unlockedLevels: _getCategoryUnlockedLevels(categoryId),
+      ),
+    );
     final profile = ProfileService.instance.activeProfile;
     
     return List.generate(category.totalLevels, (index) {
@@ -253,10 +308,11 @@ class GameController extends ChangeNotifier {
     profile.setLevelStars(_currentCategoryId!, _currentLevelNumber!, stars);
     profile.setLevelScore(_currentCategoryId!, _currentLevelNumber!, _score);
 
-    // Unlock next level ONLY if passed (clamped at max levels per category = 10)
+    // Unlock next level ONLY if passed (clamped cleanly to category's dynamic max levels)
     if (percentage >= AppConstants.passingScore) {
       final currentUnlocked = profile.getCategoryUnlockedLevels(_currentCategoryId!);
-      final targetUnlocked = (_currentLevelNumber! + 1).clamp(1, AppConstants.levelsPerCategory);
+      final maxLevels = CmsCategoryBounds.maxLevelsFor(_currentCategoryId!);
+      final targetUnlocked = (_currentLevelNumber! + 1).clamp(1, maxLevels);
       if (targetUnlocked >= currentUnlocked) {
         profile.setCategoryUnlockedLevels(_currentCategoryId!, targetUnlocked);
       }

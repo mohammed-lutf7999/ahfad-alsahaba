@@ -6,6 +6,7 @@ import 'core/app_routes.dart';
 import 'core/startup_bootstrap.dart';
 import 'data/local/shared_prefs_service.dart';
 import 'data/services/app_control_service.dart';
+import 'data/services/cms_cache_service.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/profile_service.dart';
 import 'data/services/progression_service.dart';
@@ -44,11 +45,12 @@ void main() async {
     debugPrint('ProfileService init error: $e');
   }
 
-  // Hydrate App Control cache at 0ms from SharedPreferences (never blocks on network)
+  // Hydrate App Control and CMS cache at 0ms from SharedPreferences (never blocks on network)
   try {
     await AppControlService.instance.initFromCache();
+    await CmsCacheService.instance.initFromCache();
   } catch (e) {
-    debugPrint('AppControlService initFromCache error: $e');
+    debugPrint('AppControlService/CmsCacheService initFromCache error: $e');
   }
 
   // Start Supabase local session bootstrap concurrently (never blocks runApp / first frame)
@@ -78,16 +80,30 @@ class _IslamicQuizAppState extends State<IslamicQuizApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _activeThemeId = ProgressionService.instance.activeTheme.themeId;
+    _activeThemeId = _themeSignature();
     ProgressionService.instance.addListener(_onThemeCheck);
     ProfileService.instance.addListener(_onThemeCheck);
+    CmsCacheService.instance.addListener(_onCmsUpdated);
+  }
+
+  String _themeSignature() {
+    final t = ProgressionService.instance.activeTheme;
+    return '${t.themeId}|${t.deepBackground.toARGB32()}|${t.surfaceCard.toARGB32()}|${t.sovereignAccent.toARGB32()}';
   }
 
   void _onThemeCheck() {
-    final nextThemeId = ProgressionService.instance.activeTheme.themeId;
-    if (nextThemeId != _activeThemeId && mounted) {
+    final nextSig = _themeSignature();
+    if (nextSig != _activeThemeId && mounted) {
       setState(() {
-        _activeThemeId = nextThemeId;
+        _activeThemeId = nextSig;
+      });
+    }
+  }
+
+  void _onCmsUpdated() {
+    if (mounted) {
+      setState(() {
+        _activeThemeId = _themeSignature();
       });
     }
   }
@@ -114,6 +130,7 @@ class _IslamicQuizAppState extends State<IslamicQuizApp>
     WidgetsBinding.instance.removeObserver(this);
     ProgressionService.instance.removeListener(_onThemeCheck);
     ProfileService.instance.removeListener(_onThemeCheck);
+    CmsCacheService.instance.removeListener(_onCmsUpdated);
     super.dispose();
   }
 

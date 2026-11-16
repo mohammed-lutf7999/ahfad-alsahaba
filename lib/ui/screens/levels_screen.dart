@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../core/app_constants.dart';
 import '../../core/app_theme.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
 import '../../data/models/level_model.dart';
+import '../../data/services/cms_cache_service.dart';
 import '../../logic/game_controller.dart';
 import '../widgets/level_item.dart';
 import '../../core/sound_service.dart';
@@ -34,7 +34,14 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
       vsync: this,
     );
     unawaited(_gameController.preloadCategory(widget.categoryId));
+    CmsCacheService.instance.addListener(_onCmsChanged);
     _loadLevels(animate: true);
+  }
+
+  void _onCmsChanged() {
+    if (mounted) {
+      unawaited(_loadLevels(animate: false));
+    }
   }
 
   Future<void> _loadLevels({bool animate = false}) async {
@@ -67,6 +74,7 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    CmsCacheService.instance.removeListener(_onCmsChanged);
     _animationController.dispose();
     super.dispose();
   }
@@ -92,7 +100,7 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
                         crossAxisAlignment: CrossAxisAlignment.start, // Align to Right (Start in RTL)
                         children: [
                           Text(
-                            AppConstants.getCategoryName(widget.categoryId),
+                            CmsCacheService.instance.getCategoryDisplayName(widget.categoryId),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,

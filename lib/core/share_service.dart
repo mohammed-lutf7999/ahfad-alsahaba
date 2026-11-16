@@ -1,7 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ShareService {
@@ -12,9 +11,11 @@ class ShareService {
       final file = await File('${tempDir.path}/quiz_result.png').create();
       await file.writeAsBytes(imageBytes);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: text,
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: text,
+        ),
       );
     } catch (e) {
       debugPrint('Error sharing image: $e');
@@ -23,6 +24,6 @@ class ShareService {
 
   /// Shares valid text only.
   static Future<void> shareText(String text) async {
-    await Share.share(text);
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 }

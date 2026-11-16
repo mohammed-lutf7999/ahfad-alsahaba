@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../core/app_routes.dart';
+import '../../data/services/cms_cache_service.dart';
 import '../../logic/game_controller.dart';
 import '../../core/sound_service.dart';
 import '../widgets/category_item.dart';
@@ -23,6 +24,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
     super.initState();
     _gameController = GameController();
     _gameController.initializeCategories();
+    CmsCacheService.instance.addListener(_onCmsUpdated);
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -31,8 +33,16 @@ class _CategoriesScreenState extends State<CategoriesScreen>
     _animationController.forward();
   }
 
+  void _onCmsUpdated() {
+    if (!mounted) return;
+    setState(() {
+      _gameController.initializeCategories();
+    });
+  }
+
   @override
   void dispose() {
+    CmsCacheService.instance.removeListener(_onCmsUpdated);
     _animationController.dispose();
     super.dispose();
   }

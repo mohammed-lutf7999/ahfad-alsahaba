@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../cms_icon_registry.dart';
+import '../../data/models/store_item_model.dart';
+import '../../data/services/cms_cache_service.dart';
 
 /// Custom ThemeExtension implementing the 4 Legendary Historical Themes
-/// for «معركة أحفاد الصحابة» with smooth 300ms color interpolation.
+/// plus dynamic cloud-configured themes from «سوق الفرسان».
 class AppCustomTheme extends ThemeExtension<AppCustomTheme> {
   final String themeId;
   final String themeName;
@@ -89,11 +92,50 @@ class AppCustomTheme extends ThemeExtension<AppCustomTheme> {
     yarmoukCarnelian,
   ];
 
-  /// Resolves a theme by its [id], defaulting to [andalusianGold].
+  /// Builds a dynamic [AppCustomTheme] from a cloud-configured Store item.
+  factory AppCustomTheme.fromStoreItem(StoreItemModel item) {
+    final meta = item.metadata;
+    final accent = CmsIconRegistry.tryParseColor(meta['sovereignAccent']) ??
+        item.previewColor;
+    final secondary = CmsIconRegistry.tryParseColor(meta['secondaryAccent']) ??
+        accent;
+    final deepBg = CmsIconRegistry.tryParseColor(meta['deepBackground']) ??
+        andalusianGold.deepBackground;
+    final surface = CmsIconRegistry.tryParseColor(meta['surfaceCard']) ??
+        andalusianGold.surfaceCard;
+    final textLightColor =
+        CmsIconRegistry.tryParseColor(meta['textLight']) ?? Colors.white;
+    final textMutedColor = CmsIconRegistry.tryParseColor(meta['textMuted']) ??
+        const Color(0xFFCBD5E1);
+
+    return AppCustomTheme(
+      themeId: item.assetKey.isNotEmpty ? item.assetKey : item.id,
+      themeName: item.title,
+      themeSubtitle: item.description,
+      deepBackground: deepBg,
+      surfaceCard: surface,
+      sovereignAccent: accent,
+      secondaryAccent: secondary,
+      textLight: textLightColor,
+      textMuted: textMutedColor,
+      isFreeDefault: item.isDefaultFree,
+      priceCoins: item.priceCoins,
+    );
+  }
+
+  /// Resolves a theme by its [id] (built-in first, then dynamic CMS store items),
+  /// defaulting to [andalusianGold].
   static AppCustomTheme fromId(String? id) {
     if (id == null || id.isEmpty) return andalusianGold;
     for (final t in allThemes) {
       if (t.themeId == id) return t;
+    }
+    final cloudItem = CmsCacheService.instance.findStoreItemByAssetKey(
+      id,
+      category: StoreItemCategory.theme,
+    );
+    if (cloudItem != null) {
+      return AppCustomTheme.fromStoreItem(cloudItem);
     }
     return andalusianGold;
   }

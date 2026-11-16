@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../data/models/library_model.dart';
+import '../../data/services/cms_cache_service.dart';
 import '../../data/services/library_service.dart';
 import '../../core/sound_service.dart';
 import 'content_list_screen.dart';
@@ -20,13 +21,22 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _libraryData = LibraryService.loadLibraryContent();
+    CmsCacheService.instance.addListener(_reloadLibrary);
     _animationController = AnimationController(
         duration: const Duration(milliseconds: 800), vsync: this);
     _animationController.forward();
   }
 
+  void _reloadLibrary() {
+    if (!mounted) return;
+    setState(() {
+      _libraryData = LibraryService.loadLibraryContent();
+    });
+  }
+
   @override
   void dispose() {
+    CmsCacheService.instance.removeListener(_reloadLibrary);
     _animationController.dispose();
     super.dispose();
   }

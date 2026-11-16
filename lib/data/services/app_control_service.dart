@@ -11,6 +11,7 @@ import '../../core/app_constants.dart';
 import '../local/shared_prefs_service.dart';
 import '../models/app_control_models.dart';
 import '../models/player_profile_model.dart';
+import 'cms_cache_service.dart';
 import 'profile_service.dart';
 
 enum AppUpdateOutcome {
@@ -279,6 +280,12 @@ class AppControlService extends ChangeNotifier {
       final serverIsAdmin = rpcResult['is_admin'] as bool?;
       final serverConfigVer =
           (rpcResult['config_version'] as num?)?.toInt() ?? cachedVersion;
+      final releaseMap = rpcResult['release_config'];
+      final serverCmsVer = (rpcResult['cms_version'] as num?)?.toInt() ??
+          (releaseMap is Map
+              ? (releaseMap['cms_version'] as num?)?.toInt()
+              : null) ??
+          _snapshot.cmsVersion;
 
       if (!changed) {
         final updated = _sanitizeSnapshotForNow(
@@ -286,22 +293,26 @@ class AppControlService extends ChangeNotifier {
             configVersion: serverConfigVer > 0
                 ? serverConfigVer
                 : _snapshot.configVersion,
+            cmsVersion: serverCmsVer > 0 ? serverCmsVer : _snapshot.cmsVersion,
             isAdmin: serverIsAdmin ?? _snapshot.isAdmin,
             syncedAt: nowUtc,
           ),
         );
         _applySnapshot(updated);
         await _persistSnapshot(updated);
+        _triggerCmsSyncIfNeeded(updated.cmsVersion);
         return _snapshot;
       }
 
       final parsed = AppControlSnapshot.fromJson({
         ...rpcResult,
+        'cms_version': serverCmsVer,
         'synced_at': nowUtc.toIso8601String(),
       });
       final sanitized = _sanitizeSnapshotForNow(parsed);
       _applySnapshot(sanitized);
       await _persistSnapshot(sanitized);
+      _triggerCmsSyncIfNeeded(sanitized.cmsVersion);
       return _snapshot;
     } catch (e) {
       debugPrint('AppControlService sync skipped (offline-safe): $e');
@@ -309,6 +320,16 @@ class AppControlService extends ChangeNotifier {
       _applySnapshot(sanitized);
       return _snapshot;
     }
+  }
+
+  void _triggerCmsSyncIfNeeded(int serverCmsVersion) {
+    if (rpcStateFetcherOverride != null &&
+        !CmsCacheService.instance.hasBundleFetcherOverride) {
+      return;
+    }
+    unawaited(
+      CmsCacheService.instance.syncIfNeeded(serverCmsVersion: serverCmsVersion),
+    );
   }
 
   /// Marks an announcement read locally (0ms) and sends server receipt in background.
@@ -553,6 +574,7 @@ class AppControlService extends ChangeNotifier {
 
     return AppControlSnapshot(
       configVersion: raw.configVersion,
+      cmsVersion: raw.cmsVersion,
       isAdmin: raw.isAdmin,
       releaseConfig: raw.releaseConfig,
       // Keep scheduled upcoming events cached on device so they illuminate on
@@ -611,6 +633,7 @@ class AppControlService extends ChangeNotifier {
         a.maintenanceTitle == b.maintenanceTitle &&
         a.maintenanceMessage == b.maintenanceMessage &&
         a.configVersion == b.configVersion &&
+        a.cmsVersion == b.cmsVersion &&
         a.updatedAt == b.updatedAt &&
         _sameBoolMaps(a.featureFlags.toJson(), b.featureFlags.toJson());
   }

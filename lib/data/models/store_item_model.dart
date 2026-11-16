@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/cms_icon_registry.dart';
 
 /// Categories of items available in «سوق الفرسان» (Knight's Store).
 enum StoreItemCategory {
@@ -21,6 +22,10 @@ class StoreItemModel {
   final Color previewColor;
   final IconData icon;
   final bool isDefaultFree;
+  final bool isVisible;
+  final int sortOrder;
+  final Map<String, dynamic> metadata;
+  final int cmsRevision;
 
   const StoreItemModel({
     required this.id,
@@ -34,6 +39,10 @@ class StoreItemModel {
     required this.previewColor,
     required this.icon,
     this.isDefaultFree = false,
+    this.isVisible = true,
+    this.sortOrder = 100,
+    this.metadata = const {},
+    this.cmsRevision = 1,
   });
 
   /// Master catalog of items in «سوق الفرسان» (4 Themes, 10 Frames, Titles, Powerups).
@@ -279,27 +288,98 @@ class StoreItemModel {
     ),
   ];
 
-  factory StoreItemModel.fromJson(Map<String, dynamic> json) {
-    final catStr = json['category'] as String? ?? 'theme';
+  static IconData defaultIconForCategory(StoreItemCategory category) {
+    switch (category) {
+      case StoreItemCategory.theme:
+        return Icons.palette_rounded;
+      case StoreItemCategory.frame:
+        return Icons.filter_frames_rounded;
+      case StoreItemCategory.title:
+        return Icons.workspace_premium_rounded;
+      case StoreItemCategory.powerup:
+        return Icons.bolt_rounded;
+    }
+  }
+
+  static Map<String, dynamic> _parseMeta(dynamic raw) {
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return const {};
+  }
+
+  factory StoreItemModel.fromJson(Map<String, dynamic> json) =>
+      StoreItemModel.fromCloudJson(json);
+
+  factory StoreItemModel.fromCloudJson(
+    Map<String, dynamic> json, {
+    StoreItemModel? fallback,
+  }) {
+    final catStr = json['category']?.toString() ?? fallback?.category.name ?? 'theme';
     final category = StoreItemCategory.values.firstWhere(
       (c) => c.name == catStr,
-      orElse: () => StoreItemCategory.theme,
+      orElse: () => fallback?.category ?? StoreItemCategory.theme,
     );
+    final meta = _parseMeta(json['metadata']);
+    final resolvedColor = CmsIconRegistry.tryParseColor(meta['previewColor']) ??
+        CmsIconRegistry.tryParseColor(meta['sovereignAccent']) ??
+        CmsIconRegistry.tryParseColor(meta['secondaryColor']) ??
+        fallback?.previewColor ??
+        const Color(0xFFF3C644);
+    final resolvedIcon = CmsIconRegistry.resolveIcon(
+      meta['iconName']?.toString(),
+      fallback: fallback?.icon ?? defaultIconForCategory(category),
+    );
+    final coins = (json['price_coins'] as num?)?.toInt() ?? fallback?.priceCoins ?? 0;
+    final gems = (json['price_gems'] as num?)?.toInt() ?? fallback?.priceGems ?? 0;
 
     return StoreItemModel(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String? ?? '',
+      id: (json['id'] ?? fallback?.id ?? '').toString(),
+      title: (json['title'] ?? fallback?.title ?? '').toString(),
+      description: (json['description'] ?? fallback?.description ?? '').toString(),
       category: category,
-      priceCoins: (json['price_coins'] as num?)?.toInt() ?? 0,
-      priceGems: (json['price_gems'] as num?)?.toInt() ?? 0,
-      minLevel: (json['min_level'] as num?)?.toInt() ?? 1,
-      assetKey: json['asset_key'] as String? ?? '',
-      previewColor: const Color(0xFFF3C644),
-      icon: Icons.stars_rounded,
-      isDefaultFree: ((json['price_coins'] as num?)?.toInt() ?? 0) == 0 &&
-          ((json['price_gems'] as num?)?.toInt() ?? 0) == 0,
+      priceCoins: coins,
+      priceGems: gems,
+      minLevel: (json['min_level'] as num?)?.toInt() ?? fallback?.minLevel ?? 1,
+      assetKey: (json['asset_key'] ?? fallback?.assetKey ?? '').toString(),
+      previewColor: resolvedColor,
+      icon: resolvedIcon,
+      isDefaultFree: fallback?.isDefaultFree ?? (coins == 0 && gems == 0),
+      isVisible: (json['is_visible'] as bool?) ?? fallback?.isVisible ?? true,
+      sortOrder: (json['sort_order'] as num?)?.toInt() ?? fallback?.sortOrder ?? 100,
+      metadata: meta.isNotEmpty ? meta : (fallback?.metadata ?? const {}),
+      cmsRevision:
+          (json['cms_revision'] as num?)?.toInt() ?? fallback?.cmsRevision ?? 1,
     );
+  }
+
+  StoreItemModel withFallback(StoreItemModel? fallback) {
+    if (fallback == null) return this;
+    final hasMeta = metadata.isNotEmpty;
+    return StoreItemModel(
+      id: id,
+      title: title.isNotEmpty ? title : fallback.title,
+      description: description.isNotEmpty ? description : fallback.description,
+      category: category,
+      priceCoins: priceCoins,
+      priceGems: priceGems,
+      minLevel: minLevel,
+      assetKey: assetKey.isNotEmpty ? assetKey : fallback.assetKey,
+      previewColor:
+          hasMeta ? previewColor : fallback.previewColor,
+      icon: metaIconOr(fallback.icon),
+      isDefaultFree: fallback.isDefaultFree,
+      isVisible: isVisible,
+      sortOrder: sortOrder,
+      metadata: hasMeta ? metadata : fallback.metadata,
+      cmsRevision: cmsRevision,
+    );
+  }
+
+  IconData metaIconOr(IconData fallbackIcon) {
+    final rawName = metadata['iconName']?.toString();
+    if (rawName != null && rawName.trim().isNotEmpty) {
+      return CmsIconRegistry.resolveIcon(rawName, fallback: fallbackIcon);
+    }
+    return fallbackIcon;
   }
 
   Map<String, dynamic> toJson() {
@@ -312,6 +392,12 @@ class StoreItemModel {
       'price_gems': priceGems,
       'min_level': minLevel,
       'asset_key': assetKey,
+      'is_visible': isVisible,
+      'sort_order': sortOrder,
+      'metadata': metadata,
+      'cms_revision': cmsRevision,
     };
   }
+
+  Map<String, dynamic> toCloudJson() => toJson();
 }

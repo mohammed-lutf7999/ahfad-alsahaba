@@ -553,6 +553,27 @@ class _KnightsStoreScreenState extends State<KnightsStoreScreen>
                         ),
                       ),
                     ),
+                    if (!item.isVisible && isOwned)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: customTheme.sovereignAccent.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'مقتنى خاص (مخفي)',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: customTheme.sovereignAccent,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                            height: 1.15,
+                          ),
+                        ),
+                      ),
                     if (isOwned && !isEquipped) ...[
                       const Text(
                         'مملوك ✓',

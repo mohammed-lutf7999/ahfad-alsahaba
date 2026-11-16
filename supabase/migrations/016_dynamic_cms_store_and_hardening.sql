@@ -2118,4 +2118,87 @@ $$;
 REVOKE ALL ON FUNCTION public.admin_manage_admin(TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_manage_admin(TEXT, TEXT, TEXT) TO authenticated, service_role;
 
+-- ==============================================================================
+-- 7. TABLE-EDITOR MANUAL EDIT GUARD + EXPLICIT `get_app_control_state` GRANTS
+-- ==============================================================================
+-- Guarantees that direct manual edits in Supabase Table Editor automatically bump
+-- cms_version / cms_revision once per transaction without double-bumping admin_* RPCs.
+
+CREATE OR REPLACE FUNCTION public.trg_fn_cms_auto_revision()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+#variable_conflict use_column
+DECLARE
+    v_txn_cms TEXT;
+    v_cur_cfg_cms BIGINT := 1;
+    v_new_cms BIGINT;
+BEGIN
+    NEW.updated_at := NOW();
+
+    -- 1. If an admin_* RPC updated cms_revision cleanly on UPDATE, honor it as-is.
+    IF TG_OP = 'UPDATE' AND NEW.cms_revision IS DISTINCT FROM OLD.cms_revision THEN
+        RETURN NEW;
+    END IF;
+
+    -- 2. Check current cms_version on app_release_config.
+    SELECT COALESCE(cfg.cms_version, 1)
+    INTO v_cur_cfg_cms
+    FROM public.app_release_config cfg
+    WHERE cfg.platform = 'android'
+    LIMIT 1;
+    v_cur_cfg_cms := COALESCE(v_cur_cfg_cms, 1);
+
+    -- 3. On INSERT where an admin_* RPC already bumped cfg.cms_version and passed it in:
+    IF TG_OP = 'INSERT'
+       AND COALESCE(NEW.cms_revision, 1) > 1
+       AND COALESCE(NEW.cms_revision, 1) >= v_cur_cfg_cms THEN
+        RETURN NEW;
+    END IF;
+
+    -- 4. Reuse one version bump across a bulk manual edit transaction.
+    v_txn_cms := NULLIF(current_setting('app.cms_auto_bumped_ver', TRUE), '');
+    IF v_txn_cms IS NOT NULL THEN
+        NEW.cms_revision := v_txn_cms::bigint;
+        RETURN NEW;
+    END IF;
+
+    v_new_cms := public._bump_cms_version('android', auth.uid());
+    PERFORM set_config('app.cms_auto_bumped_ver', v_new_cms::text, TRUE);
+    NEW.cms_revision := v_new_cms;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_store_items_cms_rev ON public.store_items;
+CREATE TRIGGER trg_store_items_cms_rev
+BEFORE INSERT OR UPDATE ON public.store_items
+FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
+
+DROP TRIGGER IF EXISTS trg_library_sections_cms_rev ON public.library_sections;
+CREATE TRIGGER trg_library_sections_cms_rev
+BEFORE INSERT OR UPDATE ON public.library_sections
+FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
+
+DROP TRIGGER IF EXISTS trg_library_items_cms_rev ON public.library_items;
+CREATE TRIGGER trg_library_items_cms_rev
+BEFORE INSERT OR UPDATE ON public.library_items
+FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
+
+DROP TRIGGER IF EXISTS trg_quiz_categories_cms_rev ON public.quiz_categories;
+CREATE TRIGGER trg_quiz_categories_cms_rev
+BEFORE INSERT OR UPDATE ON public.quiz_categories
+FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
+
+DROP TRIGGER IF EXISTS trg_quiz_questions_cms_rev ON public.quiz_questions;
+CREATE TRIGGER trg_quiz_questions_cms_rev
+BEFORE INSERT OR UPDATE ON public.quiz_questions
+FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
+
+-- Explicit idempotent permissions on get_app_control_state
+REVOKE ALL ON FUNCTION public.get_app_control_state(TEXT, INTEGER, BIGINT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_app_control_state(TEXT, INTEGER, BIGINT, TEXT) TO anon, authenticated, service_role;
+
 NOTIFY pgrst, 'reload schema';

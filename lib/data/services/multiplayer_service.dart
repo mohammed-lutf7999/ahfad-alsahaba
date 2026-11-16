@@ -321,7 +321,7 @@ class MultiplayerService {
       }
       return false;
     } catch (e) {
-      print('Error confirming ready: $e');
+      debugPrint('Error confirming ready: $e');
       return false;
     }
   }
@@ -371,7 +371,7 @@ class MultiplayerService {
         _matchStateController?.add(MatchState.fromJson(data));
       }
     } catch (e) {
-      print('Error fetching match state: $e');
+      debugPrint('Error fetching match state: $e');
     }
   }
 
@@ -385,7 +385,7 @@ class MultiplayerService {
           .maybeSingle();
       return data;
     } catch (e) {
-      print('Error getting match data: $e');
+      debugPrint('Error getting match data: $e');
       return null;
     }
   }
@@ -464,7 +464,7 @@ class MultiplayerService {
         };
       }
     } catch (e) {
-      print('Error finishing match: $e');
+      debugPrint('Error finishing match: $e');
     }
     return {};
   }
@@ -969,7 +969,7 @@ class MultiplayerService {
         // ProfileService.updateProfile calls _saveProfiles and usually triggers sync.
       }
     } catch (e) {
-      print('Error updating score: $e');
+      debugPrint('Error updating score: $e');
     }
   }
 

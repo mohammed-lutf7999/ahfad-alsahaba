@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/cms_icon_registry.dart';
 import '../../data/models/player_level_model.dart';
+import '../../data/models/store_item_model.dart';
+import '../../data/services/cms_cache_service.dart';
 
 /// Visual specification for each of the 10 Royal Avatar Frames (`frame_wood` .. `frame_diamond`).
 class RoyalFrameStyle {
@@ -141,10 +144,51 @@ class RoyalFrameStyle {
     ),
   };
 
-  /// Resolves a [RoyalFrameStyle] from [frameKey] or [level] (1..100).
+  /// Builds a procedural [RoyalFrameStyle] from a dynamic CMS Store frame item.
+  factory RoyalFrameStyle.fromStoreItem(StoreItemModel item) {
+    final meta = item.metadata;
+    final secondary =
+        CmsIconRegistry.tryParseColor(meta['secondaryColor']) ??
+            item.previewColor;
+    final primary =
+        CmsIconRegistry.tryParseColor(meta['primaryColor']) ??
+            Color.lerp(secondary, Colors.black, 0.45) ??
+            secondary;
+    final highlight =
+        CmsIconRegistry.tryParseColor(meta['highlightColor']) ??
+            Color.lerp(secondary, Colors.white, 0.65) ??
+            Colors.white;
+    final rawStroke = (meta['strokeRatio'] as num?)?.toDouble() ?? 0.095;
+    final tierFromLevel = ((item.minLevel / 10).ceil()).clamp(2, 10);
+
+    return RoyalFrameStyle(
+      frameKey: item.assetKey.isNotEmpty ? item.assetKey : item.id,
+      name: item.title,
+      tierIndex: (meta['tierIndex'] as num?)?.toInt() ?? tierFromLevel,
+      primaryColor: primary,
+      secondaryColor: secondary,
+      highlightColor: highlight,
+      hasOctagonalStar: meta['hasOctagonalStar'] as bool? ?? true,
+      hasCornerGems: meta['hasCornerGems'] as bool? ?? true,
+      hasCrownCrest: meta['hasCrownCrest'] as bool? ?? (item.minLevel >= 60),
+      strokeRatio: rawStroke.clamp(0.06, 0.14),
+    );
+  }
+
+  /// Resolves a [RoyalFrameStyle] from [frameKey] (built-in or dynamic CMS)
+  /// or [level] (1..100).
   static RoyalFrameStyle resolve({String? frameKey, int? level}) {
     if (frameKey != null && styles.containsKey(frameKey)) {
       return styles[frameKey]!;
+    }
+    if (frameKey != null && frameKey.isNotEmpty) {
+      final cloudFrame = CmsCacheService.instance.findStoreItemByAssetKey(
+        frameKey,
+        category: StoreItemCategory.frame,
+      );
+      if (cloudFrame != null) {
+        return RoyalFrameStyle.fromStoreItem(cloudFrame);
+      }
     }
     if (level != null) {
       final tier = PlayerLevelInfo.resolveTier(level);

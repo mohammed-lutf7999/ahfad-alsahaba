@@ -2,31 +2,36 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../models/cms_models.dart';
 import '../models/question_model.dart';
+import 'cms_cache_service.dart';
 
 Map<String, dynamic> _decodeQuestionJson(String jsonString) {
   return jsonDecode(jsonString) as Map<String, dynamic>;
 }
 
-/// Service for loading questions from JSON files
-/// Implements caching and background-isolate JSON decoding
+/// Service for loading questions from local JSON assets merged with dynamic
+/// solo Quiz additions/edits/visibility rules cached in [CmsCacheService].
+///
+/// Multiplayer & Ghost replays (`loadQuestionBySpec` / `getQuestionsForMultiplayer`)
+/// continue reading immutable base assets cleanly so matches never desync across versions.
 class QuestionService {
-  // Singleton pattern
   static final QuestionService _instance = QuestionService._internal();
   factory QuestionService() => _instance;
-  QuestionService._internal();
+  QuestionService._internal() {
+    CmsCacheService.instance.registerOnBundleApplied(() => clearCache());
+  }
 
-  // Cache for loaded category data
-  final Map<String, dynamic> _cache = {};
+  /// Raw decoded asset data per built-in category (immutable once loaded).
+  final Map<String, Map<String, dynamic>?> _baseAssetCache = {};
 
-  // Coalesces concurrent loads/preloads for the same category
+  /// Coalesces concurrent asset loads per category.
   final Map<String, Future<void>> _inFlightLoads = {};
 
-  // Random generator for shuffling
   final Random _random = Random();
 
-  Future<void> _ensureCategoryLoaded(String categoryId) async {
-    if (_cache.containsKey(categoryId)) return;
+  Future<void> _ensureBaseCategoryLoaded(String categoryId) async {
+    if (_baseAssetCache.containsKey(categoryId)) return;
 
     final existingFuture = _inFlightLoads[categoryId];
     if (existingFuture != null) {
@@ -35,10 +40,17 @@ class QuestionService {
     }
 
     final loadFuture = () async {
-      final jsonString = await rootBundle.loadString(
-        'assets/questions/$categoryId.json',
-      );
-      _cache[categoryId] = await compute(_decodeQuestionJson, jsonString);
+      try {
+        final jsonString = await rootBundle.loadString(
+          'assets/questions/$categoryId.json',
+        );
+        _baseAssetCache[categoryId] =
+            await compute(_decodeQuestionJson, jsonString);
+      } catch (_) {
+        // Cloud-only categories have no bundled asset file; record null cleanly
+        // so level lookups proceed smoothly from CmsCacheService.
+        _baseAssetCache[categoryId] = null;
+      }
     }();
 
     _inFlightLoads[categoryId] = loadFuture;
@@ -49,8 +61,6 @@ class QuestionService {
     }
   }
 
-  /// Returns [question] with its options deterministically or randomly shuffled
-  /// when [optionRandom] is supplied.
   Question _withOptionRandom(Question question, Random? optionRandom) {
     final originalOptions = question.options;
     final originalCorrectIndex = question.correctAnswerIndex;
@@ -66,10 +76,13 @@ class QuestionService {
           originalOptions.isEmpty ? 0 : originalOptions.length - 1,
         ),
         explanation: question.explanation,
+        syncScope: question.syncScope,
+        isVisible: question.isVisible,
       );
     }
 
-    final safeCorrect = originalCorrectIndex.clamp(0, originalOptions.length - 1);
+    final safeCorrect =
+        originalCorrectIndex.clamp(0, originalOptions.length - 1);
     final correctAnswer = originalOptions[safeCorrect];
     final indices = List<int>.generate(originalOptions.length, (i) => i);
     indices.shuffle(optionRandom);
@@ -85,11 +98,11 @@ class QuestionService {
       options: shuffledOptions,
       correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
       explanation: question.explanation,
+      syncScope: question.syncScope,
+      isVisible: question.isVisible,
     );
   }
 
-  /// Maps a raw JSON question entry into a [Question], optionally shuffling
-  /// options with [optionRandom] (pass a seeded [Random] for synchronized PvP/Ghost).
   Question _mapQuestionEntry(
     Map<String, dynamic> q, {
     required String categoryId,
@@ -99,20 +112,40 @@ class QuestionService {
     final originalOptions = List<String>.from(q['options'] ?? []);
     final originalCorrectIndex = (q['correct'] as num?)?.toInt() ?? 0;
     final baseQuestion = Question(
-      id: q['id'] ?? '',
+      id: (q['id'] ?? '').toString(),
       categoryId: categoryId,
       levelNumber: levelNumber,
-      questionText: q['question'] ?? '',
+      questionText: (q['question'] ?? '').toString(),
       options: originalOptions,
       correctAnswerIndex: originalCorrectIndex,
-      explanation: q['explanation'],
+      explanation: q['explanation']?.toString(),
+      syncScope: 'all_with_fallback',
+      isVisible: true,
     );
     return _withOptionRandom(baseQuestion, optionRandom);
   }
 
+  Question _mapDynamicQuestion(
+    DynamicQuizQuestionData q, {
+    Random? optionRandom,
+  }) {
+    final base = Question(
+      id: q.id,
+      categoryId: q.categoryId,
+      levelNumber: q.levelNumber,
+      questionText: q.questionText,
+      options: List<String>.from(q.options),
+      correctAnswerIndex: q.correctIndex,
+      explanation: q.explanation,
+      syncScope: q.syncScope,
+      isVisible: q.isVisible,
+    );
+    return _withOptionRandom(base, optionRandom);
+  }
+
   /// Loads a single deterministic question by `category:level:index` specification
-  /// WITHOUT shuffling the level list, guaranteeing Device A, Device B, and Ghost Replays
-  /// receive the exact same question and option ordering.
+  /// WITHOUT shifting base list ordering, guaranteeing Device A, Device B, and
+  /// Ghost Replays receive the exact same question and option ordering.
   Future<Question?> loadQuestionBySpec({
     required String categoryId,
     required int levelNumber,
@@ -120,15 +153,10 @@ class QuestionService {
     int? seed,
     int slotOffset = 0,
   }) async {
-    try {
-      await _ensureCategoryLoaded(categoryId);
-    } catch (e) {
-      debugPrint('QuestionService: Failed loading $categoryId spec: $e');
-      return null;
-    }
-
-    final data = _cache[categoryId];
+    await _ensureBaseCategoryLoaded(categoryId);
+    final data = _baseAssetCache[categoryId];
     if (data == null) return null;
+
     final levels = data['levels'] as Map<String, dynamic>?;
     final levelList = levels?[levelNumber.toString()] as List?;
     if (levelList == null || levelList.isEmpty) return null;
@@ -147,80 +175,140 @@ class QuestionService {
     );
   }
 
-  /// Load questions for a specific level from a category
-  /// Returns a list of Question objects
+  /// Builds visible solo questions for `(categoryId, levelNumber)` merging
+  /// local asset JSON with dynamic overrides & additions from [CmsCacheService].
   Future<List<Question>> loadQuestions({
     required String categoryId,
     required int levelNumber,
   }) async {
-    try {
-      await _ensureCategoryLoaded(categoryId);
-    } catch (e) {
-      throw Exception('Failed to load questions for $categoryId: $e');
-    }
+    await _ensureBaseCategoryLoaded(categoryId);
 
-    // Extract questions for the specified level
-    final data = _cache[categoryId];
-    final levels = data['levels'] as Map<String, dynamic>;
+    final baseData = _baseAssetCache[categoryId];
+    final levels = baseData?['levels'] as Map<String, dynamic>?;
     final levelKey = levelNumber.toString();
+    final rawBaseList = levels?[levelKey] as List?;
 
-    if (!levels.containsKey(levelKey)) {
-      throw Exception('Level $levelNumber not found in $categoryId');
-    }
+    // Track cloud overrides/additions for this category
+    final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
+        .where((q) => q.categoryId == categoryId)
+        .toList();
+    final cloudById = <String, DynamicQuizQuestionData>{
+      for (final q in cloudQuestions) q.id: q,
+    };
 
-    final levelQuestions = levels[levelKey] as List;
+    final List<({int sortOrder, Question question})> merged = [];
+    final seenIds = <String>{};
 
-    // Convert to Question objects with shuffled options
-    final questions = levelQuestions
-        .map(
-          (q) => _mapQuestionEntry(
-            q as Map<String, dynamic>,
+    if (rawBaseList != null) {
+      for (var i = 0; i < rawBaseList.length; i++) {
+        final rawMap = Map<String, dynamic>.from(rawBaseList[i] as Map);
+        final rawId = (rawMap['id'] ?? '').toString();
+        final override = rawId.isNotEmpty ? cloudById[rawId] : null;
+        if (override != null) {
+          seenIds.add(rawId);
+          if (override.isVisible && override.levelNumber == levelNumber) {
+            merged.add((
+              sortOrder: override.sortOrder,
+              question: _mapDynamicQuestion(override, optionRandom: _random),
+            ));
+          }
+          continue;
+        }
+        if (rawId.isNotEmpty) seenIds.add(rawId);
+        merged.add((
+          sortOrder: 100 + i,
+          question: _mapQuestionEntry(
+            rawMap,
             categoryId: categoryId,
             levelNumber: levelNumber,
             optionRandom: _random,
           ),
-        )
-        .toList();
+        ));
+      }
+    }
 
-    // Shuffle the questions to randomize their order
+    // Add newly created cloud questions for this category & level
+    for (final q in cloudQuestions) {
+      if (seenIds.contains(q.id)) continue;
+      if (q.levelNumber == levelNumber && q.isVisible && q.options.length == 4) {
+        merged.add((
+          sortOrder: q.sortOrder,
+          question: _mapDynamicQuestion(q, optionRandom: _random),
+        ));
+      }
+    }
+
+    if (merged.isEmpty) {
+      throw Exception('Level $levelNumber not found in $categoryId');
+    }
+
+    merged.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final questions = merged.map((e) => e.question).toList();
     questions.shuffle(_random);
-
     return questions;
   }
 
-  /// Load all questions from all levels for a specific category
+  /// Load all visible solo questions from all levels for [categoryId].
   Future<List<Question>> loadAllQuestionsForCategory(
     String categoryId, {
     bool shuffleQuestions = true,
     bool shuffleOptions = true,
     Random? optionRandom,
+    bool includeCloudSoloQuestions = true,
   }) async {
-    try {
-      await _ensureCategoryLoaded(categoryId);
-    } catch (e) {
-      debugPrint('❌ Failed to load questions for $categoryId: $e');
-      return [];
-    }
+    await _ensureBaseCategoryLoaded(categoryId);
 
-    final data = _cache[categoryId];
-    final levels = data['levels'] as Map<String, dynamic>;
-    final allQuestions = <Question>[];
+    final baseData = _baseAssetCache[categoryId];
+    final levels = baseData?['levels'] as Map<String, dynamic>?;
     final effectiveOptionRng = shuffleOptions ? (optionRandom ?? _random) : null;
 
-    for (var levelKey in levels.keys) {
-      final levelNumber = int.tryParse(levelKey) ?? 1;
-      final levelQuestions = levels[levelKey] as List;
+    final cloudQuestions = includeCloudSoloQuestions
+        ? CmsCacheService.instance.snapshot.quizQuestions.values
+            .where((q) => q.categoryId == categoryId)
+            .toList()
+        : const <DynamicQuizQuestionData>[];
+    final cloudById = {for (final q in cloudQuestions) q.id: q};
 
-      allQuestions.addAll(
-        levelQuestions.map(
-          (q) => _mapQuestionEntry(
-            q as Map<String, dynamic>,
-            categoryId: categoryId,
-            levelNumber: levelNumber,
-            optionRandom: effectiveOptionRng,
-          ),
-        ),
-      );
+    final allQuestions = <Question>[];
+    final seenIds = <String>{};
+
+    if (levels != null) {
+      for (final levelKey in levels.keys) {
+        final levelNumber = int.tryParse(levelKey) ?? 1;
+        final levelQuestions = levels[levelKey] as List;
+        for (final raw in levelQuestions) {
+          final rawMap = Map<String, dynamic>.from(raw as Map);
+          final rawId = (rawMap['id'] ?? '').toString();
+          final override = rawId.isNotEmpty ? cloudById[rawId] : null;
+          if (override != null) {
+            seenIds.add(rawId);
+            if (override.isVisible) {
+              allQuestions.add(
+                _mapDynamicQuestion(override, optionRandom: effectiveOptionRng),
+              );
+            }
+            continue;
+          }
+          if (rawId.isNotEmpty) seenIds.add(rawId);
+          allQuestions.add(
+            _mapQuestionEntry(
+              rawMap,
+              categoryId: categoryId,
+              levelNumber: levelNumber,
+              optionRandom: effectiveOptionRng,
+            ),
+          );
+        }
+      }
+    }
+
+    for (final q in cloudQuestions) {
+      if (seenIds.contains(q.id)) continue;
+      if (q.isVisible && q.options.length == 4) {
+        allQuestions.add(
+          _mapDynamicQuestion(q, optionRandom: effectiveOptionRng),
+        );
+      }
     }
 
     if (shuffleQuestions) {
@@ -229,86 +317,71 @@ class QuestionService {
     return allQuestions;
   }
 
-  /// Get the total number of questions for a category
+  /// Get the total number of visible solo questions for [categoryId].
   Future<int> getTotalQuestionsForCategory(String categoryId) async {
-    try {
-      await _ensureCategoryLoaded(categoryId);
-    } catch (e) {
-      return 0;
-    }
-
-    final data = _cache[categoryId];
-    final levels = data['levels'] as Map<String, dynamic>;
-    int total = 0;
-
-    for (var level in levels.values) {
-      total += (level as List).length;
-    }
-
-    return total;
+    final questions = await loadAllQuestionsForCategory(
+      categoryId,
+      shuffleQuestions: false,
+      shuffleOptions: false,
+    );
+    return questions.length;
   }
 
-  /// Check if a specific level exists
+  /// Check if a specific level has visible questions in [categoryId].
   Future<bool> levelExists(String categoryId, int levelNumber) async {
-    // ... (rest is same, ensuring consistency)
-    if (!_cache.containsKey(categoryId)) {
-        await preloadCategory(categoryId);
-    }
-    final data = _cache[categoryId];
-    if (data == null) return false;
-    final levels = data['levels'] as Map<String, dynamic>;
-    return levels.containsKey(levelNumber.toString());
+    await _ensureBaseCategoryLoaded(categoryId);
+    final hasCloudForLevel = CmsCacheService.instance.snapshot.quizQuestions.values
+        .any((q) =>
+            q.categoryId == categoryId &&
+            q.levelNumber == levelNumber &&
+            q.isVisible &&
+            q.options.length == 4);
+    if (hasCloudForLevel) return true;
+
+    final baseData = _baseAssetCache[categoryId];
+    final levels = baseData?['levels'] as Map<String, dynamic>?;
+    final list = levels?[levelNumber.toString()] as List?;
+    return list != null && list.isNotEmpty;
   }
 
-  /// Clear cache for a specific category or all categories
+  /// Clears cached JSON asset data (only needed explicitly in memory cleanup/tests).
   void clearCache([String? categoryId]) {
     if (categoryId != null) {
-      _cache.remove(categoryId);
+      _baseAssetCache.remove(categoryId);
     } else {
-      _cache.clear();
+      _baseAssetCache.clear();
     }
   }
 
-  /// Check if a category is cached
-  bool isCached(String categoryId) {
-    return _cache.containsKey(categoryId);
-  }
+  bool isCached(String categoryId) => _baseAssetCache.containsKey(categoryId);
 
-  /// Preloads a category into cache in background isolate if not already loaded
   Future<void> preloadCategory(String categoryId) async {
-    try {
-      await _ensureCategoryLoaded(categoryId);
-    } catch (e) {
-      debugPrint('Error preloading category $categoryId: $e');
-    }
+    await _ensureBaseCategoryLoaded(categoryId);
   }
 
-  /// Get 5 deterministic questions for multiplayer based on a seed
+  /// Get 5 deterministic questions for multiplayer based on a seed.
+  /// Strictly uses built-in base categories (`includeCloudSoloQuestions: false`)
+  /// so devices on different CMS revisions never desync on question indices.
   Future<List<Question>> getQuestionsForMultiplayer(int seed) async {
     const categories = ['quran', 'hadith', 'fiqh', 'seerah', 'history', 'aqeedah'];
     final allQuestions = <Question>[];
 
-    // Load all questions with unshuffled options first so option order
-    // remains strictly deterministic per [seed] across clients.
     for (final cat in categories) {
       final questions = await loadAllQuestionsForCategory(
         cat,
         shuffleQuestions: false,
         shuffleOptions: false,
+        includeCloudSoloQuestions: false,
       );
       allQuestions.addAll(questions);
     }
 
     if (allQuestions.isEmpty) return [];
 
-    // 1. Sort by ID to ensure consistent initial order across devices
     allQuestions.sort((a, b) => a.id.compareTo(b.id));
-
-    // 2. Shuffle using the provided seed
     final r = Random(seed);
     allQuestions.shuffle(r);
 
-    // 3. Take top 5 and shuffle each slot's options deterministically
     final selected = allQuestions.take(5).toList();
     return List<Question>.generate(
       selected.length,

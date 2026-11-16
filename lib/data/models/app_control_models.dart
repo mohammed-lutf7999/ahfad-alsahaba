@@ -78,6 +78,7 @@ class AppReleaseConfig {
   final String maintenanceMessage;
   final AppFeatureFlags featureFlags;
   final int configVersion;
+  final int cmsVersion;
   final DateTime? updatedAt;
 
   const AppReleaseConfig({
@@ -95,6 +96,7 @@ class AppReleaseConfig {
         'نعمل الآن على ترقية الخوادم وإضافة أسئلة جديدة. نعود قريباً بإذن الله.',
     this.featureFlags = const AppFeatureFlags(),
     this.configVersion = 1,
+    this.cmsVersion = 1,
     this.updatedAt,
   });
 
@@ -129,6 +131,7 @@ class AppReleaseConfig {
           ? AppFeatureFlags.fromJson(Map<String, dynamic>.from(flagsRaw))
           : const AppFeatureFlags(),
       configVersion: (json['config_version'] as num?)?.toInt() ?? 1,
+      cmsVersion: (json['cms_version'] as num?)?.toInt() ?? 1,
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'].toString())
           : null,
@@ -148,6 +151,7 @@ class AppReleaseConfig {
         'maintenance_message': maintenanceMessage,
         'feature_flags': featureFlags.toJson(),
         'config_version': configVersion,
+        'cms_version': cmsVersion,
         'updated_at': updatedAt?.toIso8601String(),
       };
 }
@@ -415,6 +419,7 @@ class AppAnnouncement {
 /// Locally cached complete snapshot hydrated at 0ms on app startup.
 class AppControlSnapshot {
   final int configVersion;
+  final int cmsVersion;
   final bool isAdmin;
   final AppReleaseConfig releaseConfig;
   final AppDynamicEvent? activeEvent;
@@ -423,6 +428,7 @@ class AppControlSnapshot {
 
   const AppControlSnapshot({
     this.configVersion = 0,
+    this.cmsVersion = 1,
     this.isAdmin = false,
     this.releaseConfig = const AppReleaseConfig(),
     this.activeEvent,
@@ -436,12 +442,15 @@ class AppControlSnapshot {
     final releaseRaw = json['release_config'];
     final eventRaw = json['active_event'];
     final annRaw = json['announcements'];
+    final parsedRelease = releaseRaw is Map
+        ? AppReleaseConfig.fromJson(Map<String, dynamic>.from(releaseRaw))
+        : const AppReleaseConfig();
     return AppControlSnapshot(
       configVersion: (json['config_version'] as num?)?.toInt() ?? 0,
+      cmsVersion:
+          (json['cms_version'] as num?)?.toInt() ?? parsedRelease.cmsVersion,
       isAdmin: json['is_admin'] as bool? ?? false,
-      releaseConfig: releaseRaw is Map
-          ? AppReleaseConfig.fromJson(Map<String, dynamic>.from(releaseRaw))
-          : const AppReleaseConfig(),
+      releaseConfig: parsedRelease,
       activeEvent: eventRaw is Map
           ? AppDynamicEvent.fromJson(Map<String, dynamic>.from(eventRaw))
           : null,
@@ -459,6 +468,7 @@ class AppControlSnapshot {
 
   AppControlSnapshot copyWith({
     int? configVersion,
+    int? cmsVersion,
     bool? isAdmin,
     AppReleaseConfig? releaseConfig,
     AppDynamicEvent? activeEvent,
@@ -468,6 +478,7 @@ class AppControlSnapshot {
   }) {
     return AppControlSnapshot(
       configVersion: configVersion ?? this.configVersion,
+      cmsVersion: cmsVersion ?? this.cmsVersion,
       isAdmin: isAdmin ?? this.isAdmin,
       releaseConfig: releaseConfig ?? this.releaseConfig,
       activeEvent: clearActiveEvent ? null : (activeEvent ?? this.activeEvent),
@@ -478,6 +489,7 @@ class AppControlSnapshot {
 
   Map<String, dynamic> toJson() => {
         'config_version': configVersion,
+        'cms_version': cmsVersion,
         'is_admin': isAdmin,
         'release_config': releaseConfig.toJson(),
         'active_event': activeEvent?.toJson(),

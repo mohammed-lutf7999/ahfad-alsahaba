@@ -11,6 +11,7 @@ import '../../core/sound_service.dart';
 import '../../core/share_service.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/services/achievement_service.dart';
+import '../../data/services/cms_cache_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../data/services/progression_service.dart';
 import '../widgets/achievement_popup.dart';
@@ -577,7 +578,9 @@ Future<void> _captureAndShare() async {
 
   Widget _buildButtons(bool isSmall) {
     final currentLevelNumber = effectiveLevelNumber;
-    final hasNextLevel = currentLevelNumber < AppConstants.levelsPerCategory;
+    final totalLevelsForCat =
+        CmsCacheService.instance.getTotalLevelsForCategory(widget.categoryId);
+    final hasNextLevel = currentLevelNumber < totalLevelsForCat;
     final nextLevelNumber = currentLevelNumber + 1;
     final nextLevelId = '${widget.categoryId}_level_$nextLevelNumber';
     final currentCanonicalLevelId = '${widget.categoryId}_level_$currentLevelNumber';

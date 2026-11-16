@@ -217,6 +217,8 @@ class SharedPrefsService {
   static const String _keyOptionalUpdateLastPromptMs =
       'optional_update_last_prompt_ms';
   static const String _keyLastDirectorySyncMs = 'last_directory_sync_ms';
+  static const String _keyCachedCmsVersion = 'cached_cms_version';
+  static const String _keyCachedCmsBundleJson = 'cached_cms_bundle_json';
 
   static String? getDevicePlayerCode() {
     final code = _prefs?.getString(_keyDevicePlayerCode);
@@ -297,5 +299,23 @@ class SharedPrefsService {
   static Future<void> setLastDirectorySyncMs(int ms) async {
     final prefs = await _instance;
     await prefs.setInt(_keyLastDirectorySyncMs, ms);
+  }
+
+  static int getCachedCmsVersion() {
+    return _prefs?.getInt(_keyCachedCmsVersion) ?? 0;
+  }
+
+  static Future<void> setCachedCmsVersion(int version) async {
+    final prefs = await _instance;
+    await prefs.setInt(_keyCachedCmsVersion, version);
+  }
+
+  static String? getCachedCmsBundleJson() {
+    return _prefs?.getString(_keyCachedCmsBundleJson);
+  }
+
+  static Future<void> setCachedCmsBundleJson(String json) async {
+    final prefs = await _instance;
+    await prefs.setString(_keyCachedCmsBundleJson, json);
   }
 }

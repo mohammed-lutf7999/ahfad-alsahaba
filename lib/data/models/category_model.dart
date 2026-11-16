@@ -9,6 +9,8 @@ class Category {
   final int unlockedLevels;
   final bool isLocked;
   final Color color;
+  final int sortOrder;
+  final bool isVisible;
 
   Category({
     required this.id,
@@ -19,6 +21,8 @@ class Category {
     this.unlockedLevels = 1,
     this.isLocked = false,
     this.color = const Color(0xFF1B5E20),
+    this.sortOrder = 100,
+    this.isVisible = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -30,7 +34,9 @@ class Category {
       'totalLevels': totalLevels,
       'unlockedLevels': unlockedLevels,
       'isLocked': isLocked,
-      'colorValue': color.value,
+      'colorValue': color.toARGB32(),
+      'sortOrder': sortOrder,
+      'isVisible': isVisible,
     };
   }
 
@@ -44,6 +50,8 @@ class Category {
       unlockedLevels: json['unlockedLevels'] ?? 1,
       isLocked: json['isLocked'] ?? false,
       color: Color(json['colorValue'] ?? 0xFF1B5E20),
+      sortOrder: json['sortOrder'] ?? 100,
+      isVisible: json['isVisible'] ?? true,
     );
   }
 
@@ -56,6 +64,8 @@ class Category {
     int? unlockedLevels,
     bool? isLocked,
     Color? color,
+    int? sortOrder,
+    bool? isVisible,
   }) {
     return Category(
       id: id ?? this.id,
@@ -66,6 +76,8 @@ class Category {
       unlockedLevels: unlockedLevels ?? this.unlockedLevels,
       isLocked: isLocked ?? this.isLocked,
       color: color ?? this.color,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isVisible: isVisible ?? this.isVisible,
     );
   }
 

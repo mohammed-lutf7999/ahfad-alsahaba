@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import '../../core/cms_icon_registry.dart';
 import 'achievement_model.dart';
 import 'arena_model.dart';
 import 'player_level_model.dart';
@@ -222,17 +223,19 @@ class PlayerProfile {
         .toList();
   }
 
-  /// Get category progress (unlocked levels, capped at 10)
+  /// Get category progress (unlocked levels, bounded cleanly by category's totalLevels)
   int getCategoryUnlockedLevels(String categoryId) {
+    final maxLevels = CmsCategoryBounds.maxLevelsFor(categoryId);
     final raw = categoryProgress[categoryId] ?? 1;
-    return raw.clamp(1, 10);
+    return raw.clamp(1, maxLevels);
   }
 
-  /// Set category progress (clamped between 1 and 10)
+  /// Set category progress (clamped between 1 and dynamic category totalLevels)
   void setCategoryUnlockedLevels(String categoryId, int levels) {
+    final maxLevels = CmsCategoryBounds.maxLevelsFor(categoryId);
     final current = categoryProgress[categoryId] ?? 1;
-    final clamped = levels.clamp(1, 10);
-    if (clamped >= current || categoryProgress[categoryId] == null || current > 10) {
+    final clamped = levels.clamp(1, maxLevels);
+    if (clamped >= current || categoryProgress[categoryId] == null || current > maxLevels) {
       categoryProgress[categoryId] = clamped;
     }
     lastPlayedAt = DateTime.now();
