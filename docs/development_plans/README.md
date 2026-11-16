@@ -1,6 +1,6 @@
 # 🗺️ الدليل الشامل وخرائط الطريق التطويرية — مشروع «معركة أحفاد الصحابة»
 > **المسار الأساسي:** `docs/development_plans/`  
-> **تاريخ التحديث:** 7 نوفمبر 2026  
+> **تاريخ التحديث:** 17 نوفمبر 2026  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
 > **معيار الجودة والهندسة:** معايير التطوير العالمية لبيئات الإنتاج (Clean Architecture + Zero-Lag Realtime + RLS Enterprise Security).
 
@@ -10,10 +10,9 @@
 
 تحويل **«معركة أحفاد الصحابة»** من مجرد تطبيق مسابقات تقليدي إلى **منصة ألعاب إسلامية ملحمية حية ومجتمع تنافسي عالمي** يجمع بين:
 1. **منظومة المستويات الـ 100 والميادين التنافسية الستة وسوق الفرسان.**
-2. **العمق المعرفي والذكاء التكيفي** (التعلم النشط عبر التكرار المتباعد وتحليل الضعف).
-3. **التنافس الجماعي الحي والاتصال المجتمعي** (التشات اللحظي، الكتائب، والبطولات التفاعلية).
-4. **الهوية البصرية والحسية الخالصة** (مؤثرات صوتية بشرية وهندسة لمسية تفاعلية وثيمات ملكية أربعة).
-5. **الاستدامة والانتشار الفيروسي الأخلاقي** (المواسم الشهرية، بطاقات التحدي المصورة، وودجت المخطوطة).
+2. **التحديات المتقدمة** (إعادة النزال الفوري، الغرف الخاصة بـ PIN، المطابقة بالكؤوس، ومحرك أشباح الصحابة).
+3. **القيادة السحابية الموفّرة (`App Control & Hybrid Admin`)** عبر بوابات الصيانة والتحديث، الأحداث الديناميكية، الرسائل الموجّهة، ولوحة الويب `admin_web/`.
+4. **بوابة المحتوى والمتجر الديناميكي القادم (`1.0.19+20`)** لتحديث الأسئلة والمكتبة والألقاب والثيمات وإخفاء/إظهار العناصر عن بُعد دون استنزاف Supabase.
 
 ---
 
@@ -23,22 +22,24 @@
 
 | # | اسم الخطة | الملف التوثيقي | الحالة الحالية | الأولوية |
 | :-: | :--- | :--- | :-: | :-: |
-| **👑 08** | **الميثاق المعماري الشامل (100 مستوى + 6 ميادين + سوق الفرسان + 4 ثيمات)** | [`08_ULTIMATE_MASTER_ARCHITECTURE.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/08_ULTIMATE_MASTER_ARCHITECTURE.md) | **M1 مكتمل 100%** (جاري M2..M6) | 🔥 سيادية |
-| **📂** | **مجلد المراحل التفصيلية للمنظومة (M1 إلى M6)** | [`master_levels_system/README.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/master_levels_system/README.md) | **M1 مكتمل 100%** | 🔥 سيادية |
-| **01** | **الذكاء الاصطناعي التكيفي والبوتات التكتيكية** | [`01_AI_ADAPTIVE_MASTERY_AND_BOTS.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/01_AI_ADAPTIVE_MASTERY_AND_BOTS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
-| **02** | **الهندسة الصوتية البشرية والنبض اللمسي** | [`02_VOCAL_ACOUSTICS_AND_HAPTICS.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/02_VOCAL_ACOUSTICS_AND_HAPTICS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
-| **03** | **شبكة التشات اللحظي للمتصلين (ديوان الأحفاد)** | [`03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md) | مخطط تفصيلي جاهز | 🟠 عالية |
-| **04** | **نظام الرتب والتصنيف ELO والمواسم الشهرية** | [`04_ELO_RANKING_AND_SEASONS.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/04_ELO_RANKING_AND_SEASONS.md) | مدمج وموسع في الخطة 08 | 🟠 عالية |
-| **05** | **بطاقات المشاركة الفيروسية وودجت اليوم** | [`05_VIRAL_CARDS_AND_WIDGETS.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/05_VIRAL_CARDS_AND_WIDGETS.md) | مخطط تفصيلي جاهز | 🟡 متوسطة |
-| **06** | **خريطة الفتوحات التفاعلية (طور القصة الملحمي)** | [`06_CONQUEST_MAP_AND_STORY_MODE.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/06_CONQUEST_MAP_AND_STORY_MODE.md) | مخطط تفصيلي جاهز | 🟡 متوسطة |
-| **07** | **الكتائب والرايات وغرف البطولات الحية (Kahoot الإسلامي)** | [`07_LIVE_TOURNAMENTS_AND_CLANS.md`](file:///d:/newcuzeapp/flutter_application_1/docs/development_plans/07_LIVE_TOURNAMENTS_AND_CLANS.md) | مخطط تفصيلي جاهز | 🟢 استراتيجية |
+| **👑 08** | **الميثاق المعماري الشامل (100 مستوى + 6 ميادين + سوق الفرسان + 4 ثيمات)** | [`08_ULTIMATE_MASTER_ARCHITECTURE.md`](./08_ULTIMATE_MASTER_ARCHITECTURE.md) | **✅ مكتمل 100% ومطبّق حياً (`009` + M1..M6)** | 🔥 سيادية |
+| **📂** | **مجلد المراحل التفصيلية لمنظومة المجد (M1 إلى M6)** | [`master_levels_system/README.md`](./master_levels_system/README.md) | **✅ مكتمل 100% (`1.0.8+9+`)** | 🔥 سيادية |
+| **⚔️** | **منظومة التحديات الكبرى (إعادة النزال + الغرف الخاصة + أشباح الصحابة `010–014`)** | [`multiplayer_matchmaking_system/README.md`](./multiplayer_matchmaking_system/README.md) | **✅ مكتمل 100% ومحصّن حياً (`1.0.18+19`)** | 🔥 سيادية |
+| **🎛️ 09** | **منظومة المحتوى الديناميكي، المتجر السحابي، الإظهار/الإخفاء، والتحصين الأمني (`1.0.19+20`)** | [`09_DYNAMIC_CMS_AND_ADMIN_SUITE.md`](./09_DYNAMIC_CMS_AND_ADMIN_SUITE.md) | **📝 خطة معتمدة للترقية القادمة (المرحلة 5–8)** | 🚀 المرحلة القادمة |
+| **01** | **الذكاء الاصطناعي التكيفي والبوتات التكتيكية** | [`01_AI_ADAPTIVE_MASTERY_AND_BOTS.md`](./01_AI_ADAPTIVE_MASTERY_AND_BOTS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
+| **02** | **الهندسة الصوتية البشرية والنبض اللمسي** | [`02_VOCAL_ACOUSTICS_AND_HAPTICS.md`](./02_VOCAL_ACOUSTICS_AND_HAPTICS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
+| **03** | **شبكة التشات اللحظي للمتصلين (ديوان الأحفاد)** | [`03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md`](./03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md) | مخطط تفصيلي جاهز | 🟠 عالية |
+| **04** | **نظام الرتب والتصنيف ELO والمواسم الشهرية** | [`04_ELO_RANKING_AND_SEASONS.md`](./04_ELO_RANKING_AND_SEASONS.md) | مدمج وموسع في الخطة 08 | 🟠 عالية |
+| **05** | **بطاقات المشاركة الفيروسية وودجت اليوم** | [`05_VIRAL_CARDS_AND_WIDGETS.md`](./05_VIRAL_CARDS_AND_WIDGETS.md) | مخطط تفصيلي جاهز | 🟡 متوسطة |
+| **06** | **خريطة الفتوحات التفاعلية (طور القصة الملحمي)** | [`06_CONQUEST_MAP_AND_STORY_MODE.md`](./06_CONQUEST_MAP_AND_STORY_MODE.md) | مخطط تفصيلي جاهز | 🟡 متوسطة |
+| **07** | **الكتائب والرايات وغرف البطولات الحية (Kahoot الإسلامي)** | [`07_LIVE_TOURNAMENTS_AND_CLANS.md`](./07_LIVE_TOURNAMENTS_AND_CLANS.md) | مخطط تفصيلي جاهز | 🟢 استراتيجية |
 
 ---
 
 ## 🛡️ بوابات الجودة الصارمة (Quality Gates)
 
 قبل دمج أي سطر برمجي من هذه الخطط إلى الفرع الرئيسي (`main`):
-1. **دستور الوكيل (`AGENT.md`):** عدم استخدام أي كود صوري أو مؤقتات غير مربوطة.
-2. **فحص المترجم:** اجتياز `flutter analyze` بنتيجة `No issues found!`.
-3. **أمان البيانات السحابية:** كتابة سياسات RLS صارمة على Supabase لأي جدول جديد لمنع أي اختراق أو استهلاك غير عادل.
-4. **الحفاظ على خفة الحجم:** لا تتجاوز حزمة المتجر الإجمالية `55 MB` بضغط الصوتيات والرسومات المتجهة.
+1. **دستور الوكيل (`AGENTS.md` / `AGENT.md`):** عدم استخدام أي كود صوري أو مؤقتات غير مربوطة، والتطبيق الحي على Supabase.
+2. **فحص المترجم والاختبارات:** اجتياز `flutter analyze --no-fatal-infos lib test` و`flutter test --timeout 30s` بنسبة 100%.
+3. **أمان البيانات السحابية:** كتابة سياسات `RLS` صارمة و`auth.uid()` و`#variable_conflict use_column` على Supabase لمنع أي اختراق أو استهلاك غير عادل.
+4. **الحفاظ على خفة الحجم وتوفير الباقة:** ضغط الصوتيات والشعار للحفاظ على خفة تنزيل المتجر، واعتماد نمط `Delta Cache` لحماية باقة Supabase المجانية.

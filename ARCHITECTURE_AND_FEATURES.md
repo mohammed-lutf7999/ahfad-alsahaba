@@ -124,3 +124,25 @@ sequenceDiagram
 2. **عدم وجود تكاليف مالية (Zero API Costs)**: تشغيل الذكاء الاصطناعي السحابي لكل جولة أسئلة سيكلف مئات الدولارات شهرياً.
 3. **الالتزام الصارم بالوقت**: يلتزم بمهلة الـ 15 ثانية بدقة متناهية عكس استجابات نماذج الذكاء الاصطناعي التوليدية التي قد تتأخر بحسب ضغط السيرفر.
 
+---
+
+## 4. التطويرات المعمارية الكبرى المنجزة حتى الإصدار `1.0.18+19`
+
+### 1. منظومة المجد الـ 100 مستوى، الميادين الـ 6، وسوق الفرسان (`009_glory_and_store.sql`)
+* **`glory_road_screen.dart` و`progression_service.dart`**: سلم تصاعدي لـ 100 مستوى بمعادلة خبرة `FLOOR(100 * L^1.6 + 150 * L)` و10 ألقاب تاريخية، ومكافآت دنانير تلقائية (`L * 50`)، مع 6 ميادين تنافسية بدرع حماية `800` كأس.
+* **`knights_store_screen.dart` و`store_service.dart` و`app_custom_theme.dart`**: 4 ثيمات ملكية بانتقال `300ms lerp`، و10 أطر إجرائية (`AnimatedAvatarFrame` عبر `CustomPainter` و`ShaderMask`)، وأوسمة شرفية، وقدرات تكتيكية (`powerup_shield`, `powerup_insight`, `powerup_xp_banner`).
+
+### 2. تطوّر نظام التحديات الجماعية ومحرّك أشباح الصحابة (`010` – `014`)
+* **إعادة النزال الفوري (`010_instant_rematch_system.sql`)**: ربط النزالات بـ `parent_match_id` بحد 3 مواجهات كؤوس متتالية ثم تحولها لودية، وانتقال لحظي (`pushReplacement`).
+* **الغرف الخاصة والمطابقة الذكية (`011` – `012`)**: إنشاء/الانضمام برمز `PIN` ومشاركة واتساب، ومطابقة بالكؤوس، مع أذونات بلوتوث/موقع متكيفة مع Android 7–16 (`NearbyService.requestPermissionsDetailed`).
+* **محرك أشباح الصحابة (`013` – `014` و`ghost_playback_service.dart`)**: تسجيل الجولات البشرية الحقيقية الخماسية الأسئلة (`ms >= 600`) وإعادة محاكاتها بانتروبيا بشرية ونفس الأسئلة والبذرة من بنك الـ 600 سؤال (`generate_match_question_ids`)، مع عزل تام للشبح عن خطف المطابقة الحية وحارس `auth.uid()` ومهلة 15 ثانية للتحول التلقائي من البحث الحي إلى الشبح.
+
+### 3. الإقلاع الفوري، Android 15/16 Edge-to-Edge، ومنظومة القيادة السحابية (`015` + `admin_web/`)
+* **أداء الإقلاع (`startup_bootstrap.dart` & `profileinstaller`):** إقلاع محلي فوري (`0ms`) بانتقال غير حاجب مع تهيئة المناطق الزمنية والإشعارات والسحابة بعد الإطار الأول وملفات `baseline-prof.txt`.
+* **التوافق الحافي `Target SDK 36` (`MainActivity.kt` & `values-v30/v31/night-v31`):** تفعيل `WindowCompat.setDecorFitsSystemWindows(window, false)`، احترام `displayCutoutMode=always`، وفحص الشاشات الضيقة (`360dp`).
+* **بوابات التحكم السحابي (`app_control_service.dart`, `app_control_dialogs.dart`, `home_dynamic_event_banner.dart`):** صيانة طارئة مع تجاوز للمشرفين، تحديث إلزامي/اختياري عبر `in_app_update` + `package_info_plus`، رسائل موجّهة (`normal`, `mandatory`, `admin`, `motivational`) لكل اللاعبين أو لكود الضيف `SAH-XXXX` أو البريد مع تصفية `expiresAt` وحدود الإصدار، وبانر/شاشة الأحداث الديناميكية، و6 `FeatureFlags`.
+* **لوحة الإدارة الهجينة:** 4 شاشات مخفية داخل التطبيق (`admin_dashboard_screen.dart` والشاشات الفرعية في `lib/ui/screens/admin/`) + لوحة ويب عربية مستقلة في [`admin_web/`](./admin_web/README.md) (`index.html`, `styles.css`, `app.js`, `serve.py`) بدون `service_role`.
+
+> لمتابعة الحالة التفصيلية وآخر الأرقام والحزم المبنية، راجع [`PROJECT_STATUS.md`](./PROJECT_STATUS.md)، وللاطلاع على خارطة الترقية القادمة للمحتوى والمتجر الديناميكي (`1.0.19+20`) راجع [`docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md`](./docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md).
+
+

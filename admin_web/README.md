@@ -40,7 +40,7 @@ npx serve admin_web -l 8080
 
 ## 3️⃣ النشر المجاني على استضافة HTTPS
 
-لأن اللوحة ملفات ساكنة (`index.html`, `styles.css`, `app.js`) بدون خطوة بناء:
+لأن اللوحة ملفات ساكنة (`index.html`, `styles.css`, `app.js`, ومعها `serve.py` للتشغيل المحلي على Windows) بدون خطوة بناء:
 
 ### Cloudflare Pages
 1. أنشئ مشروعاً جديداً ووصّله بالمستودع (أو ارفع مجلد `admin_web/` مباشرةً via Direct Upload).
