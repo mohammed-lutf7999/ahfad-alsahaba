@@ -465,6 +465,7 @@ BEGIN
                 'is_dismissible', comb.is_dismissible,
                 'min_version_code', comb.min_version_code,
                 'max_version_code', comb.max_version_code,
+                'expires_at', comb.expires_at,
                 'created_at', comb.created_at
             )
             ORDER BY comb.scope_rank ASC, comb.mandatory_rank ASC, comb.created_at DESC
@@ -486,6 +487,7 @@ BEGIN
             ann.is_dismissible,
             ann.min_version_code,
             ann.max_version_code,
+            ann.expires_at,
             ann.created_at,
             CASE WHEN ann.target_scope = 'single_user' THEN 0 ELSE 1 END AS scope_rank,
             CASE WHEN ann.message_type = 'mandatory' THEN 0 ELSE 1 END AS mandatory_rank
@@ -534,8 +536,8 @@ BEGIN
         'release_config', jsonb_build_object(
             'platform', COALESCE(v_config.platform, 'android'),
             'min_version_code', COALESCE(v_config.min_version_code, 1),
-            'latest_version_code', COALESCE(v_config.latest_version_code, 18),
-            'latest_version_name', COALESCE(v_config.latest_version_name, '1.0.17'),
+            'latest_version_code', COALESCE(v_config.latest_version_code, 19),
+            'latest_version_name', COALESCE(v_config.latest_version_name, '1.0.18'),
             'update_title', COALESCE(v_config.update_title, 'تحديث جديد متاح'),
             'update_message', COALESCE(v_config.update_message, ''),
             'update_url', COALESCE(v_config.update_url, 'https://play.google.com/store/apps/details?id=com.ahfad.alsahaba.battle'),
