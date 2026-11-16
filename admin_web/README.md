@@ -6,13 +6,12 @@
 
 ## 1️⃣ التشغيل المحلي على جهازك للتجربة
 
-> **تنبيه مهم:** لا تفتح `index.html` مباشرةً بصيغة `file://` لأن وحدات JavaScript (`ES Modules`) وتحويلات OAuth تتطلب خادم `http(s)://`.
+> **تنبيه مهم:** لا تفتح `index.html` مباشرةً بصيغة `file://` لأن تسجيل الدخول عبر Google (`OAuth`) وتحقق الروابط (`window.location.origin`) يتطلبان خادم `http(s)://`.
+> وعلى نظام **Windows** قد يرسل الأمر الافتراضي `python -m http.server` ملفات `.js` بنوع `text/plain` بسبب إعدادات سجل النظام، لذلك استخدم السكربت المرفق `serve.py` الذي يفرض ترويسات `application/javascript` و`text/css` تلقائياً:
 
-اختر أي أمر مما يلي من جذر المشروع:
-
-### الخيار أ (باستخدام Python):
+### الخيار أ (الموصى به على Windows — باستخدام `serve.py` المرفق):
 ```bash
-python -m http.server 8080 --directory admin_web
+python admin_web/serve.py
 ```
 
 ### الخيار ب (باستخدام Node / npx):

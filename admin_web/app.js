@@ -1,17 +1,21 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+(() => {
+  'use strict';
 
 // Public project URL and publishable anon key only (from lib/core/supabase_config.dart).
 // NEVER place any service_role key or management token in client/web code.
 const SUPABASE_URL = 'https://khatzzpqxaiwuoodgcst.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Zp9URQMtw71oyhZztDGsmg_hT9FfyIv';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+const supabaseLib = window.supabase;
+const supabase = supabaseLib?.createClient
+  ? supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
 
 const state = {
   user: null,
@@ -192,7 +196,18 @@ async function verifySessionAndLoad(session, eventName = '') {
   return state.verifyPromise;
 }
 
+const SUPABASE_UNAVAILABLE_MSG =
+  'تعذر تحميل مكتبة الاتصال السحابي (Supabase SDK). تأكد من اتصال الإنترنت ثم أعد تحميل الصفحة (Ctrl+F5).';
+
+function requireSupabase() {
+  if (supabase) return true;
+  setAuthWarning(SUPABASE_UNAVAILABLE_MSG);
+  showToast(SUPABASE_UNAVAILABLE_MSG, true);
+  return false;
+}
+
 async function loginWithGoogle() {
+  if (!requireSupabase()) return;
   const redirectTo = `${window.location.origin}${window.location.pathname}`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -203,6 +218,7 @@ async function loginWithGoogle() {
 
 async function loginWithMagicLink(e) {
   e.preventDefault();
+  if (!requireSupabase()) return;
   const emailInput = document.getElementById('admin-email-input');
   const email = emailInput.value.trim();
   if (!email) return;
@@ -227,6 +243,7 @@ async function loginWithMagicLink(e) {
 
 async function verifyOtpCode(e) {
   e.preventDefault();
+  if (!requireSupabase()) return;
   const email = document.getElementById('admin-email-input').value.trim();
   const token = document.getElementById('admin-otp-input').value.trim();
   if (!email || !token) return;
@@ -251,7 +268,9 @@ async function verifyOtpCode(e) {
 }
 
 async function logout() {
-  await supabase.auth.signOut();
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
   state.user = null;
   state.isAdmin = false;
   state.dashboardHydrated = false;
@@ -1023,12 +1042,26 @@ function checkUrlAuthError() {
 async function init() {
   bindUiListeners();
   checkUrlAuthError();
-  const { data } = await supabase.auth.getSession();
-  await verifySessionAndLoad(data.session, 'INITIAL_SESSION');
+  if (!supabase) {
+    setAuthWarning(SUPABASE_UNAVAILABLE_MSG);
+    return;
+  }
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    verifySessionAndLoad(session, event);
-  });
+  try {
+    const { data } = await supabase.auth.getSession();
+    await verifySessionAndLoad(data.session, 'INITIAL_SESSION');
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      verifySessionAndLoad(session, event);
+    });
+  } catch (err) {
+    setAuthWarning(`تعذر تهيئة الاتصال بـ Supabase: ${err?.message || err}`);
+  }
 }
 
-init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
