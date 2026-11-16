@@ -42,3 +42,12 @@
 -keepattributes Signature
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
+
+# Google Play In-App Update & Play Core
+-keep class de.ffuf.in_app_update.** { *; }
+-keep class com.google.android.play.core.appupdate.** { *; }
+-keep class com.google.android.play.core.install.** { *; }
+-dontwarn com.google.android.play.core.**
+
+# Package Info Plus
+-keep class dev.fluttercommunity.plus.packageinfo.** { *; }

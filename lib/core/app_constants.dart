@@ -65,6 +65,12 @@ class AppConstants {
   // App & Developer info
   static const String appName = 'معركة أحفاد الصحابة';
   static const String storeTitle = 'معركة أحفاد الصحابة: مسابقات';
-  static const String appVersion = '1.0.17';
+  static const String appVersion = '1.0.18';
+  static const int appBuildNumber = 19;
+  static const String playStorePackageId = 'com.ahfad.alsahaba.battle';
+  static const String playStoreWebUrl =
+      'https://play.google.com/store/apps/details?id=$playStorePackageId';
+  static const String playStoreMarketUri = 'market://details?id=$playStorePackageId';
+  static const int appControlSyncCooldownMinutes = 15;
   static const String developerName = 'م. محمد لطف';
 }
