@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../core/app_theme.dart';
+
+import '../../core/sound_service.dart';
+import '../../core/theme/app_custom_theme.dart';
+import '../../data/models/app_control_models.dart';
 import '../../data/services/admin_service.dart';
+import 'admin/admin_announcements_screen.dart';
+import 'admin/admin_events_screen.dart';
+import 'admin/admin_release_control_screen.dart';
+import 'admin/widgets/admin_ui_kit.dart';
 import 'admin_email_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -12,7 +19,8 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
-  Map<String, dynamic> _stats = {};
+  AdminOverview? _overview;
+  Map<String, dynamic> _fallbackStats = {};
   DateTime? _lastUpdated;
 
   @override
@@ -22,193 +30,253 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final overview = await AdminService().getOverview();
+      if (!mounted) return;
+      if (overview != null) {
+        setState(() {
+          _overview = overview;
+          _isLoading = false;
+          _lastUpdated = DateTime.now();
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('AdminDashboard getOverview notice: $e');
+    }
+
     final stats = await AdminService().getStats();
+    if (!mounted) return;
+    setState(() {
+      _fallbackStats = stats;
+      _isLoading = false;
+      _lastUpdated = DateTime.now();
+    });
+  }
+
+  Future<void> _openAndRefresh(Widget screen) async {
+    SoundService().playClick();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    );
     if (mounted) {
-      setState(() {
-        _stats = stats;
-        _isLoading = false;
-        _lastUpdated = DateTime.now();
-      });
+      await _loadStats();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header بسيط وأنيق
-              _buildHeader(),
+    final subtitle = _lastUpdated == null
+        ? 'غرفة القيادة السحابية'
+        : 'آخر تحديث: ${_formatTime(_lastUpdated!)}';
 
-              // المحتوى الرئيسي
-              Expanded(
-                child: _isLoading
-                    ? _buildLoadingState()
-                    : RefreshIndicator(
-                        onRefresh: _loadStats,
-                        color: AppTheme.accentColor,
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // بطاقات الإحصائيات
-                              _buildStatsSection(),
-                              
-                              const SizedBox(height: 32),
-                              
-                              // قسم الإجراءات
-                              _buildActionsSection(),
-                            ],
-                          ),
-                        ),
-                      ),
+    return AdminScaffoldShell(
+      title: 'لوحة تحكم المدير',
+      subtitle: subtitle,
+      isLoading: _isLoading,
+      onRefresh: _loadStats,
+      body: _isLoading
+          ? _buildLoadingState()
+          : RefreshIndicator(
+              onRefresh: _loadStats,
+              color: AppCustomTheme.of(context).sovereignAccent,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildLiveStatusStrip(),
+                    const SizedBox(height: 16),
+                    _buildStatsSection(),
+                    const SizedBox(height: 24),
+                    _buildActionsSection(),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        textDirection: TextDirection.rtl,
+  Widget _buildLoadingState() {
+    final accent = AppCustomTheme.of(context).sovereignAccent;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // زر الرجوع
-          _buildBackButton(),
-          const SizedBox(width: 16),
-          // العنوان
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  'لوحة التحكم',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (_lastUpdated != null)
-                  Text(
-                    'آخر تحديث: ${_formatTime(_lastUpdated!)}',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(120),
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
+          CircularProgressIndicator(color: accent),
+          const SizedBox(height: 14),
+          Text(
+            'جاري مزامنة غرفة القيادة...',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: Colors.white.withValues(alpha: 0.72),
             ),
           ),
-          // زر التحديث
-          _buildRefreshButton(),
         ],
       ),
     );
   }
 
-  Widget _buildBackButton() {
-    return GestureDetector(
-      onTap: () => Navigator.pop(context),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(15),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withAlpha(30)),
-        ),
-        child: const Icon(
-          Icons.arrow_forward_ios,
-          color: Colors.white,
-          size: 20,
-        ),
-      ),
-    );
-  }
+  Widget _buildLiveStatusStrip() {
+    final customTheme = AppCustomTheme.of(context);
+    final cfg = _overview?.releaseConfig;
+    final inMaintenance = cfg?.maintenanceMode ?? false;
+    final statusColor =
+        inMaintenance ? Colors.redAccent : const Color(0xFF10B981);
 
-  Widget _buildRefreshButton() {
-    return GestureDetector(
-      onTap: _isLoading ? null : _loadStats,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.accentColor.withAlpha(25),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.accentColor.withAlpha(60)),
-        ),
-        child: Icon(
-          Icons.refresh_rounded,
-          color: AppTheme.accentColor,
-          size: 22,
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: customTheme.surfaceCard.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withValues(alpha: 0.5)),
       ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          const CircularProgressIndicator(color: AppTheme.accentColor),
-          const SizedBox(height: 16),
-          Text(
-            'جاري التحميل...',
-            style: TextStyle(color: Colors.white.withAlpha(150)),
+          Icon(
+            inMaintenance
+                ? Icons.engineering_rounded
+                : Icons.verified_user_rounded,
+            color: statusColor,
+            size: 20,
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              inMaintenance
+                  ? 'وضع الصيانة مفعّل حالياً على السحابة ⚠️'
+                  : 'الحالة التشغيلية: مستقرة ومتاحة ✅',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                color: statusColor,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (cfg != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: customTheme.sovereignAccent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'v${cfg.minVersionCode}..${cfg.latestVersionCode}',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: customTheme.sovereignAccent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildStatsSection() {
+    final totalAccounts =
+        _overview?.totalAccounts ?? (_fallbackStats['totalUsers'] ?? 0);
+    final active24h =
+        _overview?.active24h ?? (_fallbackStats['onlineUsers'] ?? 0);
+    final directoryPlayers =
+        _overview?.directoryPlayers ??
+            (_fallbackStats['directoryPlayers'] ?? 0);
+    final guestPlayers =
+        _overview?.guestPlayers ?? (_fallbackStats['guestPlayers'] ?? 0);
+    final activeEvents = _overview?.activeEvents ?? 0;
+    final activeAnnouncements = _overview?.activeAnnouncements ?? 0;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // عنوان القسم
-        const Text(
-          'الإحصائيات',
+        Text(
+          'المؤشرات الحيّة',
           style: TextStyle(
-            color: Colors.white70,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontFamily: 'Cairo',
+            color: Colors.white.withValues(alpha: 0.8),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 16),
-        
-        // بطاقات الإحصائيات
+        const SizedBox(height: 12),
         Row(
           children: [
-            // بطاقة المتصلين الآن
             Expanded(
               child: _buildStatCard(
-                title: 'المتصلين الآن',
-                value: '${_stats['onlineUsers'] ?? 0}',
+                key: const Key('stat_total_accounts'),
+                title: 'إجمالي الحسابات',
+                value: '$totalAccounts',
+                icon: Icons.people_alt_rounded,
+                color: AppCustomTheme.of(context).sovereignAccent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_active_24h'),
+                title: 'نشطو آخر 24 ساعة',
+                value: '$active24h',
                 icon: Icons.wifi_tethering_rounded,
-                color: Colors.green,
+                color: const Color(0xFF10B981),
                 isLive: true,
               ),
             ),
-            const SizedBox(width: 16),
-            // بطاقة إجمالي المستخدمين
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: _buildStatCard(
-                title: 'إجمالي المستخدمين',
-                value: '${_stats['totalUsers'] ?? 0}',
-                icon: Icons.people_alt_rounded,
-                color: AppTheme.accentColor,
-                isLive: false,
+                key: const Key('stat_directory_players'),
+                title: 'دليل اللاعبين',
+                value: '$directoryPlayers',
+                icon: Icons.badge_rounded,
+                color: const Color(0xFF38BDF8),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_guest_players'),
+                title: 'اللاعبون الضيوف',
+                value: '$guestPlayers',
+                icon: Icons.person_outline_rounded,
+                color: Colors.amberAccent,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_active_events'),
+                title: 'الأحداث النشطة',
+                value: '$activeEvents',
+                icon: Icons.celebration_rounded,
+                color: const Color(0xFFA78BFA),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_active_announcements'),
+                title: 'الرسائل النشطة',
+                value: '$activeAnnouncements',
+                icon: Icons.campaign_rounded,
+                color: const Color(0xFFFB7185),
               ),
             ),
           ],
@@ -218,75 +286,80 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildStatCard({
+    required Key key,
     required String title,
     required String value,
     required IconData icon,
     required Color color,
-    required bool isLive,
+    bool isLive = false,
   }) {
+    final customTheme = AppCustomTheme.of(context);
     return Container(
-      padding: const EdgeInsets.all(20),
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(80), width: 1.5),
+        color: customTheme.surfaceCard.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1.2),
       ),
       child: Column(
         children: [
-          // الأيقونة مع مؤشر الحالة
-          Stack(
-            alignment: Alignment.topRight,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(30),
-                  borderRadius: BorderRadius.circular(16),
+                  color: color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 32),
+                child: Icon(icon, color: color, size: 22),
               ),
-              // مؤشر الحالة النشطة
-              if (isLive)
+              if (isLive) ...[
+                const SizedBox(width: 6),
                 Container(
-                  width: 14,
-                  height: 14,
+                  width: 9,
+                  height: 9,
                   decoration: BoxDecoration(
-                    color: Colors.green,
+                    color: const Color(0xFF10B981),
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.primaryDark, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withAlpha(150),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                        color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                        blurRadius: 6,
                       ),
                     ],
                   ),
                 ),
+              ],
             ],
           ),
-          const SizedBox(height: 16),
-          
-          // الرقم
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              height: 1,
+          const SizedBox(height: 10),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          
-          // العنوان
+          const SizedBox(height: 4),
           Text(
             title,
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withAlpha(180),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontFamily: 'Cairo',
+              color: Colors.white.withValues(alpha: 0.78),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
             ),
           ),
         ],
@@ -295,104 +368,134 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildActionsSection() {
+    final customTheme = AppCustomTheme.of(context);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // عنوان القسم
-        const Text(
-          'الإجراءات',
+        Text(
+          'أدوات الإدارة والتحكم',
           style: TextStyle(
-            color: Colors.white70,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontFamily: 'Cairo',
+            color: Colors.white.withValues(alpha: 0.8),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 16),
-        
-        // بطاقة إرسال البريد
+        const SizedBox(height: 12),
         _buildActionCard(
-          title: 'إرسال بريد إلكتروني',
-          subtitle: 'مراسلة المستخدمين',
-          icon: Icons.email_rounded,
-          color: Colors.blue,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminEmailScreen()),
+          key: const Key('admin_nav_release_control'),
+          title: 'الإصدارات والصيانة والمزايا',
+          subtitle: 'التحديث الإلزامي، وضع الصيانة، و6 أعلام ميزات',
+          icon: Icons.tune_rounded,
+          color: customTheme.sovereignAccent,
+          onTap: () => _openAndRefresh(
+            AdminReleaseControlScreen(initialConfig: _overview?.releaseConfig),
           ),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_announcements'),
+          title: 'الرسائل الموجّهة والبحث',
+          subtitle: 'بث جماعي أو استهداف مباشر (Google & SAH-XXXX)',
+          icon: Icons.campaign_rounded,
+          color: const Color(0xFFFB7185),
+          onTap: () => _openAndRefresh(const AdminAnnouncementsScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_events'),
+          title: 'الأحداث والمواسم الديناميكية',
+          subtitle: 'إطلاق وجدولة بانر الشاشة الرئيسية ومعاينته',
+          icon: Icons.auto_awesome_rounded,
+          color: const Color(0xFFA78BFA),
+          onTap: () => _openAndRefresh(const AdminEventsScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_email'),
+          title: 'إرسال بريد إلكتروني',
+          subtitle: 'مراسلة المستخدمين عبر البريد المسجّل',
+          icon: Icons.email_rounded,
+          color: const Color(0xFF38BDF8),
+          onTap: () => _openAndRefresh(const AdminEmailScreen()),
         ),
       ],
     );
   }
 
   Widget _buildActionCard({
+    required Key key,
     required String title,
     required String subtitle,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withAlpha(60)),
-        ),
-        child: Row(
-          textDirection: TextDirection.rtl,
-          children: [
-            // الأيقونة
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: color.withAlpha(30),
-                borderRadius: BorderRadius.circular(14),
+    final customTheme = AppCustomTheme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: customTheme.surfaceCard.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.45)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 24),
               ),
-              child: Icon(icon, color: color, size: 26),
-            ),
-            const SizedBox(width: 16),
-            
-            // النصوص
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(150),
-                      fontSize: 14,
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            
-            // سهم الانتقال
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white.withAlpha(100),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: color.withValues(alpha: 0.75),
                 size: 16,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
