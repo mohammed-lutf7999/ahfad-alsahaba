@@ -91,6 +91,7 @@ class GhostMatchResult {
   final List<Map<String, dynamic>>? timeline;
   final bool isFriendly;
   final int dailyGhostCount;
+  final bool isHumanMatch;
   final String? error;
 
   GhostMatchResult({
@@ -107,6 +108,7 @@ class GhostMatchResult {
     this.timeline,
     this.isFriendly = false,
     this.dailyGhostCount = 0,
+    this.isHumanMatch = false,
     this.error,
   });
 }
@@ -270,6 +272,7 @@ class MultiplayerService {
               final isMe = (row['player1_id'] == userId || row['player2_id'] == userId);
               final status = row['status'] as String? ?? '';
               final isFreshMatch = status == 'matched' || status == 'ready';
+              final isNotGhost = row['is_ghost_match'] != true;
               
               final createdAtStr = row['created_at'] as String?;
               bool isFromCurrentSearch = true;
@@ -279,7 +282,7 @@ class MultiplayerService {
                   isFromCurrentSearch = createdAt.isAfter(searchStartCutoff);
                 }
               }
-              return isMe && isFreshMatch && isFromCurrentSearch;
+              return isMe && isFreshMatch && isNotGhost && isFromCurrentSearch;
             },
             orElse: () => <String, dynamic>{},
           );
@@ -783,8 +786,11 @@ class MultiplayerService {
 
       final data = (response as List).first as Map<String, dynamic>;
       final matchId = data['match_id'] as String;
+      final isHumanMatch = data['is_human_match'] as bool? ?? false;
       final ghostUserId = data['ghost_user_id'] as String?;
-      final ghostName = data['ghost_name'] as String? ?? 'فارس الأندلس';
+      final ghostName = isHumanMatch
+          ? (data['ghost_name'] as String?)
+          : (data['ghost_name'] as String? ?? 'فارس الأندلس');
       final ghostAvatarIndex =
           (data['ghost_avatar_index'] as num?)?.toInt() ?? 0;
       final ghostFrame = data['ghost_frame'] as String? ?? 'frame_wood';
@@ -817,6 +823,7 @@ class MultiplayerService {
         timeline: timeline,
         isFriendly: isFriendly,
         dailyGhostCount: dailyCount,
+        isHumanMatch: isHumanMatch,
       );
     } catch (e) {
       debugPrint('Error finding ghost match: $e');
@@ -851,10 +858,13 @@ class MultiplayerService {
     final seed = rnd.nextInt(100000);
     final matchId = 'bot_${DateTime.now().millisecondsSinceEpoch}';
     
-    // Generate random question IDs similar to server
-    // categories: quran, hadith, fiqh, seerah, aqeedah
-    final categories = ['quran', 'hadith', 'fiqh', 'seerah', 'aqeedah'];
-    final questionIds = categories.map((cat) => '$cat:1:${rnd.nextInt(10)}').toList();
+    // Pick 5 random categories across all 6 categories x levels 1..10 (600 questions)
+    final allCategories = ['quran', 'hadith', 'fiqh', 'seerah', 'history', 'aqeedah']
+      ..shuffle(rnd);
+    final questionIds = allCategories
+        .take(5)
+        .map((cat) => '$cat:${rnd.nextInt(10) + 1}:${rnd.nextInt(10)}')
+        .toList();
 
     return MatchmakingResult(
       success: true,

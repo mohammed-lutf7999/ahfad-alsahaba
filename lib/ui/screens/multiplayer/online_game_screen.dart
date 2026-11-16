@@ -14,6 +14,7 @@ import '../../../data/models/question_model.dart';
 import '../../widgets/avatar_selector.dart';
 import '../../widgets/animated_avatar_frame.dart';
 import '../../dialogs/app_dialogs.dart';
+import 'versus_screen.dart';
 import 'widgets/game_match_result_dialog.dart';
 import 'widgets/game_tactical_powerups_bar.dart';
 import 'widgets/game_reactions_ribbon.dart';
@@ -28,6 +29,7 @@ class OnlineGameScreen extends StatefulWidget {
   final int opponentAvatarIndex;
   final bool isBot; // New parameter
   final bool isGhost;
+  final bool isFriendly;
   final List<Map<String, dynamic>>? ghostTimeline;
   final String? ghostFrame;
   final int? ghostLevel;
@@ -43,6 +45,7 @@ class OnlineGameScreen extends StatefulWidget {
     required this.opponentAvatarIndex,
     this.isBot = false,
     this.isGhost = false,
+    this.isFriendly = false,
     this.ghostTimeline,
     this.ghostFrame,
     this.ghostLevel,
@@ -144,9 +147,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       if (widget.isBot) {
         // Start Bot Logic after questions are loaded
         _startBotLogic();
-      } else if (widget.isGhost && widget.ghostTimeline != null && widget.ghostTimeline!.isNotEmpty) {
-        // Start Ghost Replay Logic
-        _startGhostLogic();
+      } else if (widget.isGhost) {
+        if (widget.ghostTimeline != null && widget.ghostTimeline!.isNotEmpty) {
+          _startGhostLogic();
+        }
       } else {
         // 2. Listen to Opponent progress
         _opponentSubscription = MultiplayerService.instance
@@ -273,37 +277,36 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     await MultiplayerService.instance.sendReaction(widget.matchId, emoji);
   }
 
-  /// Load questions based on question IDs from Supabase
+  /// Load questions deterministically based on question IDs from Supabase
   /// Format: 'category:level:question_index'
   Future<List<Question>> _loadQuestionsFromIds(List<String> questionIds) async {
     final questions = <Question>[];
-    
-    for (final qId in questionIds) {
+
+    for (int slot = 0; slot < questionIds.length; slot++) {
+      final qId = questionIds[slot];
       try {
         final parts = qId.split(':');
         if (parts.length >= 3) {
           final categoryId = parts[0];
           final level = int.tryParse(parts[1]) ?? 1;
           final questionIndex = int.tryParse(parts[2]) ?? 0;
-          
-          // Load questions for this category and level
-          final levelQuestions = await QuestionService().loadQuestions(
+
+          final question = await QuestionService().loadQuestionBySpec(
             categoryId: categoryId,
             levelNumber: level,
+            questionIndex: questionIndex,
+            seed: widget.seed,
+            slotOffset: slot,
           );
-          
-          if (questionIndex < levelQuestions.length) {
-            questions.add(levelQuestions[questionIndex]);
-          } else if (levelQuestions.isNotEmpty) {
-            // Fallback to first question if index out of range
-            questions.add(levelQuestions[questionIndex % levelQuestions.length]);
+          if (question != null) {
+            questions.add(question);
           }
         }
       } catch (e) {
-        print('Error loading question $qId: $e');
+        debugPrint('Error loading question $qId: $e');
       }
     }
-    
+
     return questions;
   }
 
@@ -368,11 +371,13 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     }
 
     final elapsedMs = DateTime.now().difference(_questionStartTime).inMilliseconds;
+    final ptsEarned = isCorrect ? (10 + _timeLeft.clamp(0, 15)) : 0;
     _myAnswerTimelines.add({
       'q': _currentQuestionIndex,
       'ms': elapsedMs,
       'ans': index,
       'ok': isCorrect,
+      'pts': ptsEarned,
     });
 
     setState(() {
@@ -448,13 +453,6 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     _botTimer?.cancel(); // Stop bot if running
     _ghostPlaybackService?.dispose();
 
-    if (!widget.isBot && !widget.isGhost && _myAnswerTimelines.length == 5) {
-      unawaited(MultiplayerService.instance.saveGhostTimeline(
-        matchId: widget.matchId,
-        timeline: _myAnswerTimelines,
-      ));
-    }
-    
     String? winnerId;
     int? trophiesDelta;
     int? totalTrophies;
@@ -473,17 +471,34 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       if (widget.opponentId.isNotEmpty) {
         MultiplayerService.instance.lastOpponentId = widget.opponentId;
       }
+      // Must finishMatch FIRST so match_participants.finished_at is stamped before saveGhostTimeline
       final result = await MultiplayerService.instance.finishMatch(widget.matchId);
-      
+
+      int resolvedOppScore = (result['opponentScore'] as num?)?.toInt() ?? _opponentScore;
+      if (widget.isGhost && result['opponentScore'] == null && widget.ghostTimeline != null) {
+        resolvedOppScore = widget.ghostTimeline!.fold<int>(
+          0,
+          (acc, rec) => acc + GhostPlaybackService.computeScoreForRecord(rec),
+        );
+      }
+
       if (mounted) {
         setState(() {
           _myScore = result['myScore'] ?? _myScore;
-          _opponentScore = result['opponentScore'] ?? _opponentScore;
+          _opponentScore = resolvedOppScore;
         });
       }
       winnerId = result['winnerId'];
       trophiesDelta = result['trophiesDelta'] as int?;
       totalTrophies = result['totalTrophies'] as int?;
+
+      // Self-Feeding Flywheel: record honest human timelines across both PvP & Ghost duels
+      if (_myAnswerTimelines.length == 5) {
+        unawaited(MultiplayerService.instance.saveGhostTimeline(
+          matchId: widget.matchId,
+          timeline: _myAnswerTimelines,
+        ));
+      }
     }
 
     final myId = MultiplayerService.instance.currentUserId;
@@ -493,15 +508,15 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     // Capture pre-match progression snapshot BEFORE modifying activeProfile
     final preSnapshot = ProgressionService.instance.captureSnapshot();
 
-    // Apply progression outcome (XP + Trophies + Arena Coins + Shield / XP Banner)
+    // Apply progression outcome (XP + Arena Coins; trophies, streak & shield stay protected on friendly matches)
     final outcome = ProgressionService.instance.applyMatchOutcome(
       rawMatchScore: _myScore,
       correctAnswers: _myCorrectAnswersCount,
       isWin: isWinner,
       isDraw: isDraw,
-      serverTotalTrophies: totalTrophies,
-      serverTrophiesDelta: trophiesDelta,
-      updateTrophies: true,
+      serverTotalTrophies: widget.isFriendly ? null : totalTrophies,
+      serverTrophiesDelta: widget.isFriendly ? 0 : trophiesDelta,
+      updateTrophies: !widget.isFriendly,
     );
 
     await ProfileService.instance.saveActiveProfileAndSync();
@@ -531,6 +546,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   void _onRematchAccepted(MatchmakingResult newMatch) {
     if (!mounted) return;
+    final resolvedIsBot =
+        widget.isBot || (newMatch.matchId?.startsWith('bot_') ?? false);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => OnlineGameScreen(
@@ -538,9 +555,51 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
           opponentId: newMatch.opponentId ?? widget.opponentId,
           seed: newMatch.seed ?? widget.seed,
           questionIds: newMatch.questionIds ?? [],
-          opponentName: widget.opponentName,
+          opponentName: resolvedIsBot ? 'المتحدي الذكي' : widget.opponentName,
           opponentAvatarIndex: widget.opponentAvatarIndex,
-          isBot: widget.isBot,
+          isBot: resolvedIsBot,
+          isFriendly: newMatch.isFriendly,
+        ),
+      ),
+    );
+  }
+
+  void _onGhostRematchAccepted(GhostMatchResult ghost) {
+    if (!mounted || ghost.matchId == null) return;
+    if (ghost.isHumanMatch) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => VersusScreen(
+            matchId: ghost.matchId!,
+            opponentId: ghost.ghostUserId ?? '',
+            seed: ghost.seed ?? 1000,
+            isBot: false,
+            isGhost: false,
+            isFriendly: ghost.isFriendly,
+            questionIds: ghost.questionIds,
+          ),
+        ),
+      );
+      return;
+    }
+    final ghostLevel = ghost.ghostLevel ?? 5;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OnlineGameScreen(
+          matchId: ghost.matchId!,
+          opponentId: ghost.ghostUserId ??
+              'ghost_${DateTime.now().millisecondsSinceEpoch}',
+          seed: ghost.seed ?? widget.seed,
+          questionIds: ghost.questionIds ?? [],
+          opponentName: ghost.ghostName ?? 'فارس الأندلس',
+          opponentAvatarIndex: ghost.ghostAvatarIndex ?? 0,
+          isBot: false,
+          isGhost: true,
+          isFriendly: ghost.isFriendly,
+          ghostTimeline: ghost.timeline,
+          ghostFrame: ghost.ghostFrame,
+          ghostLevel: ghostLevel,
+          ghostTrophies: ghost.ghostTrophies,
         ),
       ),
     );
@@ -573,8 +632,11 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       opponentName: widget.opponentName,
       matchId: widget.matchId,
       opponentId: widget.opponentId,
-      isBot: widget.isBot || widget.isGhost,
+      isBot: widget.isBot,
+      isGhost: widget.isGhost,
+      isFriendly: widget.isFriendly,
       onRematchAccepted: _onRematchAccepted,
+      onGhostRematchAccepted: _onGhostRematchAccepted,
       onDismiss: () => Navigator.of(context).popUntil((route) => route.isFirst),
     );
   }
