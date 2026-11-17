@@ -5,8 +5,11 @@ import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
 import '../../data/services/admin_service.dart';
 import 'admin/admin_announcements_screen.dart';
+import 'admin/admin_cms_manager_screen.dart';
 import 'admin/admin_events_screen.dart';
+import 'admin/admin_players_support_screen.dart';
 import 'admin/admin_release_control_screen.dart';
+import 'admin/admin_telemetry_security_screen.dart';
 import 'admin/widgets/admin_ui_kit.dart';
 import 'admin_email_screen.dart';
 
@@ -168,7 +171,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                'v${cfg.minVersionCode}..${cfg.latestVersionCode}',
+                'v${cfg.minVersionCode}..${cfg.latestVersionCode} • CMS#${_overview?.cmsVersion ?? 1}',
                 style: TextStyle(
                   fontFamily: 'Cairo',
                   color: customTheme.sovereignAccent,
@@ -281,7 +284,115 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_cms_items_summary'),
+                title: 'المتجر / الأسئلة السحابية',
+                value:
+                    '${_overview?.storeItemsCount ?? 0} / ${_overview?.quizQuestionsCount ?? 0}',
+                icon: Icons.storefront_rounded,
+                color: AppCustomTheme.of(context).sovereignAccent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                key: const Key('stat_ghosts_summary'),
+                title: 'الأشباح (نشط/الكل)',
+                value:
+                    '${_overview?.activeGhosts ?? 0} / ${_overview?.totalGhosts ?? 0}',
+                icon: Icons.auto_fix_high_rounded,
+                color: const Color(0xFF38BDF8),
+              ),
+            ),
+          ],
+        ),
+        if (_overview != null && _overview!.versionBreakdown.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _buildVersionBreakdownCard(_overview!.versionBreakdown),
+        ],
       ],
+    );
+  }
+
+  Widget _buildVersionBreakdownCard(List<AdminVersionBreakdown> rows) {
+    final customTheme = AppCustomTheme.of(context);
+    final total = rows.fold<int>(0, (sum, r) => sum + r.playersCount);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: customTheme.surfaceCard.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: customTheme.sovereignAccent.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'توزيع نسخ التطبيق النشطة ($total لاعب)',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: customTheme.sovereignAccent,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final entry in rows.take(5)) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 96,
+                    child: Text(
+                      entry.appVersion != null
+                          ? '${entry.appVersion} (b${entry.versionCode ?? "?"})'
+                          : 'Build ${entry.versionCode ?? "?"}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: total > 0 ? entry.playersCount / total : 0,
+                        minHeight: 7,
+                        backgroundColor: Colors.white.withValues(alpha: 0.1),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          customTheme.sovereignAccent,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${entry.playersCount}',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -409,6 +520,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           icon: Icons.auto_awesome_rounded,
           color: const Color(0xFFA78BFA),
           onTap: () => _openAndRefresh(const AdminEventsScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_cms_manager'),
+          title: 'إدارة المتجر والمحتوى (CMS)',
+          subtitle: 'عناصر سوق الفرسان، المكتبة، المسابقات، وإظهار/إخفاء فوري',
+          icon: Icons.store_mall_directory_rounded,
+          color: customTheme.sovereignAccent,
+          onTap: () => _openAndRefresh(const AdminCmsManagerScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_players_support'),
+          title: 'دعم اللاعبين والتعويضات',
+          subtitle: 'فحص المحفظة والمقتنيات ومنح تعويض آمن بسجل تدقيق',
+          icon: Icons.support_agent_rounded,
+          color: const Color(0xFF10B981),
+          onTap: () => _openAndRefresh(const AdminPlayersSupportScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_telemetry'),
+          title: 'الأشباح والتدقيق والمشرفون',
+          subtitle: 'تبديل الأشباح وسجل الإجراءات وإدارة المشرفين',
+          icon: Icons.security_rounded,
+          color: Colors.amberAccent,
+          onTap: () => _openAndRefresh(const AdminTelemetrySecurityScreen()),
         ),
         const SizedBox(height: 12),
         _buildActionCard(

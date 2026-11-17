@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>غرفة القيادة السحابية | معركة أحفاد الصحابة</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -83,7 +84,8 @@
           <h1 class="topbar-title">غرفة القيادة السحابية</h1>
           <p class="topbar-sub">
             المشرف: <span id="admin-user-email" class="gold-text">—</span>
-            • بصمة الإعدادات: <span id="topbar-config-ver" class="badge-pill">#1</span>
+            • الإعدادات: <span id="topbar-config-ver" class="badge-pill">#1</span>
+            • المحتوى CMS: <span id="topbar-cms-ver" class="badge-pill">#1</span>
           </p>
         </div>
       </div>
@@ -121,13 +123,41 @@
         <span class="stat-label">الرسائل النشطة</span>
         <strong id="stat-active-announcements" class="stat-value rose-text">0</strong>
       </article>
+      <article class="stat-card glass-card">
+        <span class="stat-label">عناصر المتجر</span>
+        <strong id="stat-store-items" class="stat-value gold-text">0</strong>
+      </article>
+      <article class="stat-card glass-card">
+        <span class="stat-label">محتوى المكتبة</span>
+        <strong id="stat-library-items" class="stat-value sky-text">0</strong>
+      </article>
+      <article class="stat-card glass-card">
+        <span class="stat-label">أسئلة السحابة</span>
+        <strong id="stat-quiz-questions" class="stat-value emerald-text">0</strong>
+      </article>
+      <article class="stat-card glass-card">
+        <span class="stat-label">الأشباح (نشط/الكل)</span>
+        <strong id="stat-ghosts-summary" class="stat-value purple-text">0 / 0</strong>
+      </article>
+    </section>
+
+    <section class="panel glass-card compact-panel" aria-label="توزيع إصدارات اللاعبين">
+      <div class="panel-header-row">
+        <h2 class="panel-title">📱 توزيع نسخ التطبيق النشطة <code class="code-tag">version_breakdown</code></h2>
+        <span id="version-breakdown-total" class="muted-text">—</span>
+      </div>
+      <div id="version-breakdown-list" class="version-bars"></div>
     </section>
 
     <!-- Navigation Tabs -->
     <nav class="tabs-bar" role="tablist">
-      <button class="tab-btn active" data-tab="release" type="button">⚙️ الإصدارات والصيانة والأعلام</button>
-      <button class="tab-btn" data-tab="announcements" type="button">📣 الرسائل الموجّهة واللاعبون</button>
-      <button class="tab-btn" data-tab="events" type="button">🌟 الأحداث الديناميكية</button>
+      <button class="tab-btn active" data-tab="release" type="button">⚙️ الإصدارات والصيانة</button>
+      <button class="tab-btn" data-tab="announcements" type="button">📣 الرسائل والبحث</button>
+      <button class="tab-btn" data-tab="events" type="button">🌟 الأحداث والمواسم</button>
+      <button class="tab-btn" data-tab="store" type="button">🛒 متجر الفرسان CMS</button>
+      <button class="tab-btn" data-tab="content" type="button">📚 المكتبة والمسابقات</button>
+      <button class="tab-btn" data-tab="players" type="button">👥 اللاعبون والتعويضات</button>
+      <button class="tab-btn" data-tab="telemetry" type="button">👻 الأشباح والتدقيق</button>
     </nav>
 
     <!-- Tab 1: Release Control, Maintenance & Feature Flags -->
@@ -510,9 +540,554 @@
         </section>
       </div>
     </main>
+
+    <!-- Tab 4: Store CMS -->
+    <main id="tab-store" class="tab-panel">
+      <div class="two-col-grid">
+        <section class="panel glass-card">
+          <div class="panel-header-row">
+            <h2 id="store-form-heading" class="panel-title">🛒 إضافة / تعديل عنصر متجر</h2>
+            <button id="btn-reset-store-form" class="btn btn-outline btn-sm" type="button">عنصر جديد</button>
+          </div>
+          <p class="muted-text mb-md">يمكنك إخفاء العناصر غير المرغوبة بزر «إظهار/إخفاء»؛ ويبقى العنصر المخفي متاحاً لمن اشتراه فقط لحماية مقتنيات اللاعبين.</p>
+          <form id="store-cms-form" class="stack-sm">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="field-label" for="st-id">المعرّف البرمجي (ID: أحرف/أرقام/_)</label>
+                <input id="st-id" class="input ltr-input" type="text" placeholder="theme_andalusia_gold" pattern="[a-z0-9_]{3,64}" required />
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="st-category">التصنيف</label>
+                <select id="st-category" class="input">
+                  <option value="title">لقب فارس (title)</option>
+                  <option value="theme">ثيم ملكي (theme)</option>
+                  <option value="frame">إطار متوهج (frame)</option>
+                  <option value="powerup">وسيلة مساعدة (powerup)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="st-title">الاسم المعروض للاعبين</label>
+              <input id="st-title" class="input" type="text" placeholder="مثال: فارس النخبة أو إشراقة قرطبة" required />
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="st-desc">الوصف</label>
+              <textarea id="st-desc" class="input" rows="2" placeholder="وصف مختصر يظهر داخل سوق الفرسان..."></textarea>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="field-label" for="st-coins">السعر (دنانير)</label>
+                <input id="st-coins" class="input" type="number" min="0" max="1000000" value="500" />
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="st-gems">السعر (ياقوت)</label>
+                <input id="st-gems" class="input" type="number" min="0" max="100000" value="0" />
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="st-min-level">أدنى مستوى</label>
+                <input id="st-min-level" class="input" type="number" min="1" max="100" value="1" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="field-label" for="st-asset-key">مفتاح الأصل / النص الفعلي</label>
+                <input id="st-asset-key" class="input" type="text" placeholder="يملأ تلقائياً إذا ترك فارغاً" />
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="st-sort">الترتيب (Sort)</label>
+                <input id="st-sort" class="input" type="number" value="100" />
+              </div>
+            </div>
+
+            <!-- Theme Metadata Builder -->
+            <div id="store-meta-theme" class="sub-box hidden">
+              <strong class="field-label">🎨 ألوان الثيم الديناميكي (5 ألوان)</strong>
+              <div class="color-grid mt-xs">
+                <label class="mini-color"><span>خلفية أساسية</span><input id="st-th-bg1" type="color" value="#1a0b2e" /></label>
+                <label class="mini-color"><span>خلفية ثانوية</span><input id="st-th-bg2" type="color" value="#2d1b4e" /></label>
+                <label class="mini-color"><span>بطاقة السطح</span><input id="st-th-card" type="color" value="#24143d" /></label>
+                <label class="mini-color"><span>ذهبي سيادي</span><input id="st-th-gold" type="color" value="#f3c644" /></label>
+                <label class="mini-color"><span>لون ثانوي</span><input id="st-th-sec" type="color" value="#38bdf8" /></label>
+              </div>
+            </div>
+
+            <!-- Frame Metadata Builder -->
+            <div id="store-meta-frame" class="sub-box hidden">
+              <strong class="field-label">🖼️ خصائص الإطار الإجرائي</strong>
+              <div class="color-grid mt-xs">
+                <label class="mini-color"><span>اللون الأساسي</span><input id="st-fr-c1" type="color" value="#f3c644" /></label>
+                <label class="mini-color"><span>اللون الثانوي</span><input id="st-fr-c2" type="color" value="#10b981" /></label>
+                <label class="mini-color"><span>توهج الهالة</span><input id="st-fr-glow" type="color" value="#f3c644" /></label>
+              </div>
+              <div class="form-row mt-xs">
+                <div class="form-group">
+                  <label class="field-label" for="st-fr-pattern">النمط</label>
+                  <select id="st-fr-pattern" class="input">
+                    <option value="aurora">شفق (aurora)</option>
+                    <option value="emerald">زمردي (emerald)</option>
+                    <option value="imperial">إمبراطوري (imperial)</option>
+                    <option value="celestial">سماوي (celestial)</option>
+                    <option value="classic">كلاسيكي (classic)</option>
+                  </select>
+                </div>
+                <label class="inline-check mt-md">
+                  <input id="st-fr-gems" type="checkbox" checked />
+                  <span>ترصيع بجواهر زوايا</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Title / Powerup Metadata Builder -->
+            <div id="store-meta-badge" class="sub-box">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="st-badge-color">لون الوسام / القدرة</label>
+                  <input id="st-badge-color" class="color-swatch" type="color" value="#f3c644" />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="st-powerup-qty">الكمية / الوصف الرقمي (اختياري)</label>
+                  <input id="st-powerup-qty" class="input" type="number" min="1" placeholder="مثال: 1" />
+                </div>
+              </div>
+            </div>
+
+            <label class="inline-check">
+              <input id="st-visible" type="checkbox" checked />
+              <span>مرئي للجميع في المتجر فور الحفظ <code class="code-tag">is_visible</code></span>
+            </label>
+
+            <button id="btn-save-store-item" class="btn btn-gold btn-block" type="submit">
+              <span>💾</span>
+              <span>حفظ العنصر وتحديث المتجر</span>
+            </button>
+          </form>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <h2 class="panel-title">👁️ معاينة عنصر المتجر على الهاتف</h2>
+            <div id="store-live-preview" class="preview-dialog"></div>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🏪 قائمة عناصر المتجر السحابية</h2>
+              <span id="store-count-pill" class="badge-pill">0</span>
+            </div>
+            <div class="quick-chips mb-md" id="store-filter-chips">
+              <button class="chip-btn active" data-store-filter="all" type="button">الكل</button>
+              <button class="chip-btn" data-store-filter="title" type="button">الألقاب</button>
+              <button class="chip-btn" data-store-filter="theme" type="button">الثيمات</button>
+              <button class="chip-btn" data-store-filter="frame" type="button">الأطر</button>
+              <button class="chip-btn" data-store-filter="powerup" type="button">القدرات</button>
+            </div>
+            <div id="store-items-list" class="items-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Tab 5: Library & Quiz Content CMS -->
+    <main id="tab-content" class="tab-panel">
+      <div class="subtabs-bar mb-md">
+        <button class="subtab-btn active" data-cms-subtab="library" type="button">📖 المكتبة الإسلامية وأقسامها</button>
+        <button class="subtab-btn" data-cms-subtab="quiz" type="button">❓ المسابقات، المراحل والأسئلة</button>
+      </div>
+
+      <!-- Subtab A: Library -->
+      <div id="cms-sub-library" class="two-col-grid">
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 id="lib-sec-heading" class="panel-title">🗂️ قسم مكتبة (إضافة / تعديل)</h2>
+              <button id="btn-reset-lib-sec" class="btn btn-outline btn-sm" type="button">قسم جديد</button>
+            </div>
+            <form id="lib-section-form" class="stack-sm">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="lib-sec-id">معرّف القسم (ID)</label>
+                  <input id="lib-sec-id" class="input ltr-input" type="text" placeholder="stories أو seerah_extra" pattern="[a-z0-9_]{2,48}" required />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="lib-sec-title">اسم القسم</label>
+                  <input id="lib-sec-title" class="input" type="text" placeholder="مثال: شمائل الصحابة" required />
+                </div>
+              </div>
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label class="field-label" for="lib-sec-icon">الأيقونة</label>
+                  <select id="lib-sec-icon" class="input">
+                    <option value="auto_stories_rounded">كتاب مفتوح</option>
+                    <option value="mosque_rounded">مسجد</option>
+                    <option value="menu_book_rounded">مصحف/كتاب</option>
+                    <option value="history_edu_rounded">تاريخ وسيرة</option>
+                    <option value="auto_awesome_rounded">نجم</option>
+                    <option value="shield_rounded">درع</option>
+                    <option value="emoji_events_rounded">كأس</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="lib-sec-color">اللون</label>
+                  <div class="color-row">
+                    <input id="lib-sec-color" class="input ltr-input" type="text" value="#D4AF37" />
+                    <input id="lib-sec-color-picker" class="color-swatch" type="color" value="#d4af37" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="lib-sec-sort">الترتيب</label>
+                  <input id="lib-sec-sort" class="input" type="number" value="10" />
+                </div>
+              </div>
+              <label class="inline-check">
+                <input id="lib-sec-visible" type="checkbox" checked />
+                <span>القسم مرئي للاعبين</span>
+              </label>
+              <button id="btn-save-lib-sec" class="btn btn-outline btn-block" type="submit">حفظ القسم</button>
+            </form>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 id="lib-item-heading" class="panel-title">📝 مقال / قصة / بطاقة معرفة</h2>
+              <button id="btn-reset-lib-item" class="btn btn-outline btn-sm" type="button">عنصر جديد</button>
+            </div>
+            <form id="lib-item-form" class="stack-sm">
+              <input id="lib-item-id" type="hidden" />
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="lib-item-section">القسم التابع له</label>
+                  <select id="lib-item-section" class="input"></select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="lib-item-sort">الترتيب</label>
+                  <input id="lib-item-sort" class="input" type="number" value="10" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="lib-item-title">عنوان البطاقة</label>
+                <input id="lib-item-title" class="input" type="text" placeholder="مثال: ثبات بلال بن رباح رضي الله عنه" required />
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="lib-item-subtitle">عنوان فرعي / تصنيف</label>
+                  <input id="lib-item-subtitle" class="input" type="text" placeholder="مواقف الإيمان..." />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="lib-item-source">المصدر الموثق (اختياري)</label>
+                  <input id="lib-item-source" class="input" type="text" placeholder="السيرة النبوية لابن هشام" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="lib-item-content">المحتوى الكامل</label>
+                <textarea id="lib-item-content" class="input" rows="4" placeholder="اكتب النص العلمي أو القصة الكاملة هنا..." required></textarea>
+              </div>
+              <label class="inline-check">
+                <input id="lib-item-visible" type="checkbox" checked />
+                <span>مرئي داخل المكتبة</span>
+              </label>
+              <button id="btn-save-lib-item" class="btn btn-gold btn-block" type="submit">حفظ عنصر المكتبة</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🗂️ أقسام المكتبة المسجّلة</h2>
+              <span id="lib-sec-count" class="badge-pill">0</span>
+            </div>
+            <div id="lib-sections-list" class="items-list compact-list"></div>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">📄 عناصر المكتبة السحابية</h2>
+              <select id="lib-filter-section" class="input compact-select">
+                <option value="">كل الأقسام</option>
+              </select>
+            </div>
+            <div id="lib-items-list" class="items-list"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Subtab B: Quiz -->
+      <div id="cms-sub-quiz" class="two-col-grid hidden">
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 id="quiz-cat-heading" class="panel-title">🏆 قسم مسابقة (إضافة / تعديل)</h2>
+              <button id="btn-reset-quiz-cat" class="btn btn-outline btn-sm" type="button">قسم جديد</button>
+            </div>
+            <form id="quiz-category-form" class="stack-sm">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-id">معرّف القسم (ID)</label>
+                  <input id="qz-cat-id" class="input ltr-input" type="text" placeholder="quran أو sahaba_women" pattern="[a-z0-9_]{2,48}" required />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-name">اسم القسم</label>
+                  <input id="qz-cat-name" class="input" type="text" placeholder="مثال: أمهات المؤمنين والصحابيات" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="qz-cat-desc">وصف القسم</label>
+                <input id="qz-cat-desc" class="input" type="text" placeholder="اختبر معلوماتك في..." />
+              </div>
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-levels">عدد المراحل (1..100)</label>
+                  <input id="qz-cat-levels" class="input" type="number" min="1" max="100" value="10" />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-icon">الأيقونة</label>
+                  <select id="qz-cat-icon" class="input">
+                    <option value="quiz_rounded">سؤال (quiz)</option>
+                    <option value="menu_book_rounded">القرآن والكتاب</option>
+                    <option value="mosque_rounded">مسجد</option>
+                    <option value="military_tech_rounded">غزوات</option>
+                    <option value="shield_rounded">عقيدة وفقه</option>
+                    <option value="groups_rounded">الصحابة</option>
+                    <option value="auto_awesome_rounded">مميز</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-color">اللون</label>
+                  <div class="color-row">
+                    <input id="qz-cat-color" class="input ltr-input" type="text" value="#1B5E20" />
+                    <input id="qz-cat-color-picker" class="color-swatch" type="color" value="#1b5e20" />
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="qz-cat-sort">الترتيب</label>
+                  <input id="qz-cat-sort" class="input" type="number" value="10" />
+                </div>
+                <div class="stack-sm">
+                  <label class="inline-check">
+                    <input id="qz-cat-visible" type="checkbox" checked />
+                    <span>مرئي في الشاشة</span>
+                  </label>
+                  <label class="inline-check">
+                    <input id="qz-cat-locked" type="checkbox" />
+                    <span>مقفل مؤقتاً <code class="code-tag">is_locked</code></span>
+                  </label>
+                </div>
+              </div>
+              <button id="btn-save-quiz-cat" class="btn btn-outline btn-block" type="submit">حفظ قسم المسابقة</button>
+            </form>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 id="quiz-q-heading" class="panel-title">❓ إضافة / تعديل سؤال سحابي</h2>
+              <button id="btn-reset-quiz-q" class="btn btn-outline btn-sm" type="button">سؤال جديد</button>
+            </div>
+            <form id="quiz-question-form" class="stack-sm">
+              <input id="qz-q-id" type="hidden" />
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label class="field-label" for="qz-q-cat">القسم</label>
+                  <select id="qz-q-cat" class="input"></select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-q-level">المستوى (1..100)</label>
+                  <input id="qz-q-level" class="input" type="number" min="1" max="100" value="1" required />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-q-scope">نطاق التزامن</label>
+                  <select id="qz-q-scope" class="input">
+                    <option value="solo_only">فردي فقط (الأكثر أماناً)</option>
+                    <option value="all_with_fallback">شامل (solo + multiplayer)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="field-label" for="qz-q-text">نص السؤال</label>
+                <textarea id="qz-q-text" class="input" rows="2" placeholder="اكتب السؤال بوضوح..." required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="qz-opt-0">الخيار الأول (0)</label>
+                  <input id="qz-opt-0" class="input" type="text" required />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-opt-1">الخيار الثاني (1)</label>
+                  <input id="qz-opt-1" class="input" type="text" required />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="qz-opt-2">الخيار الثالث (2)</label>
+                  <input id="qz-opt-2" class="input" type="text" required />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-opt-3">الخيار الرابع (3)</label>
+                  <input id="qz-opt-3" class="input" type="text" required />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="qz-q-correct">الإجابة الصحيحة</label>
+                  <select id="qz-q-correct" class="input">
+                    <option value="0">الخيار الأول (0)</option>
+                    <option value="1">الخيار الثاني (1)</option>
+                    <option value="2">الخيار الثالث (2)</option>
+                    <option value="3">الخيار الرابع (3)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="qz-q-sort">الترتيب</label>
+                  <input id="qz-q-sort" class="input" type="number" value="10" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="field-label" for="qz-q-exp">الشرح والفائدة العلمية (يظهر بعد الإجابة)</label>
+                <textarea id="qz-q-exp" class="input" rows="2" placeholder="شرح مختصر ومصدر المعلومة..."></textarea>
+              </div>
+
+              <label class="inline-check">
+                <input id="qz-q-visible" type="checkbox" checked />
+                <span>السؤال مرئي ومفعّل</span>
+              </label>
+
+              <button id="btn-save-quiz-q" class="btn btn-gold btn-block" type="submit">حفظ السؤال السحابي</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🏆 أقسام المسابقات</h2>
+              <span id="quiz-cat-count" class="badge-pill">0</span>
+            </div>
+            <div id="quiz-categories-list" class="items-list compact-list"></div>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">❓ الأسئلة السحابية المضافة</h2>
+              <div class="record-actions">
+                <select id="quiz-filter-cat" class="input compact-select">
+                  <option value="">كل الأقسام</option>
+                </select>
+                <input id="quiz-filter-level" class="input compact-input" type="number" min="1" max="100" placeholder="مستوى" />
+              </div>
+            </div>
+            <div id="quiz-questions-list" class="items-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Tab 6: Players Inspector, Compensation & CSV -->
+    <main id="tab-players" class="tab-panel">
+      <div class="two-col-grid">
+        <section class="panel glass-card">
+          <div class="panel-header-row">
+            <h2 class="panel-title">🔍 البحث عن لاعب وتصدير السجل</h2>
+            <button id="btn-export-players-csv" class="btn btn-outline btn-sm" type="button">📥 تصدير CSV</button>
+          </div>
+          <div class="search-row mb-md">
+            <input id="player-inspector-query" class="input" type="text" placeholder="اسم، بريد إلكتروني، كود SAH-XXXX أو اتركه فارغاً لأحدث اللاعبين..." />
+            <button id="btn-inspector-search" class="btn btn-gold btn-sm" type="button">بحث</button>
+          </div>
+          <div id="inspector-results-list" class="items-list"></div>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🪪 بطاقة ملف اللاعب التفصيلية</h2>
+              <button id="btn-target-player-msg" class="btn btn-outline btn-sm hidden" type="button">✉️ مراسلة هذا اللاعب</button>
+            </div>
+            <div id="player-dossier-card" class="muted-text">اختر أي لاعب من قائمة البحث لعرض محفظته، مخزونه، وآخر 10 نزالات.</div>
+          </div>
+
+          <div class="panel glass-card">
+            <h2 class="panel-title">🎁 منح تعويض آمن بسقف رقابي</h2>
+            <p class="muted-text mb-md">الحدود القصوى للمعاملة الواحدة: 10,000 دينار، 100 ياقوتة، 5,000 نقطة خبرة مع توثيق السبب إلزامياً.</p>
+            <form id="compensation-form" class="stack-sm">
+              <input id="comp-user-id" type="hidden" />
+              <div id="comp-target-label" class="selected-pill hidden"></div>
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label class="field-label" for="comp-coins">دنانير (0..10000)</label>
+                  <input id="comp-coins" class="input" type="number" min="0" max="10000" value="0" />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="comp-gems">ياقوت (0..100)</label>
+                  <input id="comp-gems" class="input" type="number" min="0" max="100" value="0" />
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="comp-xp">خبرة XP (0..5000)</label>
+                  <input id="comp-xp" class="input" type="number" min="0" max="5000" value="0" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="comp-reason">سبب التعويض (إلزامي للتدقيق)</label>
+                <input id="comp-reason" class="input" type="text" minlength="3" placeholder="مثال: تعويض عن انقطاع نزال أونلاين #..." required />
+              </div>
+              <button id="btn-grant-compensation" class="btn btn-gold btn-block" type="submit" disabled>منح التعويض وتسجيله في التدقيق</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Tab 7: Ghost Monitor, Audit Logs & Owner-Only Admins -->
+    <main id="tab-telemetry" class="tab-panel">
+      <div class="two-col-grid">
+        <section class="panel glass-card">
+          <div class="panel-header-row">
+            <h2 class="panel-title">👻 مراقب أشباح الصحابة</h2>
+            <span id="ghosts-count-pill" class="badge-pill">0</span>
+          </div>
+          <div id="ghosts-list" class="items-list"></div>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🛡️ إدارة طاقم المشرفين <code class="code-tag">owner-only</code></h2>
+              <span id="admins-role-pill" class="badge-pill">—</span>
+            </div>
+            <div id="admins-owner-note" class="muted-text mb-md"></div>
+            <form id="admin-manage-form" class="search-row mb-md hidden">
+              <input id="new-admin-email" class="input ltr-input" type="email" placeholder="admin@gmail.com" required />
+              <select id="new-admin-role" class="input compact-select">
+                <option value="admin">admin</option>
+                <option value="owner">owner</option>
+              </select>
+              <button id="btn-add-admin" class="btn btn-gold btn-sm" type="submit">إضافة / ترقية</button>
+            </form>
+            <div id="admins-list" class="items-list compact-list"></div>
+          </div>
+
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">📒 سجل التدقيق الرقابي غير القابل للتعديل</h2>
+              <span id="audit-count-pill" class="badge-pill">0</span>
+            </div>
+            <div id="audit-logs-list" class="items-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./app.js" defer></script>
+  <script src="./cms_suite.js" defer></script>
 </body>
 </html>

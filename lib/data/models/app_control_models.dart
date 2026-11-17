@@ -498,6 +498,27 @@ class AppControlSnapshot {
       };
 }
 
+/// Version adoption distribution entry returned inside `AdminOverview`.
+class AdminVersionBreakdown {
+  final int? versionCode;
+  final String? appVersion;
+  final int playersCount;
+
+  const AdminVersionBreakdown({
+    this.versionCode,
+    this.appVersion,
+    this.playersCount = 0,
+  });
+
+  factory AdminVersionBreakdown.fromJson(Map<String, dynamic> json) {
+    return AdminVersionBreakdown(
+      versionCode: (json['version_code'] as num?)?.toInt(),
+      appVersion: json['app_version'] as String?,
+      playersCount: (json['players_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 /// Overview statistics shown at the top of the Admin Dashboard (in-app & web).
 class AdminOverview {
   final int totalAccounts;
@@ -506,6 +527,14 @@ class AdminOverview {
   final int active24h;
   final int activeEvents;
   final int activeAnnouncements;
+  final int cmsVersion;
+  final int storeItemsCount;
+  final int libraryItemsCount;
+  final int quizQuestionsCount;
+  final int totalGhosts;
+  final int activeGhosts;
+  final int humanGhosts;
+  final List<AdminVersionBreakdown> versionBreakdown;
   final AppReleaseConfig releaseConfig;
 
   const AdminOverview({
@@ -515,11 +544,30 @@ class AdminOverview {
     this.active24h = 0,
     this.activeEvents = 0,
     this.activeAnnouncements = 0,
+    this.cmsVersion = 1,
+    this.storeItemsCount = 0,
+    this.libraryItemsCount = 0,
+    this.quizQuestionsCount = 0,
+    this.totalGhosts = 0,
+    this.activeGhosts = 0,
+    this.humanGhosts = 0,
+    this.versionBreakdown = const [],
     this.releaseConfig = const AppReleaseConfig(),
   });
 
   factory AdminOverview.fromJson(Map<String, dynamic> json) {
     final rcRaw = json['release_config'];
+    final vbRaw = json['version_breakdown'];
+    final parsedBreakdown = <AdminVersionBreakdown>[];
+    if (vbRaw is List) {
+      for (final entry in vbRaw) {
+        if (entry is Map) {
+          parsedBreakdown.add(
+            AdminVersionBreakdown.fromJson(Map<String, dynamic>.from(entry)),
+          );
+        }
+      }
+    }
     return AdminOverview(
       totalAccounts: (json['total_accounts'] as num?)?.toInt() ?? 0,
       directoryPlayers: (json['directory_players'] as num?)?.toInt() ?? 0,
@@ -528,6 +576,14 @@ class AdminOverview {
       activeEvents: (json['active_events'] as num?)?.toInt() ?? 0,
       activeAnnouncements:
           (json['active_announcements'] as num?)?.toInt() ?? 0,
+      cmsVersion: (json['cms_version'] as num?)?.toInt() ?? 1,
+      storeItemsCount: (json['store_items_count'] as num?)?.toInt() ?? 0,
+      libraryItemsCount: (json['library_items_count'] as num?)?.toInt() ?? 0,
+      quizQuestionsCount: (json['quiz_questions_count'] as num?)?.toInt() ?? 0,
+      totalGhosts: (json['total_ghosts'] as num?)?.toInt() ?? 0,
+      activeGhosts: (json['active_ghosts'] as num?)?.toInt() ?? 0,
+      humanGhosts: (json['human_ghosts'] as num?)?.toInt() ?? 0,
+      versionBreakdown: List<AdminVersionBreakdown>.unmodifiable(parsedBreakdown),
       releaseConfig: rcRaw is Map
           ? AppReleaseConfig.fromJson(Map<String, dynamic>.from(rcRaw))
           : const AppReleaseConfig(),
@@ -582,6 +638,281 @@ class AdminPlayerSearchResult {
           ? DateTime.tryParse(json['last_seen_at'].toString())
           : null,
       isGuest: json['is_guest'] as bool? ?? false,
+    );
+  }
+}
+
+/// Owned store item snapshot returned inside `AdminPlayerDetail`.
+class AdminPlayerInventoryItem {
+  final String itemId;
+  final String title;
+  final String? category;
+  final bool isVisible;
+  final DateTime? purchasedAt;
+
+  const AdminPlayerInventoryItem({
+    required this.itemId,
+    required this.title,
+    this.category,
+    this.isVisible = true,
+    this.purchasedAt,
+  });
+
+  factory AdminPlayerInventoryItem.fromJson(Map<String, dynamic> json) {
+    return AdminPlayerInventoryItem(
+      itemId: (json['item_id'] ?? '').toString(),
+      title: (json['title'] ?? json['item_id'] ?? '').toString(),
+      category: json['category']?.toString(),
+      isVisible: json['is_visible'] as bool? ?? true,
+      purchasedAt: json['purchased_at'] != null
+          ? DateTime.tryParse(json['purchased_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Recent match summary returned inside `AdminPlayerDetail`.
+class AdminPlayerMatchRecord {
+  final String id;
+  final String status;
+  final String? winnerId;
+  final bool isGhostMatch;
+  final bool isFriendly;
+  final int myScore;
+  final DateTime? createdAt;
+
+  const AdminPlayerMatchRecord({
+    required this.id,
+    required this.status,
+    this.winnerId,
+    this.isGhostMatch = false,
+    this.isFriendly = false,
+    this.myScore = 0,
+    this.createdAt,
+  });
+
+  factory AdminPlayerMatchRecord.fromJson(Map<String, dynamic> json) {
+    return AdminPlayerMatchRecord(
+      id: (json['id'] ?? '').toString(),
+      status: (json['status'] ?? 'unknown').toString(),
+      winnerId: json['winner_id']?.toString(),
+      isGhostMatch: json['is_ghost_match'] as bool? ?? false,
+      isFriendly: json['is_friendly'] as bool? ?? false,
+      myScore: (json['my_score'] as num?)?.toInt() ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Comprehensive support dossier returned by `admin_get_player_detail`.
+class AdminPlayerDetail {
+  final String? userId;
+  final String? playerCode;
+  final Map<String, dynamic>? directory;
+  final Map<String, dynamic>? progress;
+  final Map<String, dynamic>? leaderboard;
+  final List<AdminPlayerInventoryItem> inventory;
+  final List<AdminPlayerMatchRecord> recentMatches;
+
+  const AdminPlayerDetail({
+    this.userId,
+    this.playerCode,
+    this.directory,
+    this.progress,
+    this.leaderboard,
+    this.inventory = const [],
+    this.recentMatches = const [],
+  });
+
+  String get displayName =>
+      (directory?['display_name'] ?? leaderboard?['display_name'] ?? 'لاعب')
+          .toString();
+
+  int get coins => (progress?['coins'] as num?)?.toInt() ?? 0;
+  int get gems => (progress?['gems'] as num?)?.toInt() ?? 0;
+  int get totalScore =>
+      (progress?['total_score'] as num?)?.toInt() ??
+      (leaderboard?['score'] as num?)?.toInt() ??
+      0;
+  int get playerLevel =>
+      (progress?['player_level'] as num?)?.toInt() ??
+      (leaderboard?['player_level'] as num?)?.toInt() ??
+      1;
+  int get trophies =>
+      (leaderboard?['trophies'] as num?)?.toInt() ??
+      (directory?['trophies'] as num?)?.toInt() ??
+      1000;
+  int get winStreak => (progress?['win_streak'] as num?)?.toInt() ?? 0;
+
+  bool get canReceiveCompensation =>
+      userId != null && userId!.isNotEmpty && progress != null;
+
+  factory AdminPlayerDetail.fromJson(Map<String, dynamic> json) {
+    final invRaw = json['inventory'];
+    final matchesRaw = json['recent_matches'];
+    return AdminPlayerDetail(
+      userId: json['user_id']?.toString(),
+      playerCode: json['player_code']?.toString(),
+      directory: json['directory'] is Map
+          ? Map<String, dynamic>.from(json['directory'] as Map)
+          : null,
+      progress: json['progress'] is Map
+          ? Map<String, dynamic>.from(json['progress'] as Map)
+          : null,
+      leaderboard: json['leaderboard'] is Map
+          ? Map<String, dynamic>.from(json['leaderboard'] as Map)
+          : null,
+      inventory: invRaw is List
+          ? invRaw
+              .whereType<Map>()
+              .map((e) =>
+                  AdminPlayerInventoryItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      recentMatches: matchesRaw is List
+          ? matchesRaw
+              .whereType<Map>()
+              .map((e) =>
+                  AdminPlayerMatchRecord.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+}
+
+/// Ghost recording telemetry entry from `admin_list_ghosts`.
+class AdminGhostSummary {
+  final String id;
+  final String? userId;
+  final String displayName;
+  final int playerLevel;
+  final int trophies;
+  final int totalScore;
+  final int useCount;
+  final bool isActive;
+  final bool isHuman;
+  final DateTime? createdAt;
+
+  const AdminGhostSummary({
+    required this.id,
+    this.userId,
+    required this.displayName,
+    this.playerLevel = 1,
+    this.trophies = 1000,
+    this.totalScore = 0,
+    this.useCount = 0,
+    this.isActive = true,
+    this.isHuman = false,
+    this.createdAt,
+  });
+
+  factory AdminGhostSummary.fromJson(Map<String, dynamic> json) {
+    return AdminGhostSummary(
+      id: (json['id'] ?? '').toString(),
+      userId: json['user_id']?.toString(),
+      displayName: (json['display_name'] ?? 'شبح').toString(),
+      playerLevel: (json['player_level'] as num?)?.toInt() ?? 1,
+      trophies: (json['trophies'] as num?)?.toInt() ?? 1000,
+      totalScore: (json['total_score'] as num?)?.toInt() ?? 0,
+      useCount: (json['use_count'] as num?)?.toInt() ?? 0,
+      isActive: json['is_active'] as bool? ?? true,
+      isHuman: json['is_human'] as bool? ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Immutable admin action log row returned by `admin_list_audit_logs`.
+class AdminAuditLogEntry {
+  final String id;
+  final String? adminEmail;
+  final String action;
+  final String targetType;
+  final String targetId;
+  final String reason;
+  final Map<String, dynamic> details;
+  final DateTime? createdAt;
+
+  const AdminAuditLogEntry({
+    required this.id,
+    this.adminEmail,
+    required this.action,
+    required this.targetType,
+    required this.targetId,
+    this.reason = '',
+    this.details = const {},
+    this.createdAt,
+  });
+
+  factory AdminAuditLogEntry.fromJson(Map<String, dynamic> json) {
+    final detRaw = json['details'];
+    return AdminAuditLogEntry(
+      id: (json['id'] ?? '').toString(),
+      adminEmail: json['admin_email']?.toString(),
+      action: (json['action'] ?? '').toString(),
+      targetType: (json['target_type'] ?? '').toString(),
+      targetId: (json['target_id'] ?? '').toString(),
+      reason: (json['reason'] ?? '').toString(),
+      details: detRaw is Map
+          ? Map<String, dynamic>.from(detRaw)
+          : const {},
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Admin account entry from `admin_list_admins`.
+class AdminRosterEntry {
+  final String email;
+  final String role;
+  final DateTime? createdAt;
+
+  const AdminRosterEntry({
+    required this.email,
+    this.role = 'admin',
+    this.createdAt,
+  });
+
+  bool get isOwner => role.trim().toLowerCase() == 'owner';
+
+  factory AdminRosterEntry.fromJson(Map<String, dynamic> json) {
+    return AdminRosterEntry(
+      email: (json['email'] ?? '').toString(),
+      role: (json['role'] ?? 'admin').toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Owner role flag + admin roster returned by `admin_list_admins`.
+class AdminRosterSnapshot {
+  final bool isOwner;
+  final List<AdminRosterEntry> admins;
+
+  const AdminRosterSnapshot({
+    this.isOwner = false,
+    this.admins = const [],
+  });
+
+  factory AdminRosterSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawList = json['admins'];
+    return AdminRosterSnapshot(
+      isOwner: json['is_owner'] as bool? ?? false,
+      admins: rawList is List
+          ? rawList
+              .whereType<Map>()
+              .map((e) =>
+                  AdminRosterEntry.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
     );
   }
 }

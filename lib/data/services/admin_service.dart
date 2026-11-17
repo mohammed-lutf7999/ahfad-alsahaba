@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_control_models.dart';
+import '../models/cms_models.dart';
+import '../models/store_item_model.dart';
 import 'app_control_service.dart';
 
 class AdminService {
@@ -91,6 +93,78 @@ class AdminService {
   })? userSearcherOverride;
 
   @visibleForTesting
+  Future<List<StoreItemModel>> Function()? storeItemsFetcherOverride;
+
+  @visibleForTesting
+  Future<StoreItemModel?> Function(Map<String, dynamic> params)?
+      storeItemUpserterOverride;
+
+  @visibleForTesting
+  Future<bool> Function({
+    required String entityType,
+    required String id,
+    required bool isVisible,
+  })? visibilitySetterOverride;
+
+  @visibleForTesting
+  Future<({List<DynamicLibrarySectionData> sections, List<DynamicLibraryItemData> items})>
+      Function({String? sectionId})? libraryContentFetcherOverride;
+
+  @visibleForTesting
+  Future<DynamicLibrarySectionData?> Function(Map<String, dynamic> params)?
+      librarySectionUpserterOverride;
+
+  @visibleForTesting
+  Future<DynamicLibraryItemData?> Function(Map<String, dynamic> params)?
+      libraryItemUpserterOverride;
+
+  @visibleForTesting
+  Future<({List<DynamicQuizCategoryData> categories, List<DynamicQuizQuestionData> questions})>
+      Function({String? categoryId, int? levelNumber, int limit})?
+      quizContentFetcherOverride;
+
+  @visibleForTesting
+  Future<DynamicQuizCategoryData?> Function(Map<String, dynamic> params)?
+      quizCategoryUpserterOverride;
+
+  @visibleForTesting
+  Future<DynamicQuizQuestionData?> Function(Map<String, dynamic> params)?
+      quizQuestionUpserterOverride;
+
+  @visibleForTesting
+  Future<AdminPlayerDetail?> Function({String? userId, String? playerCode})?
+      playerDetailFetcherOverride;
+
+  @visibleForTesting
+  Future<Map<String, dynamic>?> Function({
+    required String userId,
+    required int coinsDelta,
+    required int gemsDelta,
+    required int xpDelta,
+    required String reason,
+  })? playerCompensationOverride;
+
+  @visibleForTesting
+  Future<List<AdminGhostSummary>> Function({int limit})? ghostsFetcherOverride;
+
+  @visibleForTesting
+  Future<bool> Function(String ghostId, bool isActive)? ghostTogglerOverride;
+
+  @visibleForTesting
+  Future<List<AdminAuditLogEntry>> Function({int limit})?
+      auditLogsFetcherOverride;
+
+  @visibleForTesting
+  Future<AdminRosterSnapshot?> Function()? adminsFetcherOverride;
+
+  @visibleForTesting
+  Future<AdminRosterSnapshot?> Function({
+    required String action,
+    required String email,
+    String role,
+  })? adminManagerOverride;
+
+  @visibleForTesting
   void resetForTesting() {
     _cloudVerifiedAdmin = null;
     overviewFetcherOverride = null;
@@ -103,6 +177,22 @@ class AdminService {
     announcementCreatorOverride = null;
     announcementStatusSetterOverride = null;
     userSearcherOverride = null;
+    storeItemsFetcherOverride = null;
+    storeItemUpserterOverride = null;
+    visibilitySetterOverride = null;
+    libraryContentFetcherOverride = null;
+    librarySectionUpserterOverride = null;
+    libraryItemUpserterOverride = null;
+    quizContentFetcherOverride = null;
+    quizCategoryUpserterOverride = null;
+    quizQuestionUpserterOverride = null;
+    playerDetailFetcherOverride = null;
+    playerCompensationOverride = null;
+    ghostsFetcherOverride = null;
+    ghostTogglerOverride = null;
+    auditLogsFetcherOverride = null;
+    adminsFetcherOverride = null;
+    adminManagerOverride = null;
   }
 
   SupabaseClient? get _supabase {
@@ -474,6 +564,509 @@ class AdminService {
           .toList();
     }
     return [];
+  }
+
+  // ==================== DYNAMIC CMS & SUPPORT RPCS (MIGRATION 016) ====================
+
+  Future<List<StoreItemModel>> listStoreItems() async {
+    if (storeItemsFetcherOverride != null) {
+      return storeItemsFetcherOverride!();
+    }
+    final client = _supabase;
+    if (client == null) return [];
+    final res = await client
+        .rpc('admin_list_store_items')
+        .timeout(const Duration(seconds: 6));
+    if (res is List) {
+      return res
+          .whereType<Map>()
+          .map((e) =>
+              StoreItemModel.fromCloudJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<StoreItemModel?> upsertStoreItem({
+    required String id,
+    required String title,
+    String description = '',
+    required StoreItemCategory category,
+    int priceCoins = 0,
+    int priceGems = 0,
+    int minLevel = 1,
+    String assetKey = '',
+    bool isVisible = true,
+    int sortOrder = 100,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final params = <String, dynamic>{
+      'p_id': id.trim().toLowerCase(),
+      'p_title': title.trim(),
+      'p_description': description.trim(),
+      'p_category': category.name,
+      'p_price_coins': priceCoins.clamp(0, 1000000),
+      'p_price_gems': priceGems.clamp(0, 100000),
+      'p_min_level': minLevel.clamp(1, 100),
+      'p_asset_key': assetKey.trim(),
+      'p_is_visible': isVisible,
+      'p_sort_order': sortOrder,
+      'p_metadata': metadata,
+    };
+    if (storeItemUpserterOverride != null) {
+      return storeItemUpserterOverride!(params);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_upsert_store_item', params: params)
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final parsed =
+          StoreItemModel.fromCloudJson(Map<String, dynamic>.from(res));
+      unawaited(AppControlService.instance.syncControlState(force: true));
+      return parsed;
+    }
+    return null;
+  }
+
+  Future<bool> setContentVisibility({
+    required String entityType,
+    required String id,
+    required bool isVisible,
+  }) async {
+    if (visibilitySetterOverride != null) {
+      return visibilitySetterOverride!(
+        entityType: entityType,
+        id: id,
+        isVisible: isVisible,
+      );
+    }
+    final client = _supabase;
+    if (client == null) return false;
+    final res = await client.rpc(
+      'admin_set_content_visibility',
+      params: {
+        'p_entity_type': entityType,
+        'p_id': id,
+        'p_is_visible': isVisible,
+      },
+    ).timeout(const Duration(seconds: 6));
+    final ok = res is Map && res['ok'] == true;
+    if (ok) {
+      unawaited(AppControlService.instance.syncControlState(force: true));
+    }
+    return ok;
+  }
+
+  Future<
+      ({
+        List<DynamicLibrarySectionData> sections,
+        List<DynamicLibraryItemData> items,
+      })> listLibraryContent({String? sectionId}) async {
+    if (libraryContentFetcherOverride != null) {
+      return libraryContentFetcherOverride!(sectionId: sectionId);
+    }
+    final client = _supabase;
+    if (client == null) return (sections: <DynamicLibrarySectionData>[], items: <DynamicLibraryItemData>[]);
+    final res = await client.rpc(
+      'admin_list_library_content',
+      params: {'p_section_id': sectionId},
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final secRaw = res['sections'] as List? ?? const [];
+      final itemRaw = res['items'] as List? ?? const [];
+      return (
+        sections: secRaw
+            .whereType<Map>()
+            .map((e) => DynamicLibrarySectionData.fromJson(
+                Map<String, dynamic>.from(e)))
+            .toList(),
+        items: itemRaw
+            .whereType<Map>()
+            .map((e) =>
+                DynamicLibraryItemData.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
+    }
+    return (sections: <DynamicLibrarySectionData>[], items: <DynamicLibraryItemData>[]);
+  }
+
+  Future<DynamicLibrarySectionData?> upsertLibrarySection({
+    required String id,
+    required String title,
+    String iconName = 'auto_stories_rounded',
+    String colorHex = '#D4AF37',
+    int sortOrder = 100,
+    bool isVisible = true,
+  }) async {
+    final params = <String, dynamic>{
+      'p_id': id.trim().toLowerCase(),
+      'p_title': title.trim(),
+      'p_icon_name': iconName,
+      'p_color_hex': colorHex.trim(),
+      'p_sort_order': sortOrder,
+      'p_is_visible': isVisible,
+    };
+    if (librarySectionUpserterOverride != null) {
+      return librarySectionUpserterOverride!(params);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_upsert_library_section', params: params)
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final sec = DynamicLibrarySectionData.fromJson(
+          Map<String, dynamic>.from(res));
+      unawaited(AppControlService.instance.syncControlState(force: true));
+      return sec;
+    }
+    return null;
+  }
+
+  Future<DynamicLibraryItemData?> upsertLibraryItem({
+    String? id,
+    required String sectionId,
+    required String title,
+    String subtitle = '',
+    required String content,
+    String sourceRef = '',
+    int sortOrder = 100,
+    bool isVisible = true,
+  }) async {
+    final params = <String, dynamic>{
+      'p_id': (id == null || id.trim().isEmpty) ? null : id.trim(),
+      'p_section_id': sectionId.trim().toLowerCase(),
+      'p_title': title.trim(),
+      'p_subtitle': subtitle.trim(),
+      'p_content': content.trim(),
+      'p_source_ref': sourceRef.trim(),
+      'p_sort_order': sortOrder,
+      'p_is_visible': isVisible,
+    };
+    if (libraryItemUpserterOverride != null) {
+      return libraryItemUpserterOverride!(params);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_upsert_library_item', params: params)
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final item =
+          DynamicLibraryItemData.fromJson(Map<String, dynamic>.from(res));
+      unawaited(AppControlService.instance.syncControlState(force: true));
+      return item;
+    }
+    return null;
+  }
+
+  Future<
+      ({
+        List<DynamicQuizCategoryData> categories,
+        List<DynamicQuizQuestionData> questions,
+      })> listQuizContent({
+    String? categoryId,
+    int? levelNumber,
+    int limit = 100,
+  }) async {
+    if (quizContentFetcherOverride != null) {
+      return quizContentFetcherOverride!(
+        categoryId: categoryId,
+        levelNumber: levelNumber,
+        limit: limit,
+      );
+    }
+    final client = _supabase;
+    if (client == null) {
+      return (
+        categories: <DynamicQuizCategoryData>[],
+        questions: <DynamicQuizQuestionData>[],
+      );
+    }
+    final res = await client.rpc(
+      'admin_list_quiz_content',
+      params: {
+        'p_category_id': categoryId,
+        'p_level_number': levelNumber,
+        'p_limit': limit.clamp(1, 250),
+      },
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final catRaw = res['categories'] as List? ?? const [];
+      final qRaw = res['questions'] as List? ?? const [];
+      return (
+        categories: catRaw
+            .whereType<Map>()
+            .map((e) => DynamicQuizCategoryData.fromJson(
+                Map<String, dynamic>.from(e)))
+            .toList(),
+        questions: qRaw
+            .whereType<Map>()
+            .map((e) => DynamicQuizQuestionData.fromJson(
+                Map<String, dynamic>.from(e)))
+            .toList(),
+      );
+    }
+    return (
+      categories: <DynamicQuizCategoryData>[],
+      questions: <DynamicQuizQuestionData>[],
+    );
+  }
+
+  Future<DynamicQuizCategoryData?> upsertQuizCategory({
+    required String id,
+    required String name,
+    String description = '',
+    String iconName = 'quiz_rounded',
+    String colorHex = '#1B5E20',
+    int totalLevels = 10,
+    int sortOrder = 100,
+    bool isVisible = true,
+    bool isLocked = false,
+  }) async {
+    final params = <String, dynamic>{
+      'p_id': id.trim().toLowerCase(),
+      'p_name': name.trim(),
+      'p_description': description.trim(),
+      'p_icon_name': iconName,
+      'p_color_hex': colorHex.trim(),
+      'p_total_levels': totalLevels.clamp(1, 100),
+      'p_sort_order': sortOrder,
+      'p_is_visible': isVisible,
+      'p_is_locked': isLocked,
+    };
+    if (quizCategoryUpserterOverride != null) {
+      return quizCategoryUpserterOverride!(params);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_upsert_quiz_category', params: params)
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final cat =
+          DynamicQuizCategoryData.fromJson(Map<String, dynamic>.from(res));
+      unawaited(AppControlService.instance.syncControlState(force: true));
+      return cat;
+    }
+    return null;
+  }
+
+  Future<DynamicQuizQuestionData?> upsertQuizQuestion({
+    String? id,
+    required String categoryId,
+    required int levelNumber,
+    required String questionText,
+    required List<String> options,
+    required int correctIndex,
+    String explanation = '',
+    String syncScope = 'solo_only',
+    int sortOrder = 100,
+    bool isVisible = true,
+  }) async {
+    if (options.length != 4 || options.any((o) => o.trim().isEmpty)) {
+      throw ArgumentError('يجب توفير 4 خيارات غير فارغة للسؤال');
+    }
+    if (correctIndex < 0 || correctIndex > 3) {
+      throw ArgumentError('رقم الإجابة الصحيحة يجب أن يكون بين 0 و 3');
+    }
+    final params = <String, dynamic>{
+      'p_id': (id == null || id.trim().isEmpty) ? null : id.trim(),
+      'p_category_id': categoryId.trim().toLowerCase(),
+      'p_level_number': levelNumber.clamp(1, 100),
+      'p_question_text': questionText.trim(),
+      'p_options': options.map((e) => e.trim()).toList(),
+      'p_correct_index': correctIndex,
+      'p_explanation': explanation.trim(),
+      'p_sync_scope': syncScope,
+      'p_sort_order': sortOrder,
+      'p_is_visible': isVisible,
+    };
+    if (quizQuestionUpserterOverride != null) {
+      return quizQuestionUpserterOverride!(params);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_upsert_quiz_question', params: params)
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      final q =
+          DynamicQuizQuestionData.fromJson(Map<String, dynamic>.from(res));
+      unawaited(AppControlService.instance.syncControlState(force: true));
+      return q;
+    }
+    return null;
+  }
+
+  Future<AdminPlayerDetail?> getPlayerDetail({
+    String? userId,
+    String? playerCode,
+  }) async {
+    if (playerDetailFetcherOverride != null) {
+      return playerDetailFetcherOverride!(
+        userId: userId,
+        playerCode: playerCode,
+      );
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client.rpc(
+      'admin_get_player_detail',
+      params: {
+        'p_user_id': userId,
+        'p_player_code': playerCode?.trim().toUpperCase(),
+      },
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminPlayerDetail.fromJson(Map<String, dynamic>.from(res));
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> grantPlayerCompensation({
+    required String userId,
+    int coinsDelta = 0,
+    int gemsDelta = 0,
+    int xpDelta = 0,
+    required String reason,
+  }) async {
+    if (userId.trim().isEmpty) {
+      throw ArgumentError('معرّف اللاعب مطلوب لمنح التعويض');
+    }
+    if (coinsDelta < 0 ||
+        coinsDelta > 10000 ||
+        gemsDelta < 0 ||
+        gemsDelta > 100 ||
+        xpDelta < 0 ||
+        xpDelta > 5000) {
+      throw RangeError('تجاوزت الحدود القصوى المسموحة للتعويض');
+    }
+    if (coinsDelta == 0 && gemsDelta == 0 && xpDelta == 0) {
+      throw ArgumentError('يجب إدخال قيمة واحدة على الأقل للتعويض');
+    }
+    final cleanedReason = reason.trim();
+    if (cleanedReason.length < 3) {
+      throw ArgumentError('سبب التعويض مطلوب (3 أحرف على الأقل)');
+    }
+    if (playerCompensationOverride != null) {
+      return playerCompensationOverride!(
+        userId: userId.trim(),
+        coinsDelta: coinsDelta,
+        gemsDelta: gemsDelta,
+        xpDelta: xpDelta,
+        reason: cleanedReason,
+      );
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client.rpc(
+      'admin_grant_player_compensation',
+      params: {
+        'p_user_id': userId.trim(),
+        'p_coins_delta': coinsDelta,
+        'p_gems_delta': gemsDelta,
+        'p_xp_delta': xpDelta,
+        'p_reason': cleanedReason,
+      },
+    ).timeout(const Duration(seconds: 6));
+    return res is Map ? Map<String, dynamic>.from(res) : null;
+  }
+
+  Future<List<AdminGhostSummary>> listGhosts({int limit = 30}) async {
+    if (ghostsFetcherOverride != null) {
+      return ghostsFetcherOverride!(limit: limit);
+    }
+    final client = _supabase;
+    if (client == null) return [];
+    final res = await client.rpc(
+      'admin_list_ghosts',
+      params: {'p_limit': limit.clamp(1, 100)},
+    ).timeout(const Duration(seconds: 6));
+    if (res is List) {
+      return res
+          .whereType<Map>()
+          .map((e) => AdminGhostSummary.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<bool> toggleGhost(String ghostId, bool isActive) async {
+    if (ghostTogglerOverride != null) {
+      return ghostTogglerOverride!(ghostId, isActive);
+    }
+    final client = _supabase;
+    if (client == null) return false;
+    final res = await client.rpc(
+      'admin_toggle_ghost',
+      params: {
+        'p_ghost_id': ghostId,
+        'p_is_active': isActive,
+      },
+    ).timeout(const Duration(seconds: 6));
+    return res == true;
+  }
+
+  Future<List<AdminAuditLogEntry>> listAuditLogs({int limit = 50}) async {
+    if (auditLogsFetcherOverride != null) {
+      return auditLogsFetcherOverride!(limit: limit);
+    }
+    final client = _supabase;
+    if (client == null) return [];
+    final res = await client.rpc(
+      'admin_list_audit_logs',
+      params: {'p_limit': limit.clamp(1, 200)},
+    ).timeout(const Duration(seconds: 6));
+    if (res is List) {
+      return res
+          .whereType<Map>()
+          .map(
+              (e) => AdminAuditLogEntry.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<AdminRosterSnapshot?> listAdmins() async {
+    if (adminsFetcherOverride != null) {
+      return adminsFetcherOverride!();
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_list_admins')
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminRosterSnapshot.fromJson(Map<String, dynamic>.from(res));
+    }
+    return null;
+  }
+
+  Future<AdminRosterSnapshot?> manageAdmin({
+    required String action,
+    required String email,
+    String role = 'admin',
+  }) async {
+    if (adminManagerOverride != null) {
+      return adminManagerOverride!(action: action, email: email, role: role);
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client.rpc(
+      'admin_manage_admin',
+      params: {
+        'p_action': action.trim().toLowerCase(),
+        'p_email': email.trim().toLowerCase(),
+        'p_role': role.trim().toLowerCase(),
+      },
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminRosterSnapshot.fromJson(Map<String, dynamic>.from(res));
+    }
+    return null;
   }
 
   // ==================== LEGACY BROADCAST & EMAIL HELPERS ====================

@@ -288,6 +288,7 @@ async function loadAllDashboardData() {
     loadOverview(),
     loadAnnouncements(),
     loadDynamicEvents(),
+    window.SahabaCmsSuite?.onDashboardLoad?.(),
   ]);
 }
 
@@ -304,6 +305,14 @@ async function loadOverview() {
   document.getElementById('stat-guest-players').textContent = ov.guest_players ?? 0;
   document.getElementById('stat-active-events').textContent = ov.active_events ?? 0;
   document.getElementById('stat-active-announcements').textContent = ov.active_announcements ?? 0;
+  document.getElementById('stat-store-items').textContent = ov.store_items_count ?? 0;
+  document.getElementById('stat-library-items').textContent = ov.library_items_count ?? 0;
+  document.getElementById('stat-quiz-questions').textContent = ov.quiz_questions_count ?? 0;
+  document.getElementById('stat-ghosts-summary').textContent =
+    `${ov.active_ghosts ?? 0} / ${ov.total_ghosts ?? 0}`;
+  document.getElementById('topbar-cms-ver').textContent = `#${ov.cms_version ?? 1}`;
+
+  window.SahabaCmsSuite?.onOverview?.(ov);
 
   if (ov.release_config) {
     hydrateReleaseForm(ov.release_config);
@@ -316,8 +325,8 @@ function hydrateReleaseForm(rc) {
   document.getElementById('rc-maintenance-title').value = rc.maintenance_title ?? 'صيانة وتحسينات مؤقتة';
   document.getElementById('rc-maintenance-message').value = rc.maintenance_message ?? '';
   document.getElementById('rc-min-version').value = rc.min_version_code ?? 1;
-  document.getElementById('rc-latest-version').value = rc.latest_version_code ?? 19;
-  document.getElementById('rc-latest-name').value = rc.latest_version_name ?? '1.0.18';
+  document.getElementById('rc-latest-version').value = rc.latest_version_code ?? 20;
+  document.getElementById('rc-latest-name').value = rc.latest_version_name ?? '1.0.19';
   document.getElementById('rc-update-url').value = rc.update_url ?? '';
   document.getElementById('rc-update-title').value = rc.update_title ?? 'تحديث جديد متاح';
   document.getElementById('rc-update-message').value = rc.update_message ?? '';
@@ -1058,6 +1067,43 @@ async function init() {
     setAuthWarning(`تعذر تهيئة الاتصال بـ Supabase: ${err?.message || err}`);
   }
 }
+
+function switchToTab(tabName) {
+  const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+  const targetPanel = document.getElementById(`tab-${tabName}`);
+  if (!targetBtn || !targetPanel) return;
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+  targetBtn.classList.add('active');
+  targetPanel.classList.add('active');
+}
+
+function selectPlayerForAnnouncement(playerObj) {
+  if (!playerObj) return;
+  state.selectedPlayer = {
+    user_id: playerObj.user_id || null,
+    player_code: playerObj.player_code || null,
+    display_name: playerObj.display_name || 'لاعب',
+  };
+  document.getElementById('ann-scope').value = 'single_user';
+  document.getElementById('single-user-box').classList.remove('hidden');
+  document.getElementById('manual-player-code').value = '';
+  renderSelectedPlayerBanner();
+  updateAnnouncementPreview();
+  switchToTab('announcements');
+}
+
+window.SahabaAdminBridge = {
+  getSupabase: () => supabase,
+  escapeHtml,
+  safeHexColor,
+  showToast,
+  formatDateDisplay,
+  isValidPlayerCode,
+  loadOverview,
+  switchToTab,
+  selectPlayerForAnnouncement,
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="معركة أحفاد الصحابة">
+  <defs>
+    <linearGradient id="royalBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d1b4e" />
+      <stop offset="100%" stop-color="#0d061a" />
+    </linearGradient>
+    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3c644" />
+      <stop offset="100%" stop-color="#b8860b" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#royalBg)" />
+  <path
+    d="M32 8L51 16V31C51 43.2 42.9 52.8 32 56C21.1 52.8 13 43.2 13 31V16L32 8Z"
+    fill="none"
+    stroke="url(#goldRim)"
+    stroke-width="3.2"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M32 17L36.5 26.8L47 28L39.2 35.2L41.3 45.6L32 40.3L22.7 45.6L24.8 35.2L17 28L27.5 26.8Z"
+    fill="url(#goldRim)"
+  />
+</svg>
