@@ -223,8 +223,13 @@ class StoreService extends ChangeNotifier {
           }
         }
       }
+    } on PostgrestException catch (e) {
+      return (
+        success: false,
+        message: 'تعذر إتمام الشراء من الخادم: ${e.message}',
+      );
     } catch (e) {
-      debugPrint('StoreService: Offline/RPC purchase notice: $e');
+      debugPrint('StoreService: Offline purchase notice (fallback to local sync): $e');
     }
 
     // 4. Deduct, equip, save locally, and sync via ProgressionService

@@ -147,30 +147,48 @@ class RoyalFrameStyle {
   /// Builds a procedural [RoyalFrameStyle] from a dynamic CMS Store frame item.
   factory RoyalFrameStyle.fromStoreItem(StoreItemModel item) {
     final meta = item.metadata;
-    final secondary =
-        CmsIconRegistry.tryParseColor(meta['secondaryColor']) ??
-            item.previewColor;
-    final primary =
-        CmsIconRegistry.tryParseColor(meta['primaryColor']) ??
-            Color.lerp(secondary, Colors.black, 0.45) ??
-            secondary;
-    final highlight =
-        CmsIconRegistry.tryParseColor(meta['highlightColor']) ??
-            Color.lerp(secondary, Colors.white, 0.65) ??
-            Colors.white;
-    final rawStroke = (meta['strokeRatio'] as num?)?.toDouble() ?? 0.095;
+    final secondary = CmsIconRegistry.tryParseColor(
+          meta['secondaryColor'] ??
+              meta['secondary_color'] ??
+              meta['previewColor'],
+        ) ??
+        item.previewColor;
+    final primary = CmsIconRegistry.tryParseColor(
+          meta['primaryColor'] ?? meta['primary_color'],
+        ) ??
+        Color.lerp(secondary, Colors.black, 0.45) ??
+        secondary;
+    final highlight = CmsIconRegistry.tryParseColor(
+          meta['highlightColor'] ??
+              meta['glow_color'] ??
+              meta['highlight_color'],
+        ) ??
+        Color.lerp(secondary, Colors.white, 0.65) ??
+        Colors.white;
+    final rawStroke =
+        ((meta['strokeRatio'] ?? meta['stroke_ratio']) as num?)?.toDouble() ??
+            0.095;
     final tierFromLevel = ((item.minLevel / 10).ceil()).clamp(2, 10);
 
     return RoyalFrameStyle(
       frameKey: item.assetKey.isNotEmpty ? item.assetKey : item.id,
       name: item.title,
-      tierIndex: (meta['tierIndex'] as num?)?.toInt() ?? tierFromLevel,
+      tierIndex:
+          ((meta['tierIndex'] ?? meta['tier_index']) as num?)?.toInt() ??
+              tierFromLevel,
       primaryColor: primary,
       secondaryColor: secondary,
       highlightColor: highlight,
-      hasOctagonalStar: meta['hasOctagonalStar'] as bool? ?? true,
-      hasCornerGems: meta['hasCornerGems'] as bool? ?? true,
-      hasCrownCrest: meta['hasCrownCrest'] as bool? ?? (item.minLevel >= 60),
+      hasOctagonalStar: (meta['hasOctagonalStar'] ??
+              meta['has_octagonal_star']) as bool? ??
+          true,
+      hasCornerGems: (meta['hasCornerGems'] ??
+              meta['show_gems'] ??
+              meta['has_corner_gems']) as bool? ??
+          true,
+      hasCrownCrest: (meta['hasCrownCrest'] ??
+              meta['has_crown_crest']) as bool? ??
+          (item.minLevel >= 60),
       strokeRatio: rawStroke.clamp(0.06, 0.14),
     );
   }

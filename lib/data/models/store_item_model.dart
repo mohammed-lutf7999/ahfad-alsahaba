@@ -320,8 +320,15 @@ class StoreItemModel {
     );
     final meta = _parseMeta(json['metadata']);
     final resolvedColor = CmsIconRegistry.tryParseColor(meta['previewColor']) ??
-        CmsIconRegistry.tryParseColor(meta['sovereignAccent']) ??
-        CmsIconRegistry.tryParseColor(meta['secondaryColor']) ??
+        CmsIconRegistry.tryParseColor(
+          meta['sovereignAccent'] ?? meta['accent_gold'] ?? meta['accent_color'],
+        ) ??
+        CmsIconRegistry.tryParseColor(
+          meta['secondaryColor'] ?? meta['secondary_color'],
+        ) ??
+        CmsIconRegistry.tryParseColor(
+          meta['primaryColor'] ?? meta['primary_color'],
+        ) ??
         fallback?.previewColor ??
         const Color(0xFFF3C644);
     final resolvedIcon = CmsIconRegistry.resolveIcon(

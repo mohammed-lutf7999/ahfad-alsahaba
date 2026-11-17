@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ahfad_alsahaba/core/theme/app_custom_theme.dart';
 import 'package:ahfad_alsahaba/data/local/shared_prefs_service.dart';
@@ -510,6 +511,67 @@ void main() {
       final mpQuestions = await QuestionService().getQuestionsForMultiplayer(42);
       expect(mpQuestions.length, 5);
       expect(mpQuestions.any((q) => q.id == 'gh_12_1'), isFalse);
+    });
+
+    test('Web Admin snake_case metadata resolves exact theme/frame colors & PostgrestException blocks local purchase', () async {
+      final snakeThemeItem = StoreItemModel.fromCloudJson({
+        'id': 'theme_snake_web',
+        'title': 'ثيم ويب متوافق',
+        'category': 'theme',
+        'price_coins': 250,
+        'asset_key': 'snake_web_theme',
+        'is_visible': true,
+        'metadata': {
+          'bg_primary': '#062B22',
+          'bg_secondary': '#0C4A3B',
+          'surface_card': '#0B3A2E',
+          'accent_gold': '#2DD4BF',
+          'accent_secondary': '#F472B6',
+        },
+      });
+      final resolvedTheme = AppCustomTheme.fromStoreItem(snakeThemeItem);
+      expect(resolvedTheme.deepBackground, equals(const Color(0xFF062B22)));
+      expect(resolvedTheme.surfaceCard, equals(const Color(0xFF0B3A2E)));
+      expect(resolvedTheme.sovereignAccent, equals(const Color(0xFF2DD4BF)));
+      expect(resolvedTheme.secondaryAccent, equals(const Color(0xFFF472B6)));
+      expect(snakeThemeItem.previewColor, equals(const Color(0xFF2DD4BF)));
+
+      final snakeFrameItem = StoreItemModel.fromCloudJson({
+        'id': 'frame_snake_web',
+        'title': 'إطار ويب متوافق',
+        'category': 'frame',
+        'price_coins': 300,
+        'asset_key': 'snake_web_frame',
+        'is_visible': true,
+        'metadata': {
+          'primary_color': '#1E293B',
+          'secondary_color': '#38BDF8',
+          'glow_color': '#E0F2FE',
+          'show_gems': false,
+        },
+      });
+      final resolvedFrame = RoyalFrameStyle.fromStoreItem(snakeFrameItem);
+      expect(resolvedFrame.primaryColor, equals(const Color(0xFF1E293B)));
+      expect(resolvedFrame.secondaryColor, equals(const Color(0xFF38BDF8)));
+      expect(resolvedFrame.highlightColor, equals(const Color(0xFFE0F2FE)));
+      expect(resolvedFrame.hasCornerGems, isFalse);
+
+      // PostgrestException from server MUST NOT fall back to local purchase
+      final profile = ProfileService.instance.activeProfile!;
+      profile.coins = 5000;
+      profile.linkedUserId = 'user_auth_1';
+      StoreService.instance.purchaseRpcOverride = ({
+        required String userId,
+        required String itemId,
+      }) async {
+        throw const PostgrestException(message: 'RLS rejection test', code: '42501');
+      };
+
+      final blocked = await StoreService.instance.purchaseOrEquip(snakeThemeItem);
+      expect(blocked.success, isFalse);
+      expect(blocked.message, contains('RLS rejection test'));
+      expect(profile.coins, equals(5000));
+      expect(profile.unlockedItemIds.contains('theme_snake_web'), isFalse);
     });
   });
 }

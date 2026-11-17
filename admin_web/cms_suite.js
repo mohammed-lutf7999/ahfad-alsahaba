@@ -119,26 +119,45 @@
 
   function collectStoreMetadata(cat) {
     if (cat === 'theme') {
+      const bg1 = safeHex(document.getElementById('st-th-bg1').value, '#1a0b2e').toUpperCase();
+      const bg2 = safeHex(document.getElementById('st-th-bg2').value, '#2d1b4e').toUpperCase();
+      const card = safeHex(document.getElementById('st-th-card').value, '#24143d').toUpperCase();
+      const gold = safeHex(document.getElementById('st-th-gold').value, '#f3c644').toUpperCase();
+      const sec = safeHex(document.getElementById('st-th-sec').value, '#38bdf8').toUpperCase();
       return {
-        bg_primary: safeHex(document.getElementById('st-th-bg1').value, '#1a0b2e').toUpperCase(),
-        bg_secondary: safeHex(document.getElementById('st-th-bg2').value, '#2d1b4e').toUpperCase(),
-        surface_card: safeHex(document.getElementById('st-th-card').value, '#24143d').toUpperCase(),
-        accent_gold: safeHex(document.getElementById('st-th-gold').value, '#f3c644').toUpperCase(),
-        accent_secondary: safeHex(document.getElementById('st-th-sec').value, '#38bdf8').toUpperCase(),
+        deepBackground: bg1,
+        surfaceCard: card,
+        sovereignAccent: gold,
+        secondaryAccent: sec,
+        previewColor: gold,
+        bg_primary: bg1,
+        bg_secondary: bg2,
+        surface_card: card,
+        accent_gold: gold,
+        accent_secondary: sec,
       };
     }
     if (cat === 'frame') {
+      const c1 = safeHex(document.getElementById('st-fr-c1').value, '#f3c644').toUpperCase();
+      const c2 = safeHex(document.getElementById('st-fr-c2').value, '#10b981').toUpperCase();
+      const glow = safeHex(document.getElementById('st-fr-glow').value, '#f3c644').toUpperCase();
+      const pattern = document.getElementById('st-fr-pattern').value || 'aurora';
+      const gems = document.getElementById('st-fr-gems').checked;
       return {
-        primary_color: safeHex(document.getElementById('st-fr-c1').value, '#f3c644').toUpperCase(),
-        secondary_color: safeHex(document.getElementById('st-fr-c2').value, '#10b981').toUpperCase(),
-        glow_color: safeHex(document.getElementById('st-fr-glow').value, '#f3c644').toUpperCase(),
-        pattern_type: document.getElementById('st-fr-pattern').value || 'aurora',
-        show_gems: document.getElementById('st-fr-gems').checked,
+        primaryColor: c1,
+        secondaryColor: c2,
+        highlightColor: glow,
+        previewColor: c2,
+        hasCornerGems: gems,
+        hasOctagonalStar: true,
+        pattern_type: pattern,
       };
     }
     const qtyRaw = document.getElementById('st-powerup-qty').value.trim();
+    const badgeHex = safeHex(document.getElementById('st-badge-color').value, '#f3c644').toUpperCase();
     const meta = {
-      accent_color: safeHex(document.getElementById('st-badge-color').value, '#f3c644').toUpperCase(),
+      previewColor: badgeHex,
+      sovereignAccent: badgeHex,
     };
     if (qtyRaw && Number.isFinite(Number(qtyRaw))) {
       meta.quantity = Number.parseInt(qtyRaw, 10);
@@ -160,16 +179,16 @@
     let visualHtml = '<div style="font-size:2rem;">🎖️</div>';
     let cardStyle = '';
     if (cat === 'theme') {
-      cardStyle = `background:linear-gradient(145deg, ${meta.bg_primary}, ${meta.bg_secondary});border-color:${meta.accent_gold};`;
-      visualHtml = `<span class="preview-badge" style="background:${meta.surface_card};color:${meta.accent_gold};border:1px solid ${meta.accent_secondary};">معاينة الثيم الملكي</span>`;
+      cardStyle = `background:linear-gradient(145deg, ${meta.bg_primary}, ${meta.bg_secondary});border-color:${meta.sovereignAccent};`;
+      visualHtml = `<span class="preview-badge" style="background:${meta.surfaceCard};color:${meta.sovereignAccent};border:1px solid ${meta.secondaryAccent};">معاينة الثيم الملكي</span>`;
     } else if (cat === 'frame') {
       visualHtml = `
-        <div class="preview-frame-ring" style="border:3px solid ${meta.primary_color};box-shadow:0 0 18px ${meta.glow_color};background:linear-gradient(135deg, ${meta.primary_color}22, ${meta.secondary_color}33);">
-          ${meta.show_gems ? '💎' : '⚔️'}
+        <div class="preview-frame-ring" style="border:3px solid ${meta.primaryColor};box-shadow:0 0 18px ${meta.highlightColor};background:linear-gradient(135deg, ${meta.primaryColor}22, ${meta.secondaryColor}33);">
+          ${meta.hasCornerGems ? '💎' : '⚔️'}
         </div>
       `;
     } else {
-      visualHtml = `<span class="preview-badge" style="background:${meta.accent_color}25;color:${meta.accent_color};border:1px solid ${meta.accent_color};">${cat === 'powerup' ? '⚡ قدرة' : '👑 وسام'}</span>`;
+      visualHtml = `<span class="preview-badge" style="background:${meta.previewColor}25;color:${meta.previewColor};border:1px solid ${meta.previewColor};">${cat === 'powerup' ? '⚡ قدرة' : '👑 وسام'}</span>`;
     }
 
     const priceTag = gems > 0 ? `💎 ${gems} ياقوتة` : `🪙 ${coins} دينار`;
@@ -217,19 +236,47 @@
 
     const meta = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
     if (item.category === 'theme') {
-      document.getElementById('st-th-bg1').value = safeHex(meta.bg_primary, '#1a0b2e').toLowerCase();
-      document.getElementById('st-th-bg2').value = safeHex(meta.bg_secondary, '#2d1b4e').toLowerCase();
-      document.getElementById('st-th-card').value = safeHex(meta.surface_card, '#24143d').toLowerCase();
-      document.getElementById('st-th-gold').value = safeHex(meta.accent_gold, '#f3c644').toLowerCase();
-      document.getElementById('st-th-sec').value = safeHex(meta.accent_secondary, '#38bdf8').toLowerCase();
+      document.getElementById('st-th-bg1').value = safeHex(
+        meta.deepBackground ?? meta.bg_primary,
+        '#1a0b2e',
+      ).toLowerCase();
+      document.getElementById('st-th-bg2').value = safeHex(
+        meta.bg_secondary ?? meta.surfaceCard,
+        '#2d1b4e',
+      ).toLowerCase();
+      document.getElementById('st-th-card').value = safeHex(
+        meta.surfaceCard ?? meta.surface_card,
+        '#24143d',
+      ).toLowerCase();
+      document.getElementById('st-th-gold').value = safeHex(
+        meta.sovereignAccent ?? meta.accent_gold,
+        '#f3c644',
+      ).toLowerCase();
+      document.getElementById('st-th-sec').value = safeHex(
+        meta.secondaryAccent ?? meta.accent_secondary,
+        '#38bdf8',
+      ).toLowerCase();
     } else if (item.category === 'frame') {
-      document.getElementById('st-fr-c1').value = safeHex(meta.primary_color, '#f3c644').toLowerCase();
-      document.getElementById('st-fr-c2').value = safeHex(meta.secondary_color, '#10b981').toLowerCase();
-      document.getElementById('st-fr-glow').value = safeHex(meta.glow_color, '#f3c644').toLowerCase();
+      document.getElementById('st-fr-c1').value = safeHex(
+        meta.primaryColor ?? meta.primary_color,
+        '#f3c644',
+      ).toLowerCase();
+      document.getElementById('st-fr-c2').value = safeHex(
+        meta.secondaryColor ?? meta.secondary_color,
+        '#10b981',
+      ).toLowerCase();
+      document.getElementById('st-fr-glow').value = safeHex(
+        meta.highlightColor ?? meta.glow_color,
+        '#f3c644',
+      ).toLowerCase();
       document.getElementById('st-fr-pattern').value = meta.pattern_type || 'aurora';
-      document.getElementById('st-fr-gems').checked = meta.show_gems !== false;
+      document.getElementById('st-fr-gems').checked =
+        (meta.hasCornerGems ?? meta.show_gems) !== false;
     } else {
-      document.getElementById('st-badge-color').value = safeHex(meta.accent_color, '#f3c644').toLowerCase();
+      document.getElementById('st-badge-color').value = safeHex(
+        meta.previewColor ?? meta.sovereignAccent ?? meta.accent_color,
+        '#f3c644',
+      ).toLowerCase();
       document.getElementById('st-powerup-qty').value = meta.quantity ?? '';
     }
     syncStoreMetadataPanels();

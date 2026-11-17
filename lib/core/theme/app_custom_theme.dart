@@ -95,17 +95,32 @@ class AppCustomTheme extends ThemeExtension<AppCustomTheme> {
   /// Builds a dynamic [AppCustomTheme] from a cloud-configured Store item.
   factory AppCustomTheme.fromStoreItem(StoreItemModel item) {
     final meta = item.metadata;
-    final accent = CmsIconRegistry.tryParseColor(meta['sovereignAccent']) ??
+    final accent = CmsIconRegistry.tryParseColor(
+          meta['sovereignAccent'] ??
+              meta['accent_gold'] ??
+              meta['accent_color'] ??
+              meta['previewColor'],
+        ) ??
         item.previewColor;
-    final secondary = CmsIconRegistry.tryParseColor(meta['secondaryAccent']) ??
+    final secondary = CmsIconRegistry.tryParseColor(
+          meta['secondaryAccent'] ?? meta['accent_secondary'],
+        ) ??
         accent;
-    final deepBg = CmsIconRegistry.tryParseColor(meta['deepBackground']) ??
+    final deepBg = CmsIconRegistry.tryParseColor(
+          meta['deepBackground'] ?? meta['bg_primary'],
+        ) ??
         andalusianGold.deepBackground;
-    final surface = CmsIconRegistry.tryParseColor(meta['surfaceCard']) ??
+    final surface = CmsIconRegistry.tryParseColor(
+          meta['surfaceCard'] ?? meta['surface_card'] ?? meta['bg_secondary'],
+        ) ??
         andalusianGold.surfaceCard;
-    final textLightColor =
-        CmsIconRegistry.tryParseColor(meta['textLight']) ?? Colors.white;
-    final textMutedColor = CmsIconRegistry.tryParseColor(meta['textMuted']) ??
+    final textLightColor = CmsIconRegistry.tryParseColor(
+          meta['textLight'] ?? meta['text_light'],
+        ) ??
+        Colors.white;
+    final textMutedColor = CmsIconRegistry.tryParseColor(
+          meta['textMuted'] ?? meta['text_muted'],
+        ) ??
         const Color(0xFFCBD5E1);
 
     return AppCustomTheme(
