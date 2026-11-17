@@ -26,6 +26,7 @@
 | **📂** | **مجلد المراحل التفصيلية لمنظومة المجد (M1 إلى M6)** | [`master_levels_system/README.md`](./master_levels_system/README.md) | **✅ مكتمل 100% (`1.0.8+9+`)** | 🔥 سيادية |
 | **⚔️** | **منظومة التحديات الكبرى (إعادة النزال + الغرف الخاصة + أشباح الصحابة `010–014`)** | [`multiplayer_matchmaking_system/README.md`](./multiplayer_matchmaking_system/README.md) | **✅ مكتمل 100% ومحصّن حياً (`1.0.18+19`)** | 🔥 سيادية |
 | **🎛️ 09** | **منظومة المحتوى الديناميكي، المتجر السحابي، الإظهار/الإخفاء، والتحصين الأمني (`016` + `1.0.19+20`)** | [`09_DYNAMIC_CMS_AND_ADMIN_SUITE.md`](./09_DYNAMIC_CMS_AND_ADMIN_SUITE.md) | **✅ مكتمل 100% ومطبّق حياً (`1.0.19+20`)** | 🔥 سيادية |
+| **📬 10** | **صندوق البريد الملكي، التسليم الفوري الذكي، إدارة موارد Supabase، الدردشة الآمنة، والبطولات (`M9–M14`)** | [`10_ROYAL_INBOX_RESOURCES_AND_SOCIAL_ECOSYSTEM.md`](./10_ROYAL_INBOX_RESOURCES_AND_SOCIAL_ECOSYSTEM.md) | **📝 مخطط رئيسي معتمد للمراحل القادمة (`1.1.0+21+`)** | 🚀 المرحلة القادمة |
 | **01** | **الذكاء الاصطناعي التكيفي والبوتات التكتيكية** | [`01_AI_ADAPTIVE_MASTERY_AND_BOTS.md`](./01_AI_ADAPTIVE_MASTERY_AND_BOTS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
 | **02** | **الهندسة الصوتية البشرية والنبض اللمسي** | [`02_VOCAL_ACOUSTICS_AND_HAPTICS.md`](./02_VOCAL_ACOUSTICS_AND_HAPTICS.md) | مخطط تفصيلي جاهز | 🔴 قصوى |
 | **03** | **شبكة التشات اللحظي للمتصلين (ديوان الأحفاد)** | [`03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md`](./03_LIVE_CHAT_AND_MESSAGING_SYSTEM.md) | مخطط تفصيلي جاهز | 🟠 عالية |
