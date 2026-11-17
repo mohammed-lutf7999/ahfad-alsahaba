@@ -64,6 +64,14 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
   }
 
   Future<void> _openDossier(AdminPlayerSearchResult player) async {
+    if (!player.isTargetable) {
+      showAdminFeedback(
+        context,
+        'هذا السجل لا يملك معرّف حساب أو كود ضيف صالحاً للفحص.',
+        isError: true,
+      );
+      return;
+    }
     if (mounted) setState(() => _isLoadingDetail = true);
     try {
       final detail = await AdminService().getPlayerDetail(
@@ -196,6 +204,8 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
                 AdminTextField(
                   controller: _searchCtrl,
                   label: 'الاسم، البريد، أو كود SAH-XXXX',
+                  textInputAction: TextInputAction.search,
+                  onFieldSubmitted: (_) => _runSearch(),
                   suffixIcon: IconButton(
                     icon: Icon(Icons.search_rounded, color: accent),
                     onPressed: _runSearch,
@@ -241,6 +251,9 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
 
   Widget _buildDossierSection(AdminPlayerDetail d) {
     final customTheme = AppCustomTheme.of(context);
+    final email = (d.directory?['email'] ?? d.leaderboard?['email'])?.toString();
+    final appVer = d.directory?['app_version']?.toString();
+    final verCode = d.directory?['version_code']?.toString();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -250,6 +263,25 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if ((d.playerCode != null && d.playerCode!.isNotEmpty) ||
+                  (email != null && email.isNotEmpty) ||
+                  appVer != null) ...[
+                Text(
+                  [
+                    if (d.playerCode != null && d.playerCode!.isNotEmpty)
+                      'الكود: ${d.playerCode}',
+                    if (email != null && email.isNotEmpty) email,
+                    if (appVer != null)
+                      'النسخة: $appVer${verCode != null ? " (b$verCode)" : ""}',
+                  ].join(' • '),
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Colors.white70,
+                    fontSize: 11.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -303,6 +335,27 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
                       ),
                   ],
                 ),
+              if (d.recentMatches.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'آخر النزالات (${d.recentMatches.length}):',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    color: customTheme.sovereignAccent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                for (final m in d.recentMatches.take(5))
+                  Text(
+                    '• ${m.isGhostMatch ? "👻" : "⚔️"} ${m.myScore} نقطة (${m.status})',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white70,
+                      fontSize: 11.5,
+                    ),
+                  ),
+              ],
             ],
           ),
         ),

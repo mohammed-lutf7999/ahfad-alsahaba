@@ -262,12 +262,56 @@ void main() {
         return true;
       };
 
+      Map<String, dynamic>? savedStoreParams;
+      admin.storeItemUpserterOverride = (params) async {
+        savedStoreParams = params;
+        return StoreItemModel.fromCloudJson({
+          'id': params['p_id'],
+          'title': params['p_title'],
+          'category': params['p_category'],
+          'price_coins': params['p_price_coins'],
+          'price_gems': params['p_price_gems'],
+          'min_level': params['p_min_level'],
+          'is_visible': params['p_is_visible'],
+          'metadata': params['p_metadata'],
+        });
+      };
+
       await tester.pumpWidget(_wrap360(const AdminCmsManagerScreen()));
       await tester.pumpAndSettle();
       expect(find.text('وسام الفاتح'), findsOneWidget);
       await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
       expect(toggledVisibility, isTrue);
+
+      // Verify in-app Store Editor modal allows creating a Theme with color presets
+      await tester.tap(find.text('إضافة عنصر متجر جديد'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'theme_mobile_test',
+      );
+      await tester.tap(find.byType(DropdownButtonFormField<StoreItemCategory>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ثيم').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'الاسم المعروض'),
+        'ثيم الهاتف الملكي',
+      );
+      await tester.ensureVisible(find.text('زمردي'));
+      await tester.tap(find.text('زمردي'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('حفظ العنصر'));
+      await tester.tap(find.text('حفظ العنصر'));
+      await tester.pumpAndSettle();
+
+      expect(savedStoreParams?['p_id'], equals('theme_mobile_test'));
+      expect(savedStoreParams?['p_category'], equals('theme'));
+      final savedMeta = savedStoreParams?['p_metadata'] as Map<String, dynamic>?;
+      expect(savedMeta?['sovereignAccent'], equals('#10B981'));
+      expect(savedMeta?['deepBackground'], isNotNull);
+      expect(tester.takeException(), isNull);
 
       admin.userSearcherOverride = ({required String query, int limit = 20}) async =>
           [

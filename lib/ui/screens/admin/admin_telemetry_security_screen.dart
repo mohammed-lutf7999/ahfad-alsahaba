@@ -100,6 +100,42 @@ class _AdminTelemetrySecurityScreenState
   }
 
   Future<void> _removeAdmin(String email) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: AppCustomTheme.of(context).surfaceCard,
+          title: const Text(
+            'تأكيد إزالة مشرف',
+            style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+          ),
+          content: Text(
+            'هل تريد سحب صلاحيات الإشراف من:\n$email؟',
+            style: const TextStyle(fontFamily: 'Cairo', color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text(
+                'إزالة الصلاحية',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
     try {
       final updated = await AdminService().manageAdmin(
         action: 'remove',

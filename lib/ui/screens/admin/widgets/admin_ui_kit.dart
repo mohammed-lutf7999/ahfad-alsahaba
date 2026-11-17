@@ -230,6 +230,8 @@ class AdminTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
   final Widget? suffixIcon;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
 
   const AdminTextField({
     super.key,
@@ -241,6 +243,8 @@ class AdminTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.suffixIcon,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -250,6 +254,8 @@ class AdminTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
       validator: validator,
       onChanged: onChanged,
       style: const TextStyle(
