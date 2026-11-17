@@ -167,17 +167,29 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                               child: CategoryItem(
                                 category: category,
                                 onTap: () async {
-                                  if (!category.isLocked) {
-                                    SoundService().playClick();
-                                    await Navigator.pushNamed(context, AppRoutes.levels, arguments: {
-                                      'categoryId': category.id,
-                                      'categoryName': category.name,
+                                  SoundService().playClick();
+                                  if (category.isLocked) {
+                                    ScaffoldMessenger.of(context)
+                                      ..hideCurrentSnackBar()
+                                      ..showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'هذا القسم مقفل مؤقتاً من الإدارة',
+                                            style: TextStyle(fontFamily: 'Cairo'),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    return;
+                                  }
+                                  await Navigator.pushNamed(context, AppRoutes.levels, arguments: {
+                                    'categoryId': category.id,
+                                    'categoryName': category.name,
+                                  });
+                                  if (mounted) {
+                                    setState(() {
+                                      _gameController.initializeCategories();
                                     });
-                                    if (mounted) {
-                                      setState(() {
-                                        _gameController.initializeCategories();
-                                      });
-                                    }
                                   }
                                 },
                               ),

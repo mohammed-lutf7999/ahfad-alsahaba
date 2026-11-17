@@ -14,6 +14,7 @@
     ghosts: [],
     auditLogs: [],
     adminsMeta: { is_owner: false, admins: [] },
+    loadedTabs: new Set(),
     loadedOnce: false,
   };
 
@@ -1421,21 +1422,31 @@
     syncStoreMetadataPanels();
   }
 
+  async function ensureTabLoaded(tabName, force = false) {
+    if (!tabName) return;
+    if (!force && cmsState.loadedTabs.has(tabName)) return;
+    cmsState.loadedTabs.add(tabName);
+    if (tabName === 'store') {
+      await loadStoreItems();
+    } else if (tabName === 'content') {
+      await Promise.all([loadLibraryContent(), loadQuizContent()]);
+    } else if (tabName === 'players') {
+      await searchPlayersForInspector();
+    } else if (tabName === 'telemetry') {
+      await Promise.all([loadGhosts(), loadAuditLogs(), loadAdminsRoster()]);
+    }
+  }
+
   async function onDashboardLoad() {
     cmsState.loadedOnce = true;
-    await Promise.all([
-      loadStoreItems(),
-      loadLibraryContent(),
-      loadQuizContent(),
-      searchPlayersForInspector(),
-      loadGhosts(),
-      loadAuditLogs(),
-      loadAdminsRoster(),
-    ]);
+    cmsState.loadedTabs.clear();
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
+    await ensureTabLoaded(activeTab, true);
   }
 
   window.SahabaCmsSuite = {
     onDashboardLoad,
+    onTabActivated: (tabName) => ensureTabLoaded(tabName, false),
     onOverview: renderVersionBreakdown,
   };
 

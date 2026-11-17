@@ -1120,7 +1120,8 @@ class AdminService {
       final response = await client
           .from('leaderboard')
           .select('display_name, email, score, created_at')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .limit(500);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

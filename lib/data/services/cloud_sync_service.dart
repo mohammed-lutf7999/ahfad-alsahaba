@@ -6,6 +6,8 @@ import '../models/achievement_model.dart';
 import '../models/arena_model.dart';
 import '../models/player_level_model.dart';
 import '../models/player_profile_model.dart';
+import '../models/store_item_model.dart';
+import 'store_service.dart';
 
 /// Service for syncing user progress, levels, arenas, and store inventory to/from Supabase.
 /// Guarantees zero data loss across local & cloud sessions.
@@ -35,6 +37,44 @@ class CloudSyncService {
   }
 
   static const Duration _networkTimeout = Duration(seconds: 8);
+
+  static const Set<String> _legacyHonorTitles = {
+    'صقر الأندلس',
+    'درع القادسية',
+    'علامة الزمان',
+  };
+
+  /// Resolves an equipped honor title cleanly from dynamic Store titles & inventory,
+  /// ignoring generic/rank-tier fallback labels while preserving custom CMS titles.
+  @visibleForTesting
+  static String? resolveEquippedHonorTitle(
+    String? rawTitle, {
+    List<String> unlockedItemIds = const [],
+  }) {
+    final cleaned = rawTitle?.trim();
+    if (cleaned == null || cleaned.isEmpty) return null;
+
+    final knownStoreTitles = <String>{
+      ..._legacyHonorTitles,
+      for (final item in StoreService.instance
+          .itemsByCategory(StoreItemCategory.title, includeHiddenUnowned: true))
+        if (item.assetKey.trim().isNotEmpty) item.assetKey.trim(),
+    };
+    if (knownStoreTitles.contains(cleaned)) {
+      return cleaned;
+    }
+
+    final rankTitles = <String>{
+      'مشارك',
+      'لاعب',
+      for (final tier in PlayerLevelInfo.allTiers) tier.title.trim(),
+    };
+    if (!rankTitles.contains(cleaned) &&
+        unlockedItemIds.any((id) => id.startsWith('title_'))) {
+      return cleaned;
+    }
+    return null;
+  }
 
   /// Sync complete profile data (including 100-Level Mastery, Economy & Inventory) to cloud.
   /// Set [syncInventory] to `false` when completing a game round where no inventory items changed.
@@ -461,9 +501,10 @@ class CloudSyncService {
           computedLevel.frameKey;
       final rawTitle = data['player_title']?.toString() ??
           lbData?['player_title']?.toString();
-      const honorTitles = ['صقر الأندلس', 'درع القادسية', 'علامة الزمان'];
-      final equippedTitle =
-          (rawTitle != null && honorTitles.contains(rawTitle)) ? rawTitle : null;
+      final equippedTitle = resolveEquippedHonorTitle(
+        rawTitle,
+        unlockedItemIds: unlockedItemIds,
+      );
 
       final profile = PlayerProfile(
         id: DateTime.now().millisecondsSinceEpoch.toString(),

@@ -4,14 +4,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ahfad_alsahaba/data/local/shared_prefs_service.dart';
 import 'package:ahfad_alsahaba/data/models/app_control_models.dart';
+import 'package:ahfad_alsahaba/data/models/category_model.dart';
 import 'package:ahfad_alsahaba/data/models/cms_models.dart';
 import 'package:ahfad_alsahaba/data/models/store_item_model.dart';
 import 'package:ahfad_alsahaba/data/services/admin_service.dart';
 import 'package:ahfad_alsahaba/data/services/app_control_service.dart';
+import 'package:ahfad_alsahaba/data/services/cloud_sync_service.dart';
+import 'package:ahfad_alsahaba/data/services/cms_cache_service.dart';
+import 'package:ahfad_alsahaba/data/services/store_service.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_cms_manager_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_players_support_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_telemetry_security_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin_dashboard_screen.dart';
+import 'package:ahfad_alsahaba/ui/widgets/category_item.dart';
 
 Widget _wrap360(Widget child) {
   return MediaQuery(
@@ -360,6 +365,100 @@ void main() {
       await tester.pumpWidget(_wrap360(const AdminTelemetrySecurityScreen()));
       await tester.pumpAndSettle();
       expect(find.textContaining('شبح بدر'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('resolveEquippedHonorTitle preserves dynamic store titles while filtering rank tiers', () async {
+      CmsCacheService.instance.resetForTesting();
+      StoreService.instance.resetForTesting();
+
+      // 1. Legacy built-in honor title is preserved
+      expect(
+        CloudSyncService.resolveEquippedHonorTitle('صقر الأندلس'),
+        equals('صقر الأندلس'),
+      );
+
+      // 2. Standard rank-tier labels and generic placeholders resolve to null
+      expect(CloudSyncService.resolveEquippedHonorTitle('طالب علم'), isNull);
+      expect(CloudSyncService.resolveEquippedHonorTitle('نخبة الأحفاد 👑'), isNull);
+      expect(CloudSyncService.resolveEquippedHonorTitle('مشارك'), isNull);
+
+      // 3. New dynamic store honor title from inventory before CMS bundle finishes syncing
+      expect(
+        CloudSyncService.resolveEquippedHonorTitle(
+          'سيف الله',
+          unlockedItemIds: const ['theme_andalusian_gold', 'title_sayf_allah'],
+        ),
+        equals('سيف الله'),
+      );
+
+      // 4. New dynamic store honor title registered in CmsCacheService catalog
+      CmsCacheService.instance.bundleFetcherOverride = ({
+        required int clientCmsVersion,
+        List<String> ownedItemIds = const [],
+      }) async =>
+          {
+            'changed': true,
+            'cms_version': 2,
+            'store_items': [
+              {
+                'id': 'custom_royal_honor',
+                'title': 'وسام القائد',
+                'category': 'title',
+                'asset_key': 'وسام القائد',
+                'price_coins': 500,
+                'is_visible': true,
+              },
+            ],
+            'library_sections': const [],
+            'library_items': const [],
+            'quiz_categories': const [],
+            'quiz_questions': const [],
+          };
+      await CmsCacheService.instance.syncIfNeeded(serverCmsVersion: 2);
+      expect(
+        CloudSyncService.resolveEquippedHonorTitle('وسام القائد'),
+        equals('وسام القائد'),
+      );
+    });
+
+    testWidgets('CategoryItem shows lock badge when category.isLocked is true', (tester) async {
+      bool tapped = false;
+      final lockedCategory = Category(
+        id: 'fiqh',
+        name: 'الفقه الإسلامي',
+        description: 'مقفل مؤقتاً',
+        icon: Icons.balance,
+        totalLevels: 10,
+        unlockedLevels: 3,
+        isLocked: true,
+        color: const Color(0xFF4A148C),
+      );
+
+      await tester.pumpWidget(
+        _wrap360(
+          Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 170,
+                height: 220,
+                child: CategoryItem(
+                  category: lockedCategory,
+                  onTap: () => tapped = true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('مقفل مؤقتاً'), findsOneWidget);
+      expect(find.byIcon(Icons.lock_rounded), findsWidgets);
+
+      await tester.tap(find.byType(CategoryItem));
+      await tester.pumpAndSettle();
+      expect(tapped, isTrue);
       expect(tester.takeException(), isNull);
     });
   });

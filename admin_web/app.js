@@ -948,7 +948,9 @@ function bindUiListeners() {
       document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
       btn.classList.add('active');
-      document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+      const tabName = btn.dataset.tab;
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      window.SahabaCmsSuite?.onTabActivated?.(tabName);
     });
   });
 
@@ -1076,6 +1078,7 @@ function switchToTab(tabName) {
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
   targetBtn.classList.add('active');
   targetPanel.classList.add('active');
+  window.SahabaCmsSuite?.onTabActivated?.(tabName);
 }
 
 function selectPlayerForAnnouncement(playerObj) {
