@@ -1,6 +1,7 @@
 # 🏛️ الخطة الهندسية 09: منظومة المحتوى الديناميكي، المتجر السحابي، والتحصين الأمني (`1.0.19+20`)
 
 > **تاريخ التوثيق:** 17 نوفمبر 2026  
+> **الحالة التنفيذية:** ✅ **مكتملة ومطبقة حياً على Supabase (`016`) ومختبرة بالكامل (`130/130 Tests` + `Edge CDP` + فحص جنائي شامل — حزم `1.0.19+20` جاهزة دون نشر بناءً على طلب المسؤول)**  
 > **الإصدار المستهدف:** `1.0.19+20` (المرحلة الخامسة ← المرحلة الثامنة)  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
 > **المعيار الهندسي:** التوافق الحرفي مع [`AGENTS.md`](../../AGENTS.md) — `0ms Local-First SWR` — `Ultra-Low-Cost Delta Sync` — `Zero Data Loss` — `Android 15/16 Edge-to-Edge`.
@@ -64,4 +65,11 @@
 1. اختبار `016` حياً على Supabase (`pg_get_functiondef` + `BEGIN ... ROLLBACK`).
 2. اختبارات `flutter test --timeout 30s` الشاملة للمتجر/المكتبة/المسابقات/الأمان/الحواف + `flutter analyze --no-fatal-infos lib test`.
 3. اختبار المتصفح الآلي (`Chrome Headless + DevTools` على `admin_web/serve.py`).
-4. توحيد الإصدار `1.0.19+20` في المواضع الأربعة + بناء `AAB` & `arm64 APK` + تحديث [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md).
+4. توحيد الإصدار `1.0.19+20` في المواضع الأربعة + بناء `AAB` (`47.1 MB`) & `arm64 APK` (`22.6 MB`) + تحديث [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md).
+
+---
+
+## ✅ سجل الاعتماد والتنفيذ الفعلي (`2026-11-17`)
+* **الترحيل السحابي المطبّق حياً:** [`supabase/migrations/016_dynamic_cms_store_and_hardening.sql`](../../supabase/migrations/016_dynamic_cms_store_and_hardening.sql) (شاملاً مشغّلات `trg_fn_cms_auto_revision` وتقييد `purchase_store_item` وحماية المقتنيات المخفية).
+* **بوابة التحقق والاختبارات:** اجتياز `flutter analyze --no-fatal-infos lib test` (`0` أخطاء، `0` تحذيرات)، واجتياز `130/130` اختباراً آلياً (بما فيها [`m16_dynamic_cms_hybrid_test.dart`](../../test/m16_dynamic_cms_hybrid_test.dart) و[`m17_admin_cms_suite_test.dart`](../../test/m17_admin_cms_suite_test.dart))، ونجاح `node --check` وفحص `Edge CDP` لتبويبات الويب الـ 7 (`0` أخطاء)، والفحص الجنائي الختامي (`467b89f` على `main`).
+* **الحالة الختامية:** الحزم جاهزة ومختبرة، ولم تُرفع إلى Google Play أو الاستضافة السحابية بعد التزاماً بتوجيه المسؤول (`ليس وقت النشر الان`).

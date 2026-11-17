@@ -126,7 +126,7 @@ sequenceDiagram
 
 ---
 
-## 4. التطويرات المعمارية الكبرى المنجزة حتى الإصدار `1.0.18+19`
+## 4. التطويرات المعمارية الكبرى المنجزة حتى الإصدار `1.0.19+20`
 
 ### 1. منظومة المجد الـ 100 مستوى، الميادين الـ 6، وسوق الفرسان (`009_glory_and_store.sql`)
 * **`glory_road_screen.dart` و`progression_service.dart`**: سلم تصاعدي لـ 100 مستوى بمعادلة خبرة `FLOOR(100 * L^1.6 + 150 * L)` و10 ألقاب تاريخية، ومكافآت دنانير تلقائية (`L * 50`)، مع 6 ميادين تنافسية بدرع حماية `800` كأس.
@@ -141,8 +141,12 @@ sequenceDiagram
 * **أداء الإقلاع (`startup_bootstrap.dart` & `profileinstaller`):** إقلاع محلي فوري (`0ms`) بانتقال غير حاجب مع تهيئة المناطق الزمنية والإشعارات والسحابة بعد الإطار الأول وملفات `baseline-prof.txt`.
 * **التوافق الحافي `Target SDK 36` (`MainActivity.kt` & `values-v30/v31/night-v31`):** تفعيل `WindowCompat.setDecorFitsSystemWindows(window, false)`، احترام `displayCutoutMode=always`، وفحص الشاشات الضيقة (`360dp`).
 * **بوابات التحكم السحابي (`app_control_service.dart`, `app_control_dialogs.dart`, `home_dynamic_event_banner.dart`):** صيانة طارئة مع تجاوز للمشرفين، تحديث إلزامي/اختياري عبر `in_app_update` + `package_info_plus`، رسائل موجّهة (`normal`, `mandatory`, `admin`, `motivational`) لكل اللاعبين أو لكود الضيف `SAH-XXXX` أو البريد مع تصفية `expiresAt` وحدود الإصدار، وبانر/شاشة الأحداث الديناميكية، و6 `FeatureFlags`.
-* **لوحة الإدارة الهجينة:** 4 شاشات مخفية داخل التطبيق (`admin_dashboard_screen.dart` والشاشات الفرعية في `lib/ui/screens/admin/`) + لوحة ويب عربية مستقلة في [`admin_web/`](./admin_web/README.md) (`index.html`, `styles.css`, `app.js`, `serve.py`) بدون `service_role`.
+* **لوحة الإدارة الهجينة:** 7 شاشات إدارة مخفية داخل التطبيق (`admin_dashboard_screen.dart` و`AdminCmsManagerScreen`, `AdminPlayersSupportScreen`, `AdminTelemetrySecurityScreen` وباقي الشاشات في `lib/ui/screens/admin/`) + لوحة ويب عربية مستقلة في [`admin_web/`](./admin_web/README.md) (`index.html`, `styles.css`, `app.js`, `cms_suite.js`, `favicon.svg`, `serve.py`) بالتحميل الكسول للتبويبات وبدون `service_role`.
 
-> لمتابعة الحالة التفصيلية وآخر الأرقام والحزم المبنية، راجع [`PROJECT_STATUS.md`](./PROJECT_STATUS.md)، وللاطلاع على خارطة الترقية القادمة للمحتوى والمتجر الديناميكي (`1.0.19+20`) راجع [`docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md`](./docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md).
+### 4. منظومة المحتوى والمتجر الديناميكي الهجين والتحصين (`016` — `1.0.19+20`)
+* **قاعدة البيانات والدلتا السريعة (`016_dynamic_cms_store_and_hardening.sql`):** جداول `library_sections`, `library_items`, `quiz_categories`, `quiz_questions`, `admin_audit_logs` وعمود `cms_version` في `app_release_config` مع مشغّلات `trg_fn_cms_auto_revision` للتعديل اليدوي، وحارس منع حذف العناصر المملوكة في `store_items` (`trg_guard_store_item_delete`)، وتقييد `purchase_store_item` بـ `auth.uid()` و`is_visible = TRUE`، و20 دالة محصنة بـ `#variable_conflict use_column`.
+* **الكاش الهجين بالهاتف (`CmsCacheService`, `StoreService`, `CloudSyncService`):** إقلاع محلي `0ms` من `SharedPreferences` ومزامنة دلتا فقط عند ارتفاع `cms_version`، مع حماية العناصر المخفية للمالك، وحفظ واستعادة ألقاب المتجر الديناميكية، وإظهار حالة القفل التفاعلية للتصنيفات المقفلة، وتقليص حجم الأصول الصوتية والشعار (`4.22 MB` وفر).
+
+> لمتابعة الحالة التفصيلية وآخر الأرقام والحزم المبنية (`130/130` اختباراً + `0` أخطاء)، راجع [`PROJECT_STATUS.md`](./PROJECT_STATUS.md)، وللاطلاع على مخطط التطوير المنجز للمحتوى والمتجر الديناميكي (`1.0.19+20`) راجع [`docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md`](./docs/development_plans/09_DYNAMIC_CMS_AND_ADMIN_SUITE.md).
 
 
