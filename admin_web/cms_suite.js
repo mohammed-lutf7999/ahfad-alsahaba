@@ -1429,6 +1429,12 @@
     document.getElementById('btn-cleanup-receipts')?.addEventListener('click', () =>
       runResourceCleanup('expired_receipts', 'هل تريد حذف إيصالات الإعلانات المنتهية؟'),
     );
+    document.getElementById('btn-cleanup-sessions')?.addEventListener('click', () =>
+      runResourceCleanup('expired_live_sessions', 'هل تريد حذف جلسات البطولات الحية المنتهية؟'),
+    );
+    document.getElementById('btn-cleanup-chat')?.addEventListener('click', () =>
+      runResourceCleanup('old_chat_messages', 'هل تريد حذف رسائل الديوان الأقدم من 24 ساعة؟'),
+    );
 
     syncStoreMetadataPanels();
   }

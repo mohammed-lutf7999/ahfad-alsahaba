@@ -12,6 +12,7 @@ import '../../data/services/auth_service.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/quote_service.dart';
 import '../../data/services/royal_inbox_service.dart';
+import '../../data/services/notification_service.dart';
 import '../dialogs/app_control_dialogs.dart';
 import '../widgets/avatar_selector.dart';
 import '../widgets/animated_avatar_frame.dart';
@@ -21,6 +22,7 @@ import '../widgets/home_dynamic_event_banner.dart';
 import 'library_screen.dart';
 import 'glory/glory_road_screen.dart';
 import 'store/knights_store_screen.dart';
+import 'chat/global_chat_bottom_sheet.dart';
 import '../../core/size_config.dart';
 import '../widgets/coach_mark_overlay.dart';
 import '../widgets/navigation/royal_bottom_nav_bar.dart';
@@ -92,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen>
       unawaited(RoyalInboxService.instance.initFromCache());
       AchievementService.instance.reconcileAchievements();
       AppControlCoordinator.instance.markAppReadyForGates();
+      NotificationService.flushPendingNavigation();
       AppControlService.instance.refreshTimedVisualState();
       unawaited(AppControlService.instance.syncPlayerDirectory());
       final showedGate = await AppControlCoordinator.instance.checkAndPresent(
@@ -562,7 +565,7 @@ class _HomeScreenState extends State<HomeScreen>
         top: false,
         child: Directionality(
           textDirection: TextDirection.rtl,
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -642,6 +645,102 @@ class _HomeScreenState extends State<HomeScreen>
                     SoundService().playClick();
                     await Navigator.pushNamed(context, AppRoutes.royalInbox);
                     if (mounted) _refreshProfile();
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  key: const Key('player_menu_diwan_tile'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                    ),
+                  ),
+                  tileColor: customTheme.deepBackground.withValues(alpha: 0.42),
+                  leading: const Icon(
+                    Icons.forum_rounded,
+                    color: Color(0xFF10B981),
+                  ),
+                  title: const Text(
+                    'ديوان الأحفاد 💬',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    AppControlService
+                            .instance
+                            .featureFlagsNotifier
+                            .value
+                            .diwanChat
+                        ? 'دردشة الفرسان المباشرة وتحدي الأعضاء'
+                        : 'متوقف مؤقتاً للصيانة من الإدارة',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 15,
+                    color: Colors.white54,
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    SoundService().playClick();
+                    await GlobalChatBottomSheet.show(context);
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  key: const Key('player_menu_guilds_tile'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Colors.amber.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  tileColor: customTheme.deepBackground.withValues(alpha: 0.42),
+                  leading: const Icon(
+                    Icons.shield_rounded,
+                    color: Colors.amber,
+                  ),
+                  title: const Text(
+                    'الكتائب والبطولات الحية 🛡️',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    AppControlService
+                            .instance
+                            .featureFlagsNotifier
+                            .value
+                            .guildsArenas
+                        ? 'رايات الكتائب ومعركة الجمعة وغرف 100 مشارك'
+                        : 'متوقف مؤقتاً للصيانة من الإدارة',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 15,
+                    color: Colors.white54,
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    SoundService().playClick();
+                    await Navigator.pushNamed(context, AppRoutes.guilds);
                   },
                 ),
                 const SizedBox(height: 10),

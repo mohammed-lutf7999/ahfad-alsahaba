@@ -12,6 +12,7 @@ import '../../../data/services/progression_service.dart';
 import '../../widgets/avatar_selector.dart';
 import '../../widgets/animated_avatar_frame.dart';
 import '../../widgets/level_badge_widget.dart';
+import '../chat/widgets/quick_phrases_bar.dart';
 import 'online_game_screen.dart';
 
 class VersusScreen extends StatefulWidget {
@@ -56,7 +57,13 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   Timer? _countdownTimer;
   Timer? _pollTimer;
   Timer? _safetyTimeoutTimer;
+  Timer? _phraseTimer;
+  Timer? _phraseEchoTimer;
   StreamSubscription? _matchStateSubscription;
+  StreamSubscription? _reactionKeepaliveSub;
+  StreamSubscription? _phraseSubscription;
+  String? _activeQuickPhrase;
+  bool _phraseIsMine = false;
 
   @override
   void initState() {
@@ -76,7 +83,11 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
      _countdownTimer?.cancel();
      _pollTimer?.cancel();
      _safetyTimeoutTimer?.cancel();
+     _phraseTimer?.cancel();
+     _phraseEchoTimer?.cancel();
      _matchStateSubscription?.cancel();
+     _reactionKeepaliveSub?.cancel();
+     _phraseSubscription?.cancel();
      super.dispose();
   }
 
@@ -131,6 +142,11 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
        }
     } else {
       // Online Match Logic: Dual-Trigger (Realtime Stream + Active Polling + 15s Safety Timeout)
+      _reactionKeepaliveSub = MultiplayerService.instance
+          .listenToReactions(widget.matchId)
+          .listen((_) {});
+      _phraseSubscription = MultiplayerService.instance.quickPhrasesStream
+          .listen((phrase) => _showQuickPhraseBanner(phrase, isMine: false));
       _matchStateSubscription = MultiplayerService.instance
           .listenToMatchState(widget.matchId)
           .listen((state) {
@@ -312,6 +328,34 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
     );
   }
   
+  void _showQuickPhraseBanner(String phrase, {required bool isMine}) {
+    if (!mounted) return;
+    _phraseTimer?.cancel();
+    setState(() {
+      _activeQuickPhrase = phrase;
+      _phraseIsMine = isMine;
+    });
+    _phraseTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _activeQuickPhrase = null);
+      }
+    });
+  }
+
+  void _sendQuickPhrase(String phrase) {
+    SoundService().playClick();
+    _showQuickPhraseBanner(phrase, isMine: true);
+    if (!widget.isBot && !widget.isGhost) {
+      unawaited(MultiplayerService.instance.sendQuickPhrase(widget.matchId, phrase));
+    } else {
+      _phraseEchoTimer?.cancel();
+      _phraseEchoTimer = Timer(const Duration(milliseconds: 550), () {
+        if (!mounted) return;
+        _showQuickPhraseBanner('وعليكم السلام ورحمة الله، حياك الله ⚔️', isMine: false);
+      });
+    }
+  }
+
   void _startCountdown() {
     if (_countdownTimer != null) return; // Already counting
     
@@ -531,6 +575,42 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                                  ),
                                ),
                            ],
+                         ),
+                         if (_activeQuickPhrase != null) ...[
+                           const SizedBox(height: 6),
+                           Container(
+                             padding: const EdgeInsets.symmetric(
+                               horizontal: 12,
+                               vertical: 5,
+                             ),
+                             decoration: BoxDecoration(
+                               color: _phraseIsMine
+                                   ? AppTheme.accentColor.withValues(alpha: 0.18)
+                                   : Colors.black54,
+                               borderRadius: BorderRadius.circular(14),
+                               border: Border.all(
+                                 color: AppTheme.accentColor.withValues(alpha: 0.65),
+                               ),
+                             ),
+                             child: Text(
+                               _phraseIsMine
+                                   ? 'أنت: $_activeQuickPhrase'
+                                   : '${_opponentData?['display_name'] ?? 'الخصم'}: $_activeQuickPhrase',
+                               maxLines: 1,
+                               overflow: TextOverflow.ellipsis,
+                               style: const TextStyle(
+                                 fontFamily: 'Cairo',
+                                 color: Colors.white,
+                                 fontSize: 12,
+                                 fontWeight: FontWeight.w700,
+                               ),
+                             ),
+                           ),
+                         ],
+                         const SizedBox(height: 8),
+                         QuickPhrasesBar(
+                           compact: true,
+                           onPhraseSelected: _sendQuickPhrase,
                          ),
                          if (widget.isFriendly) ...[
                            const SizedBox(height: 6),

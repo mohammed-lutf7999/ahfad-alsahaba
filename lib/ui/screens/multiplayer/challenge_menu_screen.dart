@@ -11,6 +11,8 @@ import 'create_challenge_screen.dart';
 import 'join_challenge_screen.dart';
 import 'private_room_hub_screen.dart';
 import 'lobby_screen.dart';
+import '../chat/global_chat_bottom_sheet.dart';
+import '../guilds/guild_dashboard_screen.dart';
 
 /// القائمة الرئيسية لوضع التحدي (منظومة الأونلاين والبلوتوث المحلي)
 class ChallengeMenuScreen extends StatefulWidget {
@@ -412,6 +414,43 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                               onTap: _launchDailyChallenge,
                             ),
                           ],
+
+                          const SizedBox(height: 16),
+
+                          // 5. Diwan Al-Ahfad Live Chat & Instant Invites (M11)
+                          _buildMenuButton(
+                            icon: Icons.forum_rounded,
+                            title: 'ديوان الأحفاد 💬',
+                            subtitle: flags.diwanChat
+                                ? 'التعارف المهذب وإطلاق تحديات الغرف الخاصة'
+                                : 'الديوان متوقف مؤقتاً للصيانة 🔒',
+                            color: const Color(0xFF38BDF8),
+                            isEnabled: flags.diwanChat,
+                            onTap: () => _handleGatedTap(
+                              isEnabled: flags.diwanChat,
+                              featureName: 'ديوان الأحفاد',
+                              onProceed: () => GlobalChatBottomSheet.show(context),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // 6. Guilds ("معركة الجمعة") & Live Kahoot Arenas (M13)
+                          _buildMenuButton(
+                            icon: Icons.shield_rounded,
+                            title: 'الكتائب والبطولات الحية 🛡️',
+                            subtitle: flags.guildsArenas
+                                ? 'رايات الكتائب، معركة الجمعة، وغرف 100 مشارك'
+                                : 'الكتائب متوقفة مؤقتاً للصيانة 🔒',
+                            color: Colors.amber,
+                            isEnabled: flags.guildsArenas,
+                            onTap: () => _handleGatedTap(
+                              isEnabled: flags.guildsArenas,
+                              featureName: 'الكتائب والبطولات الحية',
+                              onProceed: () =>
+                                  _navigateTo(const GuildDashboardScreen()),
+                            ),
+                          ),
 
                           const SizedBox(height: 32),
 

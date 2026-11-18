@@ -46,6 +46,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
   bool _royalInbox = true;
   bool _liveAnnouncementPing = true;
   bool _wiseTeacherMode = true;
+  bool _diwanChat = true;
+  bool _guildsArenas = false;
   int _configVersion = 1;
 
   @override
@@ -86,6 +88,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
     _royalInbox = cfg.featureFlags.royalInbox;
     _liveAnnouncementPing = cfg.featureFlags.liveAnnouncementPing;
     _wiseTeacherMode = cfg.featureFlags.wiseTeacherMode;
+    _diwanChat = cfg.featureFlags.diwanChat;
+    _guildsArenas = cfg.featureFlags.guildsArenas;
     _configVersion = cfg.configVersion;
   }
 
@@ -250,6 +254,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
           'royal_inbox': _royalInbox,
           'live_announcement_ping': _liveAnnouncementPing,
           'wise_teacher_mode': _wiseTeacherMode,
+          'diwan_chat': _diwanChat,
+          'guilds_arenas': _guildsArenas,
         },
       );
       if (!mounted) return;
@@ -499,6 +505,20 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
                       subtitle: 'التحكم المركزي بميزة مراجعة الأخطاء والإضاءة التاريخية',
                       value: _wiseTeacherMode,
                       onChanged: (v) => setState(() => _wiseTeacherMode = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_diwan_chat'),
+                      title: 'ديوان الأحفاد (الدردشة الحية) 💬',
+                      subtitle: 'فتح أو إيقاف غرفة التواصل الجماعي وتحديات الديوان',
+                      value: _diwanChat,
+                      onChanged: (v) => setState(() => _diwanChat = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_guilds_arenas'),
+                      title: 'الكتائب والبطولات الجماعية 🛡️',
+                      subtitle: 'تفعيل أو إيقاف نظام الكتائب وغرف البطولات الحية',
+                      value: _guildsArenas,
+                      onChanged: (v) => setState(() => _guildsArenas = v),
                     ),
                   ],
                 ),

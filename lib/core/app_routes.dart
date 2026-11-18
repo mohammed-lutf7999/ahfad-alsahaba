@@ -17,6 +17,8 @@ import '../ui/screens/multiplayer/private_room_hub_screen.dart';
 import '../ui/screens/glory/glory_road_screen.dart';
 import '../ui/screens/store/knights_store_screen.dart';
 import '../ui/screens/royal_inbox_screen.dart';
+import '../ui/screens/guilds/guild_dashboard_screen.dart';
+import '../ui/screens/live_arena/student_participant_screen.dart';
 import '../data/models/app_control_models.dart';
 import '../data/models/player_profile_model.dart';
 import '../data/services/progression_service.dart';
@@ -40,6 +42,8 @@ class AppRoutes {
   static const String gloryRoad = '/glory-road';
   static const String knightsStore = '/knights-store';
   static const String royalInbox = '/inbox';
+  static const String guilds = '/guilds';
+  static const String liveArena = '/live-arena';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -134,6 +138,10 @@ class AppRoutes {
         return _slideRoute(const KnightsStoreScreen(), settings);
       case royalInbox:
         return _slideRoute(const RoyalInboxScreen(), settings);
+      case guilds:
+        return _slideRoute(const GuildDashboardScreen(), settings);
+      case liveArena:
+        return _slideRoute(const StudentParticipantScreen(), settings);
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

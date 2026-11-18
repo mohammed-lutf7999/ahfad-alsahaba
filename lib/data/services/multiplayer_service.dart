@@ -124,6 +124,13 @@ class MultiplayerService {
   RealtimeChannel? _reactionChannel;
   RealtimeChannel? _rematchChannel;
   StreamController<MatchState>? _matchStateController;
+  StreamController<String>? _phraseController;
+  DateTime? _lastQuickPhraseAt;
+
+  Stream<String> get quickPhrasesStream {
+    _phraseController ??= StreamController<String>.broadcast();
+    return _phraseController!.stream;
+  }
 
   MultiplayerService._internal();
 
@@ -515,24 +522,59 @@ class MultiplayerService {
     }
   }
 
-  /// Listens to reactions from the opponent
+  /// Sends a polite chivalric quick phrase over the existing match channel (`0` extra sockets).
+  Future<void> sendQuickPhrase(String matchId, String phrase) async {
+    final trimmed = phrase.trim();
+    if (trimmed.isEmpty) return;
+    final now = DateTime.now();
+    if (_lastQuickPhraseAt != null &&
+        now.difference(_lastQuickPhraseAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastQuickPhraseAt = now;
+    try {
+      final channel = _reactionChannel ?? _client.channel('reactions_$matchId');
+      await channel.sendBroadcastMessage(
+        event: 'quick_phrase',
+        payload: {'phrase': trimmed, 'senderId': currentUserId},
+      );
+    } catch (e) {
+      debugPrint('Error sending quick phrase: $e');
+    }
+  }
+
+  /// Listens to reactions & chivalric quick phrases from the opponent on one channel.
   Stream<String> listenToReactions(String matchId) {
     _reactionChannel?.unsubscribe();
     final controller = StreamController<String>.broadcast();
-    
+
     _reactionChannel = _client.channel('reactions_$matchId');
-    _reactionChannel!.onBroadcast(
-      event: 'reaction',
-      callback: (payload) {
-        final senderId = payload['senderId'] as String?;
-        if (senderId != null && senderId == currentUserId) return;
-        final emoji = payload['emoji'] as String? ?? '';
-        if (emoji.isNotEmpty) {
-          controller.add(emoji);
-        }
-      },
-    ).subscribe();
-    
+    _reactionChannel!
+        .onBroadcast(
+          event: 'reaction',
+          callback: (payload) {
+            final senderId = payload['senderId'] as String?;
+            if (senderId != null && senderId == currentUserId) return;
+            final emoji = payload['emoji'] as String? ?? '';
+            if (emoji.isNotEmpty) {
+              controller.add(emoji);
+            }
+          },
+        )
+        .onBroadcast(
+          event: 'quick_phrase',
+          callback: (payload) {
+            final senderId = payload['senderId'] as String?;
+            if (senderId != null && senderId == currentUserId) return;
+            final phrase = payload['phrase']?.toString().trim() ?? '';
+            final pc = _phraseController;
+            if (phrase.isNotEmpty && pc != null && !pc.isClosed) {
+              pc.add(phrase);
+            }
+          },
+        )
+        .subscribe();
+
     return controller.stream;
   }
 
@@ -984,5 +1026,7 @@ class MultiplayerService {
     _rematchChannel = null;
     _matchStateController?.close();
     _matchStateController = null;
+    _phraseController?.close();
+    _phraseController = null;
   }
 }

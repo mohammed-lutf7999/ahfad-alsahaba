@@ -8,6 +8,7 @@ import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/question_service.dart';
 import '../../../data/services/profile_service.dart';
 import '../../../data/services/progression_service.dart';
+import '../../../data/services/guild_service.dart';
 import '../../../data/services/achievement_service.dart';
 import '../../../data/models/achievement_model.dart';
 import '../../../data/models/question_model.dart';
@@ -18,6 +19,7 @@ import 'versus_screen.dart';
 import 'widgets/game_match_result_dialog.dart';
 import 'widgets/game_tactical_powerups_bar.dart';
 import 'widgets/game_reactions_ribbon.dart';
+import '../chat/widgets/quick_phrases_bar.dart';
 import '../../../data/services/ghost_playback_service.dart';
 
 class OnlineGameScreen extends StatefulWidget {
@@ -90,9 +92,13 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
   late Animation<Offset> _emojiSlideAnim;
   late Animation<double> _emojiFadeAnim;
   String? _incomingReactionEmoji;
-  
+  String? _incomingQuickPhrase;
+  bool _showQuickPhrases = false;
+  Timer? _quickPhraseBannerTimer;
+
   StreamSubscription? _opponentSubscription;
   StreamSubscription? _reactionSubscription;
+  StreamSubscription? _quickPhraseSubscription;
 
   @override
   void initState() {
@@ -118,8 +124,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     _questionTimer?.cancel();
     _progressController.dispose();
     _reactionController.dispose();
+    _quickPhraseBannerTimer?.cancel();
     _opponentSubscription?.cancel();
     _reactionSubscription?.cancel();
+    _quickPhraseSubscription?.cancel();
     super.dispose();
   }
 
@@ -164,11 +172,15 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
               }
             });
 
-        // 3. Listen to Reactions
+        // 3. Listen to Reactions & Quick Phrases (same channel, 0 extra sockets)
         _reactionSubscription = MultiplayerService.instance
             .listenToReactions(widget.matchId)
             .listen((emoji) {
               _showIncomingReaction(emoji);
+            });
+        _quickPhraseSubscription = MultiplayerService.instance.quickPhrasesStream
+            .listen((phrase) {
+              _showQuickPhrase(phrase);
             });
       }
 
@@ -275,6 +287,24 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   Future<void> _sendReaction(String emoji) async {
     await MultiplayerService.instance.sendReaction(widget.matchId, emoji);
+  }
+
+  void _showQuickPhrase(String phrase) {
+    if (!mounted) return;
+    _quickPhraseBannerTimer?.cancel();
+    setState(() => _incomingQuickPhrase = phrase);
+    _quickPhraseBannerTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _incomingQuickPhrase = null);
+    });
+  }
+
+  Future<void> _sendQuickPhrase(String phrase) async {
+    SoundService().playClick();
+    setState(() => _showQuickPhrases = false);
+    _showQuickPhrase('أنت: $phrase');
+    if (!widget.isBot && !widget.isGhost) {
+      await MultiplayerService.instance.sendQuickPhrase(widget.matchId, phrase);
+    }
   }
 
   /// Load questions deterministically based on question IDs from Supabase
@@ -520,6 +550,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     );
 
     await ProfileService.instance.saveActiveProfileAndSync();
+    if (_myScore > 0) {
+      unawaited(GuildService.instance.contributeScore(_myScore));
+    }
     
     // فحص وتسوية الإنجازات فوراً بنقاط المسابقة الجماعية
     await AchievementService.instance.reconcileAchievements();
@@ -867,10 +900,60 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                             },
                           ),
                           const SizedBox(height: 8),
-                          if (!widget.isBot)
-                            GameReactionsRibbon(
-                              onReactionSelected: _sendReaction,
+                          if (!widget.isBot) ...[
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                GameReactionsRibbon(
+                                  onReactionSelected: _sendReaction,
+                                ),
+                                InkWell(
+                                  key: const Key('toggle_quick_phrases_btn'),
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () {
+                                    SoundService().playClick();
+                                    setState(
+                                      () => _showQuickPhrases = !_showQuickPhrases,
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 7,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _showQuickPhrases
+                                          ? AppTheme.accentColor
+                                          : Colors.white.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(
+                                        color: AppTheme.accentColor.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.chat_rounded,
+                                      size: 18,
+                                      color: _showQuickPhrases
+                                          ? AppTheme.primaryDark
+                                          : AppTheme.accentColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            if (_showQuickPhrases) ...[
+                              const SizedBox(height: 6),
+                              QuickPhrasesBar(
+                                compact: true,
+                                onPhraseSelected: _sendQuickPhrase,
+                              ),
+                            ],
+                          ],
                           const SizedBox(height: 10),
                           ...List.generate(question.options.length, (i) {
                              if (_hiddenOptionIndices.contains(i)) {
@@ -885,6 +968,38 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                 ],
               ),
               
+              // Incoming Quick Chivalric Phrase Banner
+              if (_incomingQuickPhrase != null)
+                Positioned(
+                  top: 66,
+                  left: 16,
+                  right: 76,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryDark.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppTheme.accentColor.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    child: Text(
+                      _incomingQuickPhrase!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
               // Reaction Animation Layer (positioned right near opponent avatar)
               if (_incomingReactionEmoji != null)
                 Positioned(

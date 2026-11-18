@@ -26,8 +26,8 @@ class AppFeatureFlags {
     this.royalInbox = true,
     this.liveAnnouncementPing = true,
     this.wiseTeacherMode = true,
-    this.diwanChat = false,
-    this.guildsArenas = false,
+    this.diwanChat = true,
+    this.guildsArenas = true,
     this.rawFlags = const {
       'online_multiplayer': true,
       'ghost_matches': true,
@@ -38,8 +38,8 @@ class AppFeatureFlags {
       'royal_inbox': true,
       'live_announcement_ping': true,
       'wise_teacher_mode': true,
-      'diwan_chat': false,
-      'guilds_arenas': false,
+      'diwan_chat': true,
+      'guilds_arenas': true,
     },
   });
 
@@ -64,8 +64,8 @@ class AppFeatureFlags {
       royalInbox: map['royal_inbox'] ?? true,
       liveAnnouncementPing: map['live_announcement_ping'] ?? true,
       wiseTeacherMode: map['wise_teacher_mode'] ?? true,
-      diwanChat: map['diwan_chat'] ?? false,
-      guildsArenas: map['guilds_arenas'] ?? false,
+      diwanChat: map['diwan_chat'] ?? true,
+      guildsArenas: map['guilds_arenas'] ?? true,
       rawFlags: map.isEmpty ? const AppFeatureFlags().rawFlags : map,
     );
   }

@@ -9,6 +9,7 @@ import '../../../../data/services/auth_service.dart';
 import '../../../widgets/top_notification.dart';
 import '../../creative_empire_screen.dart';
 import '../../global_ranking_screen.dart';
+import '../../chat/global_chat_bottom_sheet.dart';
 import '../../multiplayer/lobby_screen.dart';
 
 /// القائمة العائمة السريعة في زاوية الشاشة الرئيسية
@@ -158,6 +159,19 @@ class HomeSpeedDial extends StatelessWidget {
               onTap: () {
                 SoundService().playClick();
                 Navigator.pushNamed(context, AppRoutes.royalInbox);
+              },
+            ),
+
+            SpeedDialChild(
+              child: const Icon(
+                Icons.forum_rounded,
+                color: Colors.white,
+                size: 21,
+              ),
+              backgroundColor: const Color(0xFF10B981),
+              onTap: () {
+                SoundService().playClick();
+                GlobalChatBottomSheet.show(context);
               },
             ),
 

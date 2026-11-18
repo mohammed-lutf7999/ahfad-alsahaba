@@ -341,6 +341,8 @@ function hydrateReleaseForm(rc) {
   document.getElementById('flag-royal-inbox').checked = flags.royal_inbox ?? true;
   document.getElementById('flag-live-ping').checked = flags.live_announcement_ping ?? true;
   document.getElementById('flag-wise-teacher').checked = flags.wise_teacher_mode ?? true;
+  document.getElementById('flag-diwan-chat').checked = flags.diwan_chat ?? true;
+  document.getElementById('flag-guilds-arenas').checked = flags.guilds_arenas ?? false;
 
   document.getElementById('topbar-config-ver').textContent = `#${rc.config_version ?? 1}`;
   const maintPill = document.getElementById('topbar-maint-pill');
@@ -424,6 +426,8 @@ async function handleSaveRelease(e) {
         royal_inbox: document.getElementById('flag-royal-inbox').checked,
         live_announcement_ping: document.getElementById('flag-live-ping').checked,
         wise_teacher_mode: document.getElementById('flag-wise-teacher').checked,
+        diwan_chat: document.getElementById('flag-diwan-chat').checked,
+        guilds_arenas: document.getElementById('flag-guilds-arenas').checked,
       },
     });
     if (error) throw error;

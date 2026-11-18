@@ -9,6 +9,7 @@ import '../../core/sound_service.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
 import '../../data/services/app_control_service.dart';
+import '../screens/chat/global_chat_bottom_sheet.dart';
 import '../widgets/top_notification.dart';
 
 /// Shared visual and navigation helpers for Dynamic Events & Admin Announcements.
@@ -26,6 +27,8 @@ class AppControlVisuals {
     AppRoutes.gloryRoad,
     AppRoutes.knightsStore,
     AppRoutes.royalInbox,
+    AppRoutes.guilds,
+    AppRoutes.liveArena,
     AppRoutes.library,
     AppRoutes.profileSetup,
   };
@@ -107,6 +110,28 @@ class AppControlVisuals {
     if (!context.mounted) return;
     final flags = AppControlService.instance.featureFlagsNotifier.value;
     final normalizedRoute = target.startsWith('/') ? target : '/$target';
+
+    if (normalizedRoute == '/diwan') {
+      if (!flags.diwanChat) {
+        TopNotification.showWarning(
+          context,
+          'ديوان الأحفاد متوقف مؤقتاً للصيانة والتحديث 🛡️',
+        );
+        return;
+      }
+      await GlobalChatBottomSheet.show(context);
+      return;
+    }
+
+    if ((normalizedRoute == AppRoutes.guilds ||
+            normalizedRoute == AppRoutes.liveArena) &&
+        !flags.guildsArenas) {
+      TopNotification.showWarning(
+        context,
+        'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة 🛡️',
+      );
+      return;
+    }
 
     if (normalizedRoute == AppRoutes.knightsStore && !flags.knightsStore) {
       TopNotification.showWarning(

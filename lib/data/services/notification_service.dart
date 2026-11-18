@@ -1,16 +1,30 @@
+import 'dart:convert';
 import 'dart:math';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_10y.dart' as tz_data;
+import '../../core/app_routes.dart';
 import '../local/shared_prefs_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  
+
   static bool _isInitialized = false;
   static Future<void>? _initFuture;
+  static GlobalKey<NavigatorState>? _navigatorKey;
+  static String? _pendingRoute;
+
+  static const Set<String> _allowedTapRoutes = {
+    AppRoutes.royalInbox,
+    AppRoutes.challenge,
+    AppRoutes.guilds,
+    AppRoutes.liveArena,
+    AppRoutes.knightsStore,
+    AppRoutes.gloryRoad,
+    AppRoutes.home,
+  };
 
   // معرف القناة (محدث)
   static const String _channelId = 'quiz_notifications_v3';
@@ -75,6 +89,13 @@ class NotificationService {
         onDidReceiveNotificationResponse: _onNotificationTap,
       );
 
+      final launchDetails =
+          await _notifications.getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp == true) {
+        final launchPayload = launchDetails?.notificationResponse?.payload;
+        handleNotificationPayload(launchPayload);
+      }
+
       // إنشاء القناة بشكل صريح
       await _createNotificationChannel();
 
@@ -131,8 +152,90 @@ class NotificationService {
     }
   }
 
+  static void configureNavigation(GlobalKey<NavigatorState> navigatorKey) {
+    _navigatorKey = navigatorKey;
+    flushPendingNavigation();
+  }
+
+  @visibleForTesting
+  static String? get pendingRouteForTesting => _pendingRoute;
+
+  @visibleForTesting
+  static void resetNavigationForTesting() {
+    _navigatorKey = null;
+    _pendingRoute = null;
+  }
+
+  /// Parses an incoming notification payload (`/inbox`, `route:/inbox`, or JSON `{"route":"/inbox"}`)
+  /// and accepts only safe in-app routes.
+  static String? parseRouteFromPayload(String? rawPayload) {
+    final trimmed = rawPayload?.trim() ?? '';
+    if (trimmed.isEmpty) return AppRoutes.royalInbox;
+
+    String candidate = trimmed;
+    if (trimmed.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map && decoded['route'] != null) {
+          candidate = decoded['route'].toString().trim();
+        }
+      } catch (_) {
+        return null;
+      }
+    } else if (trimmed.toLowerCase().startsWith('route:')) {
+      candidate = trimmed.substring(6).trim();
+    }
+
+    if (!candidate.startsWith('/')) return null;
+    return _allowedTapRoutes.contains(candidate) ? candidate : null;
+  }
+
+  static void handleNotificationPayload(String? payload) {
+    final route = parseRouteFromPayload(payload);
+    if (route == null) return;
+    _pendingRoute = route;
+    flushPendingNavigation();
+  }
+
+  static void flushPendingNavigation() {
+    final route = _pendingRoute;
+    final nav = _navigatorKey?.currentState;
+    if (route == null || nav == null) return;
+    _pendingRoute = null;
+    nav.pushNamed(route);
+  }
+
   static void _onNotificationTap(NotificationResponse response) {
     debugPrint('User tapped notification: ${response.payload}');
+    handleNotificationPayload(response.payload);
+  }
+
+  static Future<void> showInboxAlertNotification({
+    required String title,
+    required String body,
+    String payload = AppRoutes.royalInbox,
+  }) async {
+    try {
+      await _notifications.show(
+        777,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: 'launcher_icon',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('NotificationService showInboxAlert error: $e');
+    }
   }
 
   static Future<void> scheduleDailyNotifications({bool force = false}) async {

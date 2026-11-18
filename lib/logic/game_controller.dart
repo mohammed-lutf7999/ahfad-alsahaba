@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/models/question_model.dart';
 import '../data/models/category_model.dart';
 import '../data/models/level_model.dart';
 import '../data/services/question_service.dart';
 import '../data/services/cms_cache_service.dart';
+import '../data/services/guild_service.dart';
 import '../data/services/profile_service.dart';
 import '../data/services/progression_service.dart';
 import '../data/services/spaced_repetition_service.dart';
@@ -395,6 +397,9 @@ class GameController extends ChangeNotifier {
       triggerBackgroundSync: true,
       syncInventory: outcome.xpBannerConsumed || outcome.shieldConsumed,
     );
+    if (_score > 0) {
+      unawaited(GuildService.instance.contributeScore(_score));
+    }
 
     // Refresh categories with profile data
     initializeCategories();

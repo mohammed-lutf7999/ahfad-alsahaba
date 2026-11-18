@@ -422,6 +422,96 @@ class _AdminResourcesScreenState extends State<AdminResourcesScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 46,
+            child: OutlinedButton.icon(
+              key: const Key('cleanup_sessions_btn'),
+              onPressed: _isCleaning
+                  ? null
+                  : () => _runCleanup(
+                        action: 'expired_live_sessions',
+                        title: 'تنظيف جلسات البطولات المنتهية',
+                        description:
+                            'سيتم حذف غرف البطولات الحية المنتهية الصلاحية أو المكتملة لتحرير المساحة.',
+                      ),
+              icon: const Icon(
+                Icons.cast_for_education_rounded,
+                size: 18,
+                color: Color(0xFF38BDF8),
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'تنظيف جلسات البطولات المنتهية',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Color(0xFF38BDF8),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                side: BorderSide(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.45),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 46,
+            child: OutlinedButton.icon(
+              key: const Key('cleanup_chat_btn'),
+              onPressed: _isCleaning
+                  ? null
+                  : () => _runCleanup(
+                        action: 'old_chat_messages',
+                        title: 'تنظيف رسائل الديوان الأقدم من 24 ساعة',
+                        description:
+                            'سيتم حذف رسائل الديوان التي مرّ عليها أكثر من 24 ساعة.',
+                      ),
+              icon: const Icon(
+                Icons.forum_outlined,
+                size: 18,
+                color: Color(0xFF10B981),
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'تنظيف رسائل الديوان (+24 ساعة)',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Color(0xFF10B981),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                side: BorderSide(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

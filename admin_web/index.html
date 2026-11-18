@@ -320,6 +320,26 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="switch-row">
+              <div>
+                <strong>ديوان الأحفاد (الدردشة الحية) 💬</strong>
+                <p class="muted-text">فتح أو إيقاف الدردشة العامة وتحديات الفرسان السريعة</p>
+              </div>
+              <label class="switch">
+                <input id="flag-diwan-chat" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <div>
+                <strong>الكتائب والبطولات الجماعية 🛡️</strong>
+                <p class="muted-text">التحكم بنظام الكتائب وغرف البطولات الحية</p>
+              </div>
+              <label class="switch">
+                <input id="flag-guilds-arenas" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
 
           <button id="btn-save-release" class="btn btn-gold btn-block mt-md" type="submit">
@@ -1089,6 +1109,8 @@
         <div class="record-actions">
           <button id="btn-cleanup-matches" class="btn btn-outline btn-sm" type="button">🧹 تنظيف مباريات +30 يوماً</button>
           <button id="btn-cleanup-receipts" class="btn btn-outline btn-sm" type="button">✉️ تنظيف إيصالات منتهية</button>
+          <button id="btn-cleanup-sessions" class="btn btn-outline btn-sm" type="button">🎓 تنظيف جلسات البطولات المنتهية</button>
+          <button id="btn-cleanup-chat" class="btn btn-outline btn-sm" type="button">💬 تنظيف رسائل الديوان (+24س)</button>
           <a class="btn btn-outline btn-sm" href="https://supabase.com/dashboard/project/khatzzpqxaiwuoodgcst/settings/billing/usage" target="_blank" rel="noopener">📊 لوحة Supabase Usage</a>
         </div>
       </section>

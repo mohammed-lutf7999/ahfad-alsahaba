@@ -79,6 +79,7 @@ class _IslamicQuizAppState extends State<IslamicQuizApp>
   @override
   void initState() {
     super.initState();
+    NotificationService.configureNavigation(_navigatorKey);
     WidgetsBinding.instance.addObserver(this);
     _activeThemeId = _themeSignature();
     ProgressionService.instance.addListener(_onThemeCheck);
