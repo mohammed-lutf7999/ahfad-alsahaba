@@ -112,6 +112,8 @@ class _IslamicQuizAppState extends State<IslamicQuizApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       AppControlService.instance.refreshTimedVisualState();
+      AppControlService.instance.startLivePingIfEnabled();
+      unawaited(AppControlService.instance.syncControlState());
       if (!AppControlCoordinator.instance.isAppReadyForGates) return;
       final navContext = _navigatorKey.currentState?.overlay?.context;
       if (navContext != null && navContext.mounted) {
@@ -122,12 +124,16 @@ class _IslamicQuizAppState extends State<IslamicQuizApp>
           ),
         );
       }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(AppControlService.instance.stopLivePing());
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(AppControlService.instance.stopLivePing());
     ProgressionService.instance.removeListener(_onThemeCheck);
     ProfileService.instance.removeListener(_onThemeCheck);
     CmsCacheService.instance.removeListener(_onCmsUpdated);

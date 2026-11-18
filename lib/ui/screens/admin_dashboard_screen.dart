@@ -9,6 +9,7 @@ import 'admin/admin_cms_manager_screen.dart';
 import 'admin/admin_events_screen.dart';
 import 'admin/admin_players_support_screen.dart';
 import 'admin/admin_release_control_screen.dart';
+import 'admin/admin_resources_screen.dart';
 import 'admin/admin_telemetry_security_screen.dart';
 import 'admin/widgets/admin_ui_kit.dart';
 import 'admin_email_screen.dart';
@@ -547,6 +548,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           icon: Icons.security_rounded,
           color: Colors.amberAccent,
           onTap: () => _openAndRefresh(const AdminTelemetrySecurityScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_resources'),
+          title: 'مراقبة وإدارة موارد Supabase',
+          subtitle: 'حجم القاعدة من 500MB، النشطون الآن، وتنظيف السجلات',
+          icon: Icons.monitor_heart_rounded,
+          color: const Color(0xFF38BDF8),
+          onTap: () => _openAndRefresh(const AdminResourcesScreen()),
         ),
         const SizedBox(height: 12),
         _buildActionCard(

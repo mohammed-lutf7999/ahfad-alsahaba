@@ -1059,7 +1059,7 @@
     const btn = document.getElementById('btn-grant-compensation');
     btn.disabled = true;
     try {
-      const { error } = await client.rpc('admin_grant_player_compensation', {
+      const { data, error } = await client.rpc('admin_grant_player_compensation', {
         p_user_id: uid,
         p_coins_delta: coins,
         p_gems_delta: gems,
@@ -1068,6 +1068,10 @@
       });
       if (error) throw error;
       toast('تم منح التعويض وتوثيقه في سجل التدقيق ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.(
+        data?.player_code || 'SINGLE',
+        uid,
+      );
       document.getElementById('comp-coins').value = '0';
       document.getElementById('comp-gems').value = '0';
       document.getElementById('comp-xp').value = '0';
@@ -1416,10 +1420,60 @@
       });
     });
 
-    // Admins
+    // Admins & Resources
     document.getElementById('admin-manage-form')?.addEventListener('submit', handleAddAdmin);
+    document.getElementById('btn-refresh-resources')?.addEventListener('click', loadResourceHealth);
+    document.getElementById('btn-cleanup-matches')?.addEventListener('click', () =>
+      runResourceCleanup('finished_matches', 'هل تريد حذف المباريات المنتهية الأقدم من 30 يوماً؟'),
+    );
+    document.getElementById('btn-cleanup-receipts')?.addEventListener('click', () =>
+      runResourceCleanup('expired_receipts', 'هل تريد حذف إيصالات الإعلانات المنتهية؟'),
+    );
 
     syncStoreMetadataPanels();
+  }
+
+  async function loadResourceHealth() {
+    const client = sb();
+    const box = document.getElementById('resource-health-summary');
+    const pill = document.getElementById('res-usage-pill');
+    if (!client || !box || !pill) return;
+    const { data, error } = await client.rpc('admin_get_resource_health');
+    if (error) {
+      box.textContent = `تعذر تحميل مؤشرات الموارد: ${error.message}`;
+      return;
+    }
+    const usedMb = ((Number(data?.db_size_bytes || 0)) / (1024 * 1024)).toFixed(1);
+    const limitMb = ((Number(data?.db_limit_bytes || 524288000)) / (1024 * 1024)).toFixed(0);
+    pill.textContent = `${usedMb} / ${limitMb} MB (${data?.db_usage_percent ?? 0}%)`;
+    const tables = Array.isArray(data?.tables) ? data.tables.slice(0, 6) : [];
+    const tablesHtml = tables
+      .map((t) => `<span class="code-tag">${esc(t.table_name)}: ${(Number(t.size_bytes || 0) / (1024 * 1024)).toFixed(2)} MB (${esc(t.row_estimate ?? 0)})</span>`)
+      .join(' ');
+    box.innerHTML = `
+      <div class="record-actions mb-xs">
+        <span>⚔️ تحديات الآن: <strong>${esc(data?.active_matches_now ?? 0)}</strong></span>
+        <span>🟢 نشطون (5د): <strong>${esc(data?.active_players_5m ?? 0)}</strong></span>
+        <span>🕒 نشطون (24س): <strong>${esc(data?.active_players_24h ?? 0)}</strong></span>
+        <span>🧹 قابل للتنظيف: <strong>${esc((data?.cleanable_old_matches ?? 0) + (data?.cleanable_expired_receipts ?? 0))}</strong></span>
+      </div>
+      <div class="record-actions">${tablesHtml}</div>
+    `;
+  }
+
+  async function runResourceCleanup(action, confirmMsg) {
+    const client = sb();
+    if (!client || !window.confirm(confirmMsg)) return;
+    const { data, error } = await client.rpc('admin_cleanup_stale_resources', {
+      p_action: action,
+      p_older_than_days: 30,
+    });
+    if (error) {
+      toast(`فشل التنظيف: ${error.message}`, true);
+      return;
+    }
+    toast(`تم تنظيف ${data?.deleted_count ?? 0} سجل قديم ✅`);
+    await Promise.all([loadResourceHealth(), loadAuditLogs()]);
   }
 
   async function ensureTabLoaded(tabName, force = false) {
@@ -1433,7 +1487,7 @@
     } else if (tabName === 'players') {
       await searchPlayersForInspector();
     } else if (tabName === 'telemetry') {
-      await Promise.all([loadGhosts(), loadAuditLogs(), loadAdminsRoster()]);
+      await Promise.all([loadResourceHealth(), loadGhosts(), loadAuditLogs(), loadAdminsRoster()]);
     }
   }
 

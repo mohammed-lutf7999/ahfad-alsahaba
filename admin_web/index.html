@@ -290,6 +290,36 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="switch-row">
+              <div>
+                <strong>صندوق البريد الملكي 📬</strong>
+                <p class="muted-text">إتاحة صندوق الرسائل والهدايا داخل قائمة اللاعب</p>
+              </div>
+              <label class="switch">
+                <input id="flag-royal-inbox" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <div>
+                <strong>النبضة اللحظية للرسائل ⚡</strong>
+                <p class="muted-text">تحديث فوري (<1ث) للمتصلين عند النشر أو إغلاقه لتوفير WebSockets</p>
+              </div>
+              <label class="switch">
+                <input id="flag-live-ping" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <div>
+                <strong>وضع المعلم الحكيم 🧠</strong>
+                <p class="muted-text">التحكم السحابي بميزة مراجعة الأخطاء والإضاءة التاريخية</p>
+              </div>
+              <label class="switch">
+                <input id="flag-wise-teacher" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
 
           <button id="btn-save-release" class="btn btn-gold btn-block mt-md" type="submit">
@@ -1045,8 +1075,23 @@
       </div>
     </main>
 
-    <!-- Tab 7: Ghost Monitor, Audit Logs & Owner-Only Admins -->
+    <!-- Tab 7: Resource Health, Ghost Monitor, Audit Logs & Owner-Only Admins -->
     <main id="tab-telemetry" class="tab-panel">
+      <section class="panel glass-card mb-md">
+        <div class="panel-header-row">
+          <h2 class="panel-title">🎛️ مراقبة وإدارة موارد Supabase</h2>
+          <div class="record-actions">
+            <span id="res-usage-pill" class="badge-pill">0 / 500 MB</span>
+            <button id="btn-refresh-resources" class="btn btn-outline btn-sm" type="button">تحديث الموارد</button>
+          </div>
+        </div>
+        <div id="resource-health-summary" class="muted-text mb-md">افتح التبويب لتحميل قياسات قاعدة البيانات والنشاط الحي...</div>
+        <div class="record-actions">
+          <button id="btn-cleanup-matches" class="btn btn-outline btn-sm" type="button">🧹 تنظيف مباريات +30 يوماً</button>
+          <button id="btn-cleanup-receipts" class="btn btn-outline btn-sm" type="button">✉️ تنظيف إيصالات منتهية</button>
+          <a class="btn btn-outline btn-sm" href="https://supabase.com/dashboard/project/khatzzpqxaiwuoodgcst/settings/billing/usage" target="_blank" rel="noopener">📊 لوحة Supabase Usage</a>
+        </div>
+      </section>
       <div class="two-col-grid">
         <section class="panel glass-card">
           <div class="panel-header-row">

@@ -9,6 +9,11 @@ class AppFeatureFlags {
   final bool knightsStore;
   final bool showEventBanner;
   final bool dailyChallenges;
+  final bool royalInbox;
+  final bool liveAnnouncementPing;
+  final bool wiseTeacherMode;
+  final bool diwanChat;
+  final bool guildsArenas;
   final Map<String, bool> rawFlags;
 
   const AppFeatureFlags({
@@ -18,6 +23,11 @@ class AppFeatureFlags {
     this.knightsStore = true,
     this.showEventBanner = true,
     this.dailyChallenges = true,
+    this.royalInbox = true,
+    this.liveAnnouncementPing = true,
+    this.wiseTeacherMode = true,
+    this.diwanChat = false,
+    this.guildsArenas = false,
     this.rawFlags = const {
       'online_multiplayer': true,
       'ghost_matches': true,
@@ -25,6 +35,11 @@ class AppFeatureFlags {
       'knights_store': true,
       'show_event_banner': true,
       'daily_challenges': true,
+      'royal_inbox': true,
+      'live_announcement_ping': true,
+      'wise_teacher_mode': true,
+      'diwan_chat': false,
+      'guilds_arenas': false,
     },
   });
 
@@ -46,6 +61,11 @@ class AppFeatureFlags {
       knightsStore: map['knights_store'] ?? true,
       showEventBanner: map['show_event_banner'] ?? true,
       dailyChallenges: map['daily_challenges'] ?? true,
+      royalInbox: map['royal_inbox'] ?? true,
+      liveAnnouncementPing: map['live_announcement_ping'] ?? true,
+      wiseTeacherMode: map['wise_teacher_mode'] ?? true,
+      diwanChat: map['diwan_chat'] ?? false,
+      guildsArenas: map['guilds_arenas'] ?? false,
       rawFlags: map.isEmpty ? const AppFeatureFlags().rawFlags : map,
     );
   }
@@ -61,6 +81,11 @@ class AppFeatureFlags {
         'knights_store': knightsStore,
         'show_event_banner': showEventBanner,
         'daily_challenges': dailyChallenges,
+        'royal_inbox': royalInbox,
+        'live_announcement_ping': liveAnnouncementPing,
+        'wise_teacher_mode': wiseTeacherMode,
+        'diwan_chat': diwanChat,
+        'guilds_arenas': guildsArenas,
       };
 }
 
@@ -913,6 +938,136 @@ class AdminRosterSnapshot {
                   AdminRosterEntry.fromJson(Map<String, dynamic>.from(e)))
               .toList()
           : const [],
+    );
+  }
+}
+
+/// Player Inbox message returned by `get_player_inbox` (archived + unread).
+class RoyalInboxMessage {
+  final AppAnnouncement announcement;
+  final bool isRead;
+  final bool isRewardNotice;
+
+  const RoyalInboxMessage({
+    required this.announcement,
+    this.isRead = false,
+    this.isRewardNotice = false,
+  });
+
+  RoyalInboxMessage copyWith({
+    AppAnnouncement? announcement,
+    bool? isRead,
+    bool? isRewardNotice,
+  }) {
+    return RoyalInboxMessage(
+      announcement: announcement ?? this.announcement,
+      isRead: isRead ?? this.isRead,
+      isRewardNotice: isRewardNotice ?? this.isRewardNotice,
+    );
+  }
+
+  factory RoyalInboxMessage.fromJson(Map<String, dynamic> json) {
+    final ann = AppAnnouncement.fromJson(json);
+    final isReward = json['is_reward_notice'] as bool? ??
+        (ann.title.contains('🎁') ||
+            ann.title.contains('تعويض') ||
+            ann.title.contains('هدية'));
+    return RoyalInboxMessage(
+      announcement: ann,
+      isRead: json['is_read'] as bool? ?? false,
+      isRewardNotice: isReward,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        ...announcement.toJson(),
+        'is_read': isRead,
+        'is_reward_notice': isRewardNotice,
+      };
+}
+
+/// Table storage breakdown item returned by `admin_get_resource_health`.
+class AdminTableMetric {
+  final String tableName;
+  final int sizeBytes;
+  final int rowEstimate;
+
+  const AdminTableMetric({
+    required this.tableName,
+    this.sizeBytes = 0,
+    this.rowEstimate = 0,
+  });
+
+  double get sizeMb => sizeBytes / (1024 * 1024);
+
+  factory AdminTableMetric.fromJson(Map<String, dynamic> json) {
+    return AdminTableMetric(
+      tableName: (json['table_name'] ?? '').toString(),
+      sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
+      rowEstimate: (json['row_estimate'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// Real PostgreSQL resource & live-activity snapshot from `admin_get_resource_health`.
+class AdminResourceHealth {
+  final int dbSizeBytes;
+  final int dbLimitBytes;
+  final double dbUsagePercent;
+  final int activeMatchesNow;
+  final int activePlayers5m;
+  final int activePlayers60m;
+  final int activePlayers24h;
+  final int totalDirectoryPlayers;
+  final int cleanableOldMatches;
+  final int cleanableExpiredReceipts;
+  final List<AdminTableMetric> tables;
+  final DateTime? measuredAt;
+
+  const AdminResourceHealth({
+    this.dbSizeBytes = 0,
+    this.dbLimitBytes = 524288000,
+    this.dbUsagePercent = 0,
+    this.activeMatchesNow = 0,
+    this.activePlayers5m = 0,
+    this.activePlayers60m = 0,
+    this.activePlayers24h = 0,
+    this.totalDirectoryPlayers = 0,
+    this.cleanableOldMatches = 0,
+    this.cleanableExpiredReceipts = 0,
+    this.tables = const [],
+    this.measuredAt,
+  });
+
+  double get dbSizeMb => dbSizeBytes / (1024 * 1024);
+  double get dbLimitMb => dbLimitBytes / (1024 * 1024);
+
+  factory AdminResourceHealth.fromJson(Map<String, dynamic> json) {
+    final rawTables = json['tables'];
+    return AdminResourceHealth(
+      dbSizeBytes: (json['db_size_bytes'] as num?)?.toInt() ?? 0,
+      dbLimitBytes: (json['db_limit_bytes'] as num?)?.toInt() ?? 524288000,
+      dbUsagePercent: (json['db_usage_percent'] as num?)?.toDouble() ?? 0.0,
+      activeMatchesNow: (json['active_matches_now'] as num?)?.toInt() ?? 0,
+      activePlayers5m: (json['active_players_5m'] as num?)?.toInt() ?? 0,
+      activePlayers60m: (json['active_players_60m'] as num?)?.toInt() ?? 0,
+      activePlayers24h: (json['active_players_24h'] as num?)?.toInt() ?? 0,
+      totalDirectoryPlayers:
+          (json['total_directory_players'] as num?)?.toInt() ?? 0,
+      cleanableOldMatches:
+          (json['cleanable_old_matches'] as num?)?.toInt() ?? 0,
+      cleanableExpiredReceipts:
+          (json['cleanable_expired_receipts'] as num?)?.toInt() ?? 0,
+      tables: rawTables is List
+          ? rawTables
+              .whereType<Map>()
+              .map((e) =>
+                  AdminTableMetric.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      measuredAt: json['measured_at'] != null
+          ? DateTime.tryParse(json['measured_at'].toString())
+          : null,
     );
   }
 }

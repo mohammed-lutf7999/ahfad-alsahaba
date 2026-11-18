@@ -43,6 +43,9 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
   bool _knightsStore = true;
   bool _showEventBanner = true;
   bool _dailyChallenges = true;
+  bool _royalInbox = true;
+  bool _liveAnnouncementPing = true;
+  bool _wiseTeacherMode = true;
   int _configVersion = 1;
 
   @override
@@ -80,6 +83,9 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
     _knightsStore = cfg.featureFlags.knightsStore;
     _showEventBanner = cfg.featureFlags.showEventBanner;
     _dailyChallenges = cfg.featureFlags.dailyChallenges;
+    _royalInbox = cfg.featureFlags.royalInbox;
+    _liveAnnouncementPing = cfg.featureFlags.liveAnnouncementPing;
+    _wiseTeacherMode = cfg.featureFlags.wiseTeacherMode;
     _configVersion = cfg.configVersion;
   }
 
@@ -241,6 +247,9 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
           'knights_store': _knightsStore,
           'show_event_banner': _showEventBanner,
           'daily_challenges': _dailyChallenges,
+          'royal_inbox': _royalInbox,
+          'live_announcement_ping': _liveAnnouncementPing,
+          'wise_teacher_mode': _wiseTeacherMode,
         },
       );
       if (!mounted) return;
@@ -468,6 +477,28 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
                       subtitle: 'إظهار بطاقة الجولة اليومية في قائمة التحدي',
                       value: _dailyChallenges,
                       onChanged: (v) => setState(() => _dailyChallenges = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_royal_inbox'),
+                      title: 'صندوق البريد الملكي 📬',
+                      subtitle: 'تفعيل أو إيقاف صندوق الرسائل والهدايا للاعبين',
+                      value: _royalInbox,
+                      onChanged: (v) => setState(() => _royalInbox = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_live_announcement_ping'),
+                      title: 'النبضة اللحظية للرسائل ⚡',
+                      subtitle: 'إيقاظ فوري (<1ث) للمتصلين أو إيقافه لتوفير WebSockets',
+                      value: _liveAnnouncementPing,
+                      onChanged: (v) =>
+                          setState(() => _liveAnnouncementPing = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_wise_teacher_mode'),
+                      title: 'وضع المعلم الحكيم 🧠',
+                      subtitle: 'التحكم المركزي بميزة مراجعة الأخطاء والإضاءة التاريخية',
+                      value: _wiseTeacherMode,
+                      onChanged: (v) => setState(() => _wiseTeacherMode = v),
                     ),
                   ],
                 ),

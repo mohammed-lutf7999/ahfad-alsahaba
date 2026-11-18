@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +11,14 @@ import '../../logic/timer_controller.dart';
 import '../../core/sound_service.dart';
 import '../../data/local/shared_prefs_service.dart';
 import '../widgets/question_card.dart';
+import '../widgets/historical_insight_sheet.dart';
 import '../widgets/option_button.dart';
 import '../widgets/timer_widget.dart';
 import '../dialogs/app_dialogs.dart';
 import 'quiz/widgets/quiz_lifelines_dock.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/progression_service.dart';
+import '../../data/services/spaced_repetition_service.dart';
 import '../../data/models/achievement_model.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -111,6 +114,18 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     setState(() => _gameController.answerQuestion(selectedIndex));
 
+    final answeredQ = _gameController.currentQuestion;
+    if (answeredQ != null &&
+        SpacedRepetitionService.instance.isEffectivelyEnabled) {
+      unawaited(
+        SpacedRepetitionService.instance.recordAnswer(
+          questionId: answeredQ.id,
+          categoryId: widget.categoryId,
+          isCorrect: isCorrect,
+        ),
+      );
+    }
+
     final isLastQuestion = _gameController.isLastQuestion;
     final totalQuestions = _gameController.currentQuestions.length;
     final currentPercentage = totalQuestions > 0
@@ -122,6 +137,21 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     // Handle Lives Logic (allow completing level if last question is reached with a passing score)
     if (_gameController.lives == 0 && !hasPassedOnLastQuestion) {
       _showGameOverDialog();
+    } else if (!isCorrect &&
+        answeredQ != null &&
+        (answeredQ.explanation ?? '').trim().isNotEmpty &&
+        SpacedRepetitionService.instance.isEffectivelyEnabled) {
+      if (_gameController.lives == 1 && !isLastQuestion) {
+        _showWarningToast();
+      }
+      Future.delayed(const Duration(milliseconds: 450), () async {
+        if (!mounted) return;
+        await HistoricalInsightSheet.show(
+          context,
+          question: answeredQ,
+        );
+        if (mounted) _nextQuestion();
+      });
     } else {
       if (_gameController.lives == 1 && !isLastQuestion) {
         _showWarningToast();

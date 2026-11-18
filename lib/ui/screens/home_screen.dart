@@ -11,6 +11,7 @@ import '../../data/services/progression_service.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/achievement_service.dart';
 import '../../data/services/quote_service.dart';
+import '../../data/services/royal_inbox_service.dart';
 import '../dialogs/app_control_dialogs.dart';
 import '../widgets/avatar_selector.dart';
 import '../widgets/animated_avatar_frame.dart';
@@ -88,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Defer post-frame tutorial & achievement reconciliation until frame 1 is painted
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      unawaited(RoyalInboxService.instance.initFromCache());
       AchievementService.instance.reconcileAchievements();
       AppControlCoordinator.instance.markAppReadyForGates();
       AppControlService.instance.refreshTimedVisualState();
@@ -287,26 +289,55 @@ class _HomeScreenState extends State<HomeScreen>
         elevation: 0,
         leadingWidth: 64,
         leading: profile != null ? GestureDetector(
-          onTap: () async {
+          key: const Key('home_player_avatar_btn'),
+          onTap: () {
             SoundService().playClick();
-            await Navigator.pushNamed(context, AppRoutes.profileSelector);
-            _refreshProfile();
+            _openPlayerHubMenu(context, profile.playerCode);
           },
           child: Center(
-            child: AnimatedAvatarFrame(
-              size: 46,
-              frameKey: profile.equippedFrame,
-              winStreak: profile.winStreak,
-              child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 38),
+            child: ValueListenableBuilder<int>(
+              valueListenable: RoyalInboxService.instance.unreadCountNotifier,
+              builder: (context, unreadCount, _) => Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedAvatarFrame(
+                    size: 46,
+                    frameKey: profile.equippedFrame,
+                    winStreak: profile.winStreak,
+                    child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 38),
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1.2),
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ) : null,
         title: profile != null ? GestureDetector(
           key: _profileKey,
-          onTap: () async {
+          onTap: () {
             SoundService().playClick();
-            await Navigator.pushNamed(context, AppRoutes.profileSelector);
-            _refreshProfile();
+            _openPlayerHubMenu(context, profile.playerCode);
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,6 +540,155 @@ class _HomeScreenState extends State<HomeScreen>
 
               return content;
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPlayerHubMenu(BuildContext context, String playerCode) async {
+    final customTheme = AppCustomTheme.of(context);
+    final unread = RoyalInboxService.instance.unreadCount;
+    final inboxEnabled =
+        AppControlService.instance.featureFlagsNotifier.value.royalInbox;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: customTheme.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        top: false,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ListTile(
+                  key: const Key('player_menu_inbox_tile'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: customTheme.sovereignAccent.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  tileColor: customTheme.deepBackground.withValues(alpha: 0.45),
+                  leading: Icon(
+                    Icons.mark_email_unread_rounded,
+                    color: customTheme.sovereignAccent,
+                  ),
+                  title: const Text(
+                    'صندوق البريد الملكي 📬',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    inboxEnabled
+                        ? (unread > 0
+                            ? 'لديك $unread رسالة غير مقروءة'
+                            : 'رسائل الإدارة والهدايا والتعويضات')
+                        : 'متوقف مؤقتاً للصيانة من الإدارة',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: unread > 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$unread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 15,
+                          color: Colors.white54,
+                        ),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    SoundService().playClick();
+                    await Navigator.pushNamed(context, AppRoutes.royalInbox);
+                    if (mounted) _refreshProfile();
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  key: const Key('player_menu_profile_tile'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  tileColor: customTheme.deepBackground.withValues(alpha: 0.35),
+                  leading: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white70,
+                  ),
+                  title: const Text(
+                    'ملفاتي وهويتي 👤',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'إدارة الحساب وتبديل الملف • الكود: $playerCode',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 15,
+                    color: Colors.white54,
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    SoundService().playClick();
+                    await Navigator.pushNamed(context, AppRoutes.profileSelector);
+                    if (mounted) _refreshProfile();
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -9,6 +9,8 @@ class SharedPrefsService {
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyVibrationEnabled = 'vibration_enabled';
   static const String _keyHasSeenTutorial = 'has_seen_tutorial';
+  static const String _keyCachedInboxJson = 'cached_royal_inbox_json';
+  static const String _keyWiseTeacherEnabled = 'wise_teacher_enabled';
 
   static Future<void> init({bool forceReload = false}) async {
     if (_prefs != null && !forceReload) return;
@@ -318,4 +320,23 @@ class SharedPrefsService {
     final prefs = await _instance;
     await prefs.setString(_keyCachedCmsBundleJson, json);
   }
+
+  static String? getCachedInboxJson() {
+    return _prefs?.getString(_keyCachedInboxJson);
+  }
+
+  static Future<void> setCachedInboxJson(String json) async {
+    final prefs = await _instance;
+    await prefs.setString(_keyCachedInboxJson, json);
+  }
+
+  static bool getWiseTeacherEnabled() =>
+      _prefs?.getBool(_keyWiseTeacherEnabled) ?? true;
+
+  static Future<void> setWiseTeacherEnabled(bool value) async {
+    final prefs = await _instance;
+    await prefs.setBool(_keyWiseTeacherEnabled, value);
+  }
+
+  static Future<SharedPreferences?> getRawPrefs() async => _instance;
 }

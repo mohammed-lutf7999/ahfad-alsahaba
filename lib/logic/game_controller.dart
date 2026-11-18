@@ -6,6 +6,7 @@ import '../data/services/question_service.dart';
 import '../data/services/cms_cache_service.dart';
 import '../data/services/profile_service.dart';
 import '../data/services/progression_service.dart';
+import '../data/services/spaced_repetition_service.dart';
 import '../core/app_constants.dart';
 import '../core/cms_icon_registry.dart';
 
@@ -236,9 +237,13 @@ class GameController extends ChangeNotifier {
 
     try {
       // Load questions from JSON using QuestionService
-      _currentQuestions = await _questionService.loadQuestions(
+      final loaded = await _questionService.loadQuestions(
         categoryId: categoryId,
         levelNumber: levelNumber,
+      );
+      _currentQuestions = await _injectDueWiseTeacherReviews(
+        categoryId: categoryId,
+        baseQuestions: loaded,
       );
       _isLoading = false;
       _error = null;
@@ -249,6 +254,64 @@ class GameController extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Prioritizes up to 2 due «المعلم الحكيم» review questions from the same
+  /// category while preserving level length and never failing level loads.
+  Future<List<Question>> _injectDueWiseTeacherReviews({
+    required String categoryId,
+    required List<Question> baseQuestions,
+  }) async {
+    if (baseQuestions.isEmpty ||
+        !SpacedRepetitionService.instance.isEffectivelyEnabled) {
+      return baseQuestions;
+    }
+    try {
+      await SpacedRepetitionService.instance.init();
+      final dueIds =
+          SpacedRepetitionService.instance.getDueQuestionIds(categoryId);
+      if (dueIds.isEmpty) return baseQuestions;
+
+      final dueSet = dueIds.toSet();
+      final baseById = {for (final q in baseQuestions) q.id: q};
+      final reviewQuestions = <Question>[];
+
+      for (final id in dueIds) {
+        if (reviewQuestions.length >= 2) break;
+        final existing = baseById[id];
+        if (existing != null) reviewQuestions.add(existing);
+      }
+
+      if (reviewQuestions.length < 2) {
+        final allCategoryQuestions =
+            await _questionService.loadAllQuestionsForCategory(
+          categoryId,
+          shuffleQuestions: false,
+        );
+        for (final q in allCategoryQuestions) {
+          if (reviewQuestions.length >= 2) break;
+          if (dueSet.contains(q.id) &&
+              !reviewQuestions.any((r) => r.id == q.id)) {
+            reviewQuestions.add(q);
+          }
+        }
+      }
+
+      if (reviewQuestions.isEmpty) return baseQuestions;
+
+      final reviewIds = reviewQuestions.map((q) => q.id).toSet();
+      final remaining =
+          baseQuestions.where((q) => !reviewIds.contains(q.id)).toList();
+      final targetLength = baseQuestions.length;
+      final neededFromRemaining =
+          (targetLength - reviewQuestions.length).clamp(0, remaining.length);
+      return [
+        ...reviewQuestions,
+        ...remaining.take(neededFromRemaining),
+      ];
+    } catch (_) {
+      return baseQuestions;
+    }
   }
 
   // Answer a question

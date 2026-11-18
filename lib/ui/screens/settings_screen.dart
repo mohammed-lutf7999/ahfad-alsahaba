@@ -8,6 +8,8 @@ import '../../data/local/shared_prefs_service.dart';
 import '../../core/sound_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../data/services/admin_service.dart'; // Add AdminService import
+import '../../data/services/app_control_service.dart';
+import '../../data/models/app_control_models.dart';
 import '../../data/models/player_profile_model.dart'; // Add PlayerProfile import
 import '../widgets/avatar_selector.dart';
 import 'admin_dashboard_screen.dart'; // Import AdminDashboardScreen
@@ -22,6 +24,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool _soundEnabled;
   late bool _vibrationEnabled;
+  late bool _wiseTeacherEnabled;
   late int _questionTime;
   int _adminAccessCounter = 0; // Counter for hidden admin access
 
@@ -37,6 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _loadSettings() {
     _soundEnabled = SharedPrefsService.getSoundEnabled();
     _vibrationEnabled = SharedPrefsService.getVibrationEnabled();
+    _wiseTeacherEnabled = SharedPrefsService.getWiseTeacherEnabled();
     _questionTime = SharedPrefsService.getQuestionTime();
   }
 
@@ -164,6 +168,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 14),
 
                       _buildTimerSetting(),
+                      const SizedBox(height: 12),
+                      ValueListenableBuilder<AppFeatureFlags>(
+                        valueListenable:
+                            AppControlService.instance.featureFlagsNotifier,
+                        builder: (context, flags, _) {
+                          final adminEnabled = flags.wiseTeacherMode;
+                          return _buildSwitchTile(
+                            Icons.psychology_rounded,
+                            'وضع المعلم الحكيم 🧠',
+                            adminEnabled
+                                ? 'مراجعة الأخطاء والإضاءة التاريخية في اللعب الفردي'
+                                : 'متوقف مؤقتاً من لوحة الإدارة',
+                            adminEnabled && _wiseTeacherEnabled,
+                            (value) async {
+                              if (!adminEnabled) {
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'وضع المعلم الحكيم متوقف مؤقتاً من الإدارة',
+                                        style: TextStyle(fontFamily: 'Cairo'),
+                                      ),
+                                    ),
+                                  );
+                                return;
+                              }
+                              setState(() => _wiseTeacherEnabled = value);
+                              await SharedPrefsService.setWiseTeacherEnabled(
+                                value,
+                              );
+                            },
+                          );
+                        },
+                      ),
 
                       const SizedBox(height: 28),
 

@@ -71,6 +71,6 @@ class AppConstants {
   static const String playStoreWebUrl =
       'https://play.google.com/store/apps/details?id=$playStorePackageId';
   static const String playStoreMarketUri = 'market://details?id=$playStorePackageId';
-  static const int appControlSyncCooldownMinutes = 15;
+  static const int appControlSyncCooldownMinutes = 3;
   static const String developerName = 'م. محمد لطف';
 }

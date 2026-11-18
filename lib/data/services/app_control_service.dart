@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -79,6 +80,8 @@ class AppControlService extends ChangeNotifier {
   Future<AppControlSnapshot>? _inFlightSync;
   bool _initialized = false;
   int? _resolvedBuildNumber;
+  RealtimeChannel? _livePingChannel;
+  bool _isLivePingSubscribed = false;
 
   @visibleForTesting
   ControlStateFetcher? rpcStateFetcherOverride;
@@ -618,7 +621,82 @@ class AppControlService extends ChangeNotifier {
         next.announcements,
       );
     }
+    if (next.releaseConfig.featureFlags.liveAnnouncementPing) {
+      startLivePingIfEnabled();
+    } else {
+      unawaited(stopLivePing());
+    }
     notifyListeners();
+  }
+
+  @visibleForTesting
+  bool allowLivePingInTests = false;
+
+  bool _isRunningUnderFlutterTest() {
+    try {
+      return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Subscribes to the ultra-lightweight `app_control_live` broadcast channel
+  /// when `featureFlags.liveAnnouncementPing` is enabled. Never carries private
+  /// payloads; only triggers `syncControlState(force: true)` for matching targets.
+  void startLivePingIfEnabled() {
+    if (rpcStateFetcherOverride != null) return;
+    if (!allowLivePingInTests && _isRunningUnderFlutterTest()) return;
+    if (!featureFlagsNotifier.value.liveAnnouncementPing) return;
+    if (_isLivePingSubscribed && _livePingChannel != null) return;
+    final client = _safeSupabase();
+    if (client == null) return;
+
+    try {
+      final channel = client.channel('app_control_live');
+      channel.onBroadcast(
+        event: 'control_ping',
+        callback: (payload) => handleControlPingPayload(payload),
+      );
+      channel.subscribe();
+      _livePingChannel = channel;
+      _isLivePingSubscribed = true;
+    } catch (e) {
+      debugPrint('AppControlService live ping subscribe notice: $e');
+    }
+  }
+
+  /// Detaches the `app_control_live` channel immediately on background/dispose
+  /// to conserve Supabase Free Plan concurrent WebSocket slots (200 cap).
+  Future<void> stopLivePing() async {
+    final ch = _livePingChannel;
+    _livePingChannel = null;
+    _isLivePingSubscribed = false;
+    if (ch == null) return;
+    try {
+      await _safeSupabase()?.removeChannel(ch);
+    } catch (e) {
+      debugPrint('AppControlService live ping unsubscribe notice: $e');
+    }
+  }
+
+  /// Handles an incoming silent sync ping payload; exposed for unit testing.
+  @visibleForTesting
+  Future<void> handleControlPingPayload(Map<String, dynamic> payload) async {
+    final targetCode =
+        payload['target_code']?.toString().trim().toUpperCase() ?? '';
+    final targetUserId = payload['target_user_id']?.toString().trim() ?? '';
+    final myCode = _resolvePlayerCode(null);
+    final myUid = _safeSupabase()?.auth.currentUser?.id;
+
+    final matchesAll = targetCode.isEmpty || targetCode == 'ALL';
+    final matchesMyCode =
+        myCode != null && targetCode.isNotEmpty && targetCode == myCode;
+    final matchesMyUid =
+        myUid != null && targetUserId.isNotEmpty && targetUserId == myUid;
+
+    if (matchesAll || matchesMyCode || matchesMyUid) {
+      await syncControlState(force: true);
+    }
   }
 
   bool _sameReleaseConfig(AppReleaseConfig a, AppReleaseConfig b) {

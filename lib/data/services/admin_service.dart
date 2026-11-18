@@ -165,6 +165,15 @@ class AdminService {
   })? adminManagerOverride;
 
   @visibleForTesting
+  Future<AdminResourceHealth?> Function()? resourceHealthFetcherOverride;
+
+  @visibleForTesting
+  Future<Map<String, dynamic>?> Function({
+    required String action,
+    int olderThanDays,
+  })? resourceCleanupOverride;
+
+  @visibleForTesting
   void resetForTesting() {
     _cloudVerifiedAdmin = null;
     overviewFetcherOverride = null;
@@ -193,6 +202,8 @@ class AdminService {
     auditLogsFetcherOverride = null;
     adminsFetcherOverride = null;
     adminManagerOverride = null;
+    resourceHealthFetcherOverride = null;
+    resourceCleanupOverride = null;
   }
 
   SupabaseClient? get _supabase {
@@ -311,6 +322,7 @@ class AdminService {
     if (res is Map) {
       final config = AppReleaseConfig.fromJson(Map<String, dynamic>.from(res));
       unawaited(AppControlService.instance.syncControlState(force: true));
+      unawaited(broadcastControlPing(targetCode: 'ALL'));
       return config;
     }
     return null;
@@ -512,6 +524,14 @@ class AdminService {
     if (res is Map) {
       final ann = AppAnnouncement.fromJson(Map<String, dynamic>.from(res));
       unawaited(AppControlService.instance.syncControlState(force: true));
+      unawaited(
+        broadcastControlPing(
+          targetCode: targetScope == 'single_user'
+              ? (targetPlayerCode ?? 'SINGLE')
+              : 'ALL',
+          targetUserId: targetUserId,
+        ),
+      );
       return ann;
     }
     return null;
@@ -972,7 +992,18 @@ class AdminService {
         'p_reason': cleanedReason,
       },
     ).timeout(const Duration(seconds: 6));
-    return res is Map ? Map<String, dynamic>.from(res) : null;
+    if (res is Map) {
+      final result = Map<String, dynamic>.from(res);
+      final targetCode = (result['player_code'] ?? '').toString().trim();
+      unawaited(
+        broadcastControlPing(
+          targetCode: targetCode.isNotEmpty ? targetCode : 'SINGLE',
+          targetUserId: userId.trim(),
+        ),
+      );
+      return result;
+    }
+    return null;
   }
 
   Future<List<AdminGhostSummary>> listGhosts({int limit = 30}) async {
@@ -1067,6 +1098,76 @@ class AdminService {
       return AdminRosterSnapshot.fromJson(Map<String, dynamic>.from(res));
     }
     return null;
+  }
+
+  /// Fetches live PostgreSQL storage & activity telemetry (`admin_get_resource_health`).
+  Future<AdminResourceHealth?> getResourceHealth() async {
+    if (resourceHealthFetcherOverride != null) {
+      return resourceHealthFetcherOverride!();
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_get_resource_health')
+        .timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminResourceHealth.fromJson(Map<String, dynamic>.from(res));
+    }
+    return null;
+  }
+
+  /// Executes safe admin cleanup (`finished_matches`, `expired_receipts`, `old_audit_logs`).
+  Future<Map<String, dynamic>?> cleanupStaleResources({
+    required String action,
+    int olderThanDays = 30,
+  }) async {
+    if (resourceCleanupOverride != null) {
+      return resourceCleanupOverride!(
+        action: action,
+        olderThanDays: olderThanDays,
+      );
+    }
+    final client = _supabase;
+    if (client == null) return null;
+    final res = await client.rpc(
+      'admin_cleanup_stale_resources',
+      params: {
+        'p_action': action.trim().toLowerCase(),
+        'p_older_than_days': olderThanDays.clamp(7, 365),
+      },
+    ).timeout(const Duration(seconds: 8));
+    return res is Map ? Map<String, dynamic>.from(res) : null;
+  }
+
+  /// Emits a non-blocking silent sync ping on `app_control_live` so active foreground
+  /// clients pull fresh announcements/maintenance state immediately (<1s).
+  Future<void> broadcastControlPing({
+    String targetCode = 'ALL',
+    String? targetUserId,
+  }) async {
+    if (!AppControlService
+        .instance.featureFlagsNotifier.value.liveAnnouncementPing) {
+      return;
+    }
+    final client = _supabase;
+    if (client == null) return;
+    try {
+      final ch = client.channel('app_control_live');
+      await ch
+          .sendBroadcastMessage(
+            event: 'control_ping',
+            payload: {
+              'target_code': targetCode.trim().toUpperCase(),
+              if (targetUserId != null && targetUserId.trim().isNotEmpty)
+                'target_user_id': targetUserId.trim(),
+              'ts': DateTime.now().toUtc().millisecondsSinceEpoch,
+            },
+          )
+          .timeout(const Duration(seconds: 4));
+      await client.removeChannel(ch);
+    } catch (e) {
+      debugPrint('AdminService broadcastControlPing notice: $e');
+    }
   }
 
   // ==================== LEGACY BROADCAST & EMAIL HELPERS ====================

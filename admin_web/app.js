@@ -338,6 +338,9 @@ function hydrateReleaseForm(rc) {
   document.getElementById('flag-knights-store').checked = flags.knights_store ?? true;
   document.getElementById('flag-show-event-banner').checked = flags.show_event_banner ?? true;
   document.getElementById('flag-daily-challenges').checked = flags.daily_challenges ?? true;
+  document.getElementById('flag-royal-inbox').checked = flags.royal_inbox ?? true;
+  document.getElementById('flag-live-ping').checked = flags.live_announcement_ping ?? true;
+  document.getElementById('flag-wise-teacher').checked = flags.wise_teacher_mode ?? true;
 
   document.getElementById('topbar-config-ver').textContent = `#${rc.config_version ?? 1}`;
   const maintPill = document.getElementById('topbar-maint-pill');
@@ -346,6 +349,25 @@ function hydrateReleaseForm(rc) {
 }
 
 // ==================== RELEASE CONTROL & FLAGS ====================
+
+async function broadcastWebControlPing(targetCode = 'ALL', targetUserId = null) {
+  try {
+    if (!supabase || !document.getElementById('flag-live-ping')?.checked) return;
+    const ch = supabase.channel('app_control_live');
+    await ch.send({
+      type: 'broadcast',
+      event: 'control_ping',
+      payload: {
+        target_code: String(targetCode || 'ALL').toUpperCase(),
+        ...(targetUserId ? { target_user_id: targetUserId } : {}),
+        ts: Date.now(),
+      },
+    });
+    await supabase.removeChannel(ch);
+  } catch (err) {
+    console.warn('Ping broadcast skipped:', err?.message || err);
+  }
+}
 
 async function handleSaveRelease(e) {
   e.preventDefault();
@@ -399,10 +421,14 @@ async function handleSaveRelease(e) {
         knights_store: document.getElementById('flag-knights-store').checked,
         show_event_banner: document.getElementById('flag-show-event-banner').checked,
         daily_challenges: document.getElementById('flag-daily-challenges').checked,
+        royal_inbox: document.getElementById('flag-royal-inbox').checked,
+        live_announcement_ping: document.getElementById('flag-live-ping').checked,
+        wise_teacher_mode: document.getElementById('flag-wise-teacher').checked,
       },
     });
     if (error) throw error;
     if (data) hydrateReleaseForm(data);
+    broadcastWebControlPing('ALL');
     showToast('تم حفظ ونشر إعدادات الإصدار والأعلام ✅');
   } catch (err) {
     showToast(`فشل الحفظ: ${err.message}`, true);
@@ -653,6 +679,7 @@ async function handleCreateAnnouncement(e) {
     document.getElementById('single-user-box').classList.add('hidden');
     updateAnnouncementPreview();
     showToast('تم إرسال ونشر الرسالة بنجاح 🚀');
+    broadcastWebControlPing(scope === 'single_user' ? (targetPlayerCode || 'SINGLE') : 'ALL', targetUserId);
     await Promise.all([loadAnnouncements(), loadOverview()]);
   } catch (err) {
     showToast(`فشل نشر الرسالة: ${err.message}`, true);
@@ -1106,6 +1133,7 @@ window.SahabaAdminBridge = {
   loadOverview,
   switchToTab,
   selectPlayerForAnnouncement,
+  broadcastWebControlPing,
 };
 
 if (document.readyState === 'loading') {

@@ -182,13 +182,13 @@ void main() {
       expect(service.pendingAnnouncementsNotifier.value.length, equals(1));
       expect(service.isAdminNotifier.value, isFalse);
 
-      // 2. Call again after 5 minutes -> skipped by 15-minute TTL cooldown!
-      fakeNow = fakeNow.add(const Duration(minutes: 5));
+      // 2. Call again after 2 minutes -> skipped by 3-minute TTL cooldown!
+      fakeNow = fakeNow.add(const Duration(minutes: 2));
       await service.syncControlState(currentVersionCode: 18);
       expect(rpcCalls, equals(1));
 
-      // 3. Call again after 16 minutes -> hits server, gets delta changed=false, preserves activeEvent & updates isAdmin
-      fakeNow = fakeNow.add(const Duration(minutes: 11));
+      // 3. Call again after 4 minutes total -> hits server, gets delta changed=false, preserves activeEvent & updates isAdmin
+      fakeNow = fakeNow.add(const Duration(minutes: 2));
       await service.syncControlState(currentVersionCode: 18);
       expect(rpcCalls, equals(2));
       expect(service.activeEventNotifier.value?.title, equals('تحدي الفرسان'));

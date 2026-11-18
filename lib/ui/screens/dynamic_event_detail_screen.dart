@@ -25,6 +25,7 @@ class AppControlVisuals {
     AppRoutes.privateRoomHub,
     AppRoutes.gloryRoad,
     AppRoutes.knightsStore,
+    AppRoutes.royalInbox,
     AppRoutes.library,
     AppRoutes.profileSetup,
   };

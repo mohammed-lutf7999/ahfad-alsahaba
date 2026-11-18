@@ -148,6 +148,19 @@ class HomeSpeedDial extends StatelessWidget {
               },
             ),
 
+            SpeedDialChild(
+              child: const Icon(
+                Icons.mark_email_unread_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              backgroundColor: const Color(0xFF0EA5E9),
+              onTap: () {
+                SoundService().playClick();
+                Navigator.pushNamed(context, AppRoutes.royalInbox);
+              },
+            ),
+
             // Google Sign-In / Sign-Out Button (uses local crisp icon to avoid failing SVG network request)
             SpeedDialChild(
               child: AuthService().isLoggedIn
