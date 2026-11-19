@@ -175,6 +175,35 @@ class QuestionService {
     );
   }
 
+  /// Loads an ordered list of questions deterministically from `category:level:index` specs.
+  Future<List<Question>> loadQuestionsBySpecs(
+    List<String> specs, {
+    int? seed,
+    String? fallbackCategoryId,
+  }) async {
+    final questions = <Question>[];
+    for (var slot = 0; slot < specs.length; slot++) {
+      final parts = specs[slot].split(':');
+      if (parts.length < 3) continue;
+      final q = await loadQuestionBySpec(
+        categoryId: parts[0],
+        levelNumber: int.tryParse(parts[1]) ?? 1,
+        questionIndex: int.tryParse(parts[2]) ?? 0,
+        seed: seed,
+        slotOffset: slot,
+      );
+      if (q != null) questions.add(q);
+    }
+    if (questions.isEmpty && fallbackCategoryId != null) {
+      final fallback = await loadQuestions(
+        categoryId: fallbackCategoryId,
+        levelNumber: 1,
+      );
+      return fallback.take(8).toList();
+    }
+    return questions;
+  }
+
   /// Builds visible solo questions for `(categoryId, levelNumber)` merging
   /// local asset JSON with dynamic overrides & additions from [CmsCacheService].
   Future<List<Question>> loadQuestions({

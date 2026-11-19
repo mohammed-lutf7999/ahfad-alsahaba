@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/app_theme.dart';
@@ -505,6 +505,51 @@ class _AdminResourcesScreenState extends State<AdminResourcesScreen> {
                 ),
                 side: BorderSide(
                   color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 46,
+            child: OutlinedButton.icon(
+              key: const Key('reset_guild_week_btn'),
+              onPressed: _isCleaning
+                  ? null
+                  : () => _runCleanup(
+                        action: 'reset_guild_week',
+                        title: 'تصفير نقاط أسبوع معركة الجمعة الكبرى',
+                        description:
+                            'سيتم بدء أسبوع تنافسي جديد للكتائب (تصفير النقاط الأسبوعية فقط مع بقاء النقاط التراكمية الكلية كما هي).',
+                      ),
+              icon: const Icon(
+                Icons.shield_moon_outlined,
+                size: 18,
+                color: Colors.amberAccent,
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'تصفير أسبوع معركة الجمعة للكتائب',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Colors.amberAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                side: BorderSide(
+                  color: Colors.amberAccent.withValues(alpha: 0.45),
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

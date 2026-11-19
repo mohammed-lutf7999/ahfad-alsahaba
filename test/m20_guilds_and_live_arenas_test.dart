@@ -280,5 +280,30 @@ void main() {
       expect(cleanedAction, equals('expired_live_sessions'));
       expect(tester.takeException(), isNull);
     });
+
+    test('QuestionService.loadQuestionsBySpecs returns deterministic identical questions for Host & 100 Students', () async {
+      final specs = ['quran:1:0', 'quran:1:2', 'quran:1:4'];
+      final hostQuestions = await QuestionService().loadQuestionsBySpecs(
+        specs,
+        seed: 54321.hashCode,
+      );
+      final studentQuestions = await QuestionService().loadQuestionsBySpecs(
+        specs,
+        seed: 54321.hashCode,
+      );
+      expect(hostQuestions.length, equals(3));
+      expect(
+        hostQuestions.map((q) => q.id).toList(),
+        equals(studentQuestions.map((q) => q.id).toList()),
+      );
+      expect(
+        hostQuestions.map((q) => q.questionText).toList(),
+        equals(studentQuestions.map((q) => q.questionText).toList()),
+      );
+      expect(
+        hostQuestions.first.options,
+        equals(studentQuestions.first.options),
+      );
+    });
   });
 }

@@ -893,6 +893,7 @@ async function handleSaveEvent(e) {
 
     const wasEditing = Boolean(state.editingEventId);
     resetEventForm();
+    broadcastWebControlPing('ALL');
     showToast(wasEditing ? 'تم تحديث الحدث بنجاح ✅' : 'تم نشر الحدث الجديد 🎉');
     await Promise.all([loadDynamicEvents(), loadOverview()]);
   } catch (err) {
@@ -912,6 +913,7 @@ async function toggleDynamicEvent(id, nextActive) {
     await loadDynamicEvents();
     return;
   }
+  broadcastWebControlPing('ALL');
   showToast(nextActive ? 'تم تفعيل الحدث ✅' : 'تم إيقاف الحدث ⏸️');
   await Promise.all([loadDynamicEvents(), loadOverview()]);
 }
@@ -927,6 +929,7 @@ async function deleteDynamicEvent(id) {
     return;
   }
   if (state.editingEventId === id) resetEventForm();
+  broadcastWebControlPing('ALL');
   showToast('تم حذف الحدث بنجاح 🗑️');
   await Promise.all([loadDynamicEvents(), loadOverview()]);
 }

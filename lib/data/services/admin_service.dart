@@ -321,8 +321,7 @@ class AdminService {
 
     if (res is Map) {
       final config = AppReleaseConfig.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
-      unawaited(broadcastControlPing(targetCode: 'ALL'));
+      _syncAndBroadcastAll();
       return config;
     }
     return null;
@@ -404,7 +403,7 @@ class AdminService {
 
     if (res is Map) {
       final event = AppDynamicEvent.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return event;
     }
     return null;
@@ -429,7 +428,7 @@ class AdminService {
 
     if (res is Map) {
       final event = AppDynamicEvent.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return event;
     }
     return null;
@@ -447,7 +446,7 @@ class AdminService {
     ).timeout(const Duration(seconds: 5));
     final deleted = res == true;
     if (deleted) {
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
     }
     return deleted;
   }
@@ -644,7 +643,7 @@ class AdminService {
     if (res is Map) {
       final parsed =
           StoreItemModel.fromCloudJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return parsed;
     }
     return null;
@@ -674,7 +673,7 @@ class AdminService {
     ).timeout(const Duration(seconds: 6));
     final ok = res is Map && res['ok'] == true;
     if (ok) {
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
     }
     return ok;
   }
@@ -739,7 +738,7 @@ class AdminService {
     if (res is Map) {
       final sec = DynamicLibrarySectionData.fromJson(
           Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return sec;
     }
     return null;
@@ -776,7 +775,7 @@ class AdminService {
     if (res is Map) {
       final item =
           DynamicLibraryItemData.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return item;
     }
     return null;
@@ -868,7 +867,7 @@ class AdminService {
     if (res is Map) {
       final cat =
           DynamicQuizCategoryData.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return cat;
     }
     return null;
@@ -915,7 +914,7 @@ class AdminService {
     if (res is Map) {
       final q =
           DynamicQuizQuestionData.fromJson(Map<String, dynamic>.from(res));
-      unawaited(AppControlService.instance.syncControlState(force: true));
+      _syncAndBroadcastAll();
       return q;
     }
     return null;
@@ -1139,8 +1138,13 @@ class AdminService {
     return res is Map ? Map<String, dynamic>.from(res) : null;
   }
 
-  /// Emits a non-blocking silent sync ping on `app_control_live` so active foreground
-  /// clients pull fresh announcements/maintenance state immediately (<1s).
+  void _syncAndBroadcastAll() {
+    unawaited(AppControlService.instance.syncControlState(force: true));
+    unawaited(broadcastControlPing(targetCode: 'ALL'));
+  }
+
+  /// Emits a non-blocking silent sync ping on `app_control_live` over REST (`httpSend`)
+  /// so active foreground clients pull fresh state in `<1s` with zero socket churn.
   Future<void> broadcastControlPing({
     String targetCode = 'ALL',
     String? targetUserId,
@@ -1153,18 +1157,16 @@ class AdminService {
     if (client == null) return;
     try {
       final ch = client.channel('app_control_live');
-      await ch
-          .sendBroadcastMessage(
-            event: 'control_ping',
-            payload: {
-              'target_code': targetCode.trim().toUpperCase(),
-              if (targetUserId != null && targetUserId.trim().isNotEmpty)
-                'target_user_id': targetUserId.trim(),
-              'ts': DateTime.now().toUtc().millisecondsSinceEpoch,
-            },
-          )
-          .timeout(const Duration(seconds: 4));
-      await client.removeChannel(ch);
+      await ch.httpSend(
+        event: 'control_ping',
+        payload: {
+          'target_code': targetCode.trim().toUpperCase(),
+          if (targetUserId != null && targetUserId.trim().isNotEmpty)
+            'target_user_id': targetUserId.trim(),
+          'ts': DateTime.now().toUtc().millisecondsSinceEpoch,
+        },
+        timeout: const Duration(seconds: 4),
+      );
     } catch (e) {
       debugPrint('AdminService broadcastControlPing notice: $e');
     }

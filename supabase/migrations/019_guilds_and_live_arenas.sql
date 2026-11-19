@@ -659,6 +659,11 @@ BEGIN
         WHERE cm.created_at < NOW() - INTERVAL '24 hours';
         GET DIAGNOSTICS v_deleted = ROW_COUNT;
 
+    ELSIF v_action = 'reset_guild_week' THEN
+        UPDATE public.guilds g SET weekly_score = 0;
+        UPDATE public.guild_members gm SET weekly_contribution = 0;
+        GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
     ELSIF v_action = 'old_audit_logs' THEN
         DELETE FROM public.admin_audit_logs al
         WHERE al.created_at < NOW() - make_interval(days => GREATEST(v_days, 90));

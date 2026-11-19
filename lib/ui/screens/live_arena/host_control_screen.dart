@@ -48,20 +48,23 @@ class _HostControlScreenState extends State<HostControlScreen> {
     SoundService().playClick();
     setState(() => _error = null);
     try {
-      final loaded = await QuestionService().loadQuestions(
+      final levelQuestions = await QuestionService().loadQuestions(
         categoryId: _categoryId,
         levelNumber: 1,
       );
-      _questions = loaded.take(8).toList();
-      final qSpecs = _questions
-          .asMap()
-          .entries
-          .map((e) => '$_categoryId:1:${e.key}')
-          .toList();
-      await _arena.createSession(
+      final slots = List<int>.generate(levelQuestions.length, (i) => i)
+        ..shuffle();
+      final qSpecs = slots.take(8).map((slot) => '$_categoryId:1:$slot').toList();
+      final sessionRaw = await _arena.createSession(
         title: _titleCtrl.text,
         categoryId: _categoryId,
         questionIds: qSpecs,
+      );
+      final pinSeed = (sessionRaw?['pin_code'] ?? '').hashCode;
+      _questions = await QuestionService().loadQuestionsBySpecs(
+        qSpecs,
+        seed: pinSeed,
+        fallbackCategoryId: _categoryId,
       );
     } catch (e) {
       if (mounted) {

@@ -95,6 +95,7 @@
       });
       if (error) throw error;
       toast(nextVisible ? 'تم إظهار العنصر فوراً ✅' : 'تم إخفاء العنصر بأمان 👁️‍🗨️');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       if (data?.cms_version) {
         const pill = document.getElementById('topbar-cms-ver');
         if (pill) pill.textContent = `#${data.cms_version}`;
@@ -397,6 +398,7 @@
       });
       if (error) throw error;
       toast('تم حفظ عنصر المتجر وتحديث الكتالوغ السحابي ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       resetStoreForm();
       await Promise.all([loadStoreItems(), bumpOverview(), loadAuditLogs()]);
     } catch (err) {
@@ -587,6 +589,7 @@
       });
       if (error) throw error;
       toast('تم حفظ قسم المكتبة ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       document.getElementById('lib-section-form').reset();
       document.getElementById('lib-sec-id').readOnly = false;
       document.getElementById('lib-sec-visible').checked = true;
@@ -619,6 +622,7 @@
       });
       if (error) throw error;
       toast('تم حفظ عنصر المكتبة ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       document.getElementById('lib-item-form').reset();
       document.getElementById('lib-item-id').value = '';
       document.getElementById('lib-item-visible').checked = true;
@@ -831,6 +835,7 @@
       });
       if (error) throw error;
       toast('تم حفظ قسم المسابقة ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       document.getElementById('quiz-category-form').reset();
       document.getElementById('qz-cat-id').readOnly = false;
       document.getElementById('qz-cat-levels').value = '10';
@@ -876,6 +881,7 @@
       });
       if (error) throw error;
       toast('تم حفظ السؤال السحابي بنجاح ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.('ALL');
       document.getElementById('quiz-question-form').reset();
       document.getElementById('qz-q-id').value = '';
       document.getElementById('qz-q-level').value = '1';
@@ -1434,6 +1440,9 @@
     );
     document.getElementById('btn-cleanup-chat')?.addEventListener('click', () =>
       runResourceCleanup('old_chat_messages', 'هل تريد حذف رسائل الديوان الأقدم من 24 ساعة؟'),
+    );
+    document.getElementById('btn-reset-guild-week')?.addEventListener('click', () =>
+      runResourceCleanup('reset_guild_week', 'هل تريد تصفير النقاط الأسبوعية لبدء جولة معركة الجمعة الكبرى؟'),
     );
 
     syncStoreMetadataPanels();

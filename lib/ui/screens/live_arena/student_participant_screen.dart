@@ -61,12 +61,13 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
     setState(() => _error = null);
     try {
       final session = await _arena.joinByPin(_pinCtrl.text);
-      final loaded = await QuestionService().loadQuestions(
-        categoryId: session.categoryId,
-        levelNumber: 1,
+      final loaded = await QuestionService().loadQuestionsBySpecs(
+        session.questionIds,
+        seed: session.pinCode.hashCode,
+        fallbackCategoryId: session.categoryId,
       );
       if (mounted) {
-        setState(() => _questions = loaded.take(8).toList());
+        setState(() => _questions = loaded);
       }
     } catch (e) {
       if (mounted) {

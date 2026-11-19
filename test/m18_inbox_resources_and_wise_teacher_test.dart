@@ -15,14 +15,25 @@ import 'package:ahfad_alsahaba/ui/widgets/historical_insight_sheet.dart';
 import 'package:ahfad_alsahaba/data/models/question_model.dart';
 import 'package:ahfad_alsahaba/logic/game_controller.dart';
 
+void _setPhoneViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(360, 800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+}
+
 Widget _wrap360(Widget child) {
-  return MediaQuery(
-    data: const MediaQueryData(
-      size: Size(360, 800),
-      padding: EdgeInsets.only(top: 48, bottom: 48),
-      viewPadding: EdgeInsets.only(top: 48, bottom: 48),
+  return MaterialApp(
+    home: MediaQuery(
+      data: const MediaQueryData(
+        size: Size(360, 800),
+        padding: EdgeInsets.only(top: 48, bottom: 48),
+        viewPadding: EdgeInsets.only(top: 48, bottom: 48),
+      ),
+      child: child,
     ),
-    child: MaterialApp(home: child),
   );
 }
 
@@ -78,6 +89,7 @@ void main() {
     });
 
     testWidgets('RoyalInboxScreen renders tabs, unread badge & marks all read cleanly at 360dp', (tester) async {
+      _setPhoneViewport(tester);
       RoyalInboxService.instance.inboxFetcherOverride = ({String? playerCode, int limit = 25}) async => [
             {
               'id': 'ann_1',
@@ -122,6 +134,7 @@ void main() {
     });
 
     testWidgets('AdminResourcesScreen renders DB health metrics & executes confirmed cleanup cleanly', (tester) async {
+      _setPhoneViewport(tester);
       AdminService().resourceHealthFetcherOverride = () async => const AdminResourceHealth(
             dbSizeBytes: 31457280, // 30 MB
             dbLimitBytes: 524288000, // 500 MB
@@ -154,8 +167,13 @@ void main() {
       );
       expect(find.text('matches'), findsOneWidget);
 
-      await tester.ensureVisible(find.byKey(const Key('cleanup_matches_btn')));
-      await tester.tap(find.byKey(const Key('cleanup_matches_btn')));
+      final btnFinder = find.byKey(const Key('cleanup_matches_btn'));
+      await Scrollable.ensureVisible(
+        tester.element(btnFinder),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(btnFinder);
       await tester.pumpAndSettle();
       await tester.tap(find.text('تنفيذ التنظيف'));
       await tester.pumpAndSettle();
@@ -198,6 +216,7 @@ void main() {
     });
 
     testWidgets('HistoricalInsightSheet renders Wise Teacher insight cleanly on 360dp', (tester) async {
+      _setPhoneViewport(tester);
       final q = Question(
         id: 'q_insight_1',
         categoryId: 'seerah',
