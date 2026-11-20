@@ -10,6 +10,7 @@ import 'admin/admin_events_screen.dart';
 import 'admin/admin_players_support_screen.dart';
 import 'admin/admin_release_control_screen.dart';
 import 'admin/admin_resources_screen.dart';
+import 'admin/admin_social_moderation_screen.dart';
 import 'admin/admin_telemetry_security_screen.dart';
 import 'admin/widgets/admin_ui_kit.dart';
 import 'admin_email_screen.dart';
@@ -497,12 +498,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _buildActionCard(
           key: const Key('admin_nav_release_control'),
           title: 'الإصدارات والصيانة والمزايا',
-          subtitle: 'التحديث الإلزامي، وضع الصيانة، و6 أعلام ميزات',
+          subtitle: 'التحديث الإلزامي، وضع الصيانة، و13 علم ميزة وتحكم ديناميكي',
           icon: Icons.tune_rounded,
           color: customTheme.sovereignAccent,
           onTap: () => _openAndRefresh(
             AdminReleaseControlScreen(initialConfig: _overview?.releaseConfig),
           ),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_social_moderation'),
+          title: 'إشراف الديوان والكتائب والبطولات 🛡️',
+          subtitle: 'مراجعة البلاغات، فك الكتم، إدارة الكتائب، والإنهاء الفوري للساحات',
+          icon: Icons.gavel_rounded,
+          color: const Color(0xFF38BDF8),
+          onTap: () => _openAndRefresh(const AdminSocialModerationScreen()),
         ),
         const SizedBox(height: 12),
         _buildActionCard(

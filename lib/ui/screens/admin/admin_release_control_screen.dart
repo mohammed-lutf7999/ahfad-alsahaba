@@ -47,7 +47,9 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
   bool _liveAnnouncementPing = true;
   bool _wiseTeacherMode = true;
   bool _diwanChat = true;
-  bool _guildsArenas = false;
+  bool _guildsArenas = true;
+  bool _quickPhrases = true;
+  bool _liveArenaHostRestricted = true;
   int _configVersion = 1;
 
   @override
@@ -90,6 +92,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
     _wiseTeacherMode = cfg.featureFlags.wiseTeacherMode;
     _diwanChat = cfg.featureFlags.diwanChat;
     _guildsArenas = cfg.featureFlags.guildsArenas;
+    _quickPhrases = cfg.featureFlags.quickPhrases;
+    _liveArenaHostRestricted = cfg.featureFlags.liveArenaHostRestricted;
     _configVersion = cfg.configVersion;
   }
 
@@ -256,6 +260,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
           'wise_teacher_mode': _wiseTeacherMode,
           'diwan_chat': _diwanChat,
           'guilds_arenas': _guildsArenas,
+          'quick_phrases': _quickPhrases,
+          'live_arena_host_restricted': _liveArenaHostRestricted,
         },
       );
       if (!mounted) return;
@@ -519,6 +525,21 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
                       subtitle: 'تفعيل أو إيقاف نظام الكتائب وغرف البطولات الحية',
                       value: _guildsArenas,
                       onChanged: (v) => setState(() => _guildsArenas = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_quick_phrases'),
+                      title: 'عبارات الفرسان السريعة في النزالات 💬',
+                      subtitle: 'إتاحة إرسال واستقبال عبارات الفروسية في المعارك',
+                      value: _quickPhrases,
+                      onChanged: (v) => setState(() => _quickPhrases = v),
+                    ),
+                    _buildFlagTile(
+                      key: const Key('flag_live_arena_host_restricted'),
+                      title: 'حصر إنشاء البطولات الحية بالمعلمين والمشرفين 🎓',
+                      subtitle: 'قصر زر إنشاء البطولة على المشرفين أو المعلمين المفوّضين',
+                      value: _liveArenaHostRestricted,
+                      onChanged: (v) =>
+                          setState(() => _liveArenaHostRestricted = v),
                     ),
                   ],
                 ),

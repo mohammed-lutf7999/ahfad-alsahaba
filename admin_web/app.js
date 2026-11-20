@@ -342,7 +342,9 @@ function hydrateReleaseForm(rc) {
   document.getElementById('flag-live-ping').checked = flags.live_announcement_ping ?? true;
   document.getElementById('flag-wise-teacher').checked = flags.wise_teacher_mode ?? true;
   document.getElementById('flag-diwan-chat').checked = flags.diwan_chat ?? true;
-  document.getElementById('flag-guilds-arenas').checked = flags.guilds_arenas ?? false;
+  document.getElementById('flag-guilds-arenas').checked = flags.guilds_arenas ?? true;
+  document.getElementById('flag-quick-phrases').checked = flags.quick_phrases ?? true;
+  document.getElementById('flag-live-arena-host-restricted').checked = flags.live_arena_host_restricted ?? true;
 
   document.getElementById('topbar-config-ver').textContent = `#${rc.config_version ?? 1}`;
   const maintPill = document.getElementById('topbar-maint-pill');
@@ -368,6 +370,26 @@ async function broadcastWebControlPing(targetCode = 'ALL', targetUserId = null) 
     await supabase.removeChannel(ch);
   } catch (err) {
     console.warn('Ping broadcast skipped:', err?.message || err);
+  }
+}
+
+async function broadcastLiveArenaFinish(sessionId, leaderboard = []) {
+  try {
+    if (!supabase || !sessionId) return;
+    const ch = supabase.channel(`live_arena_${sessionId}`);
+    await ch.send({
+      type: 'broadcast',
+      event: 'arena_event',
+      payload: {
+        type: 'finish',
+        question_index: 999,
+        leaderboard: Array.isArray(leaderboard) ? leaderboard : [],
+        ts: Date.now(),
+      },
+    });
+    await supabase.removeChannel(ch);
+  } catch (err) {
+    console.warn('Live arena finish broadcast skipped:', err?.message || err);
   }
 }
 
@@ -428,6 +450,8 @@ async function handleSaveRelease(e) {
         wise_teacher_mode: document.getElementById('flag-wise-teacher').checked,
         diwan_chat: document.getElementById('flag-diwan-chat').checked,
         guilds_arenas: document.getElementById('flag-guilds-arenas').checked,
+        quick_phrases: document.getElementById('flag-quick-phrases').checked,
+        live_arena_host_restricted: document.getElementById('flag-live-arena-host-restricted').checked,
       },
     });
     if (error) throw error;
@@ -1141,6 +1165,7 @@ window.SahabaAdminBridge = {
   switchToTab,
   selectPlayerForAnnouncement,
   broadcastWebControlPing,
+  broadcastLiveArenaFinish,
 };
 
 if (document.readyState === 'loading') {

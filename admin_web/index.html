@@ -158,6 +158,7 @@
       <button class="tab-btn" data-tab="content" type="button">📚 المكتبة والمسابقات</button>
       <button class="tab-btn" data-tab="players" type="button">👥 اللاعبون والتعويضات</button>
       <button class="tab-btn" data-tab="telemetry" type="button">👻 الأشباح والتدقيق</button>
+      <button class="tab-btn" data-tab="moderation" type="button">🛡️ الديوان والكتائب</button>
     </nav>
 
     <!-- Tab 1: Release Control, Maintenance & Feature Flags -->
@@ -340,6 +341,26 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="switch-row">
+              <div>
+                <strong>عبارات الفرسان السريعة في النزالات 💬</strong>
+                <p class="muted-text">إتاحة إرسال واستقبال عبارات الفروسية في المعارك</p>
+              </div>
+              <label class="switch">
+                <input id="flag-quick-phrases" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <div>
+                <strong>حصر إنشاء البطولات الحية بالمعلمين والمشرفين 🎓</strong>
+                <p class="muted-text">قصر زر إنشاء البطولة على المشرفين أو المعلمين المفوّضين</p>
+              </div>
+              <label class="switch">
+                <input id="flag-live-arena-host-restricted" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
 
           <button id="btn-save-release" class="btn btn-gold btn-block mt-md" type="submit">
@@ -421,6 +442,10 @@
               <button class="chip-btn" data-ann-route="/challenge" data-ann-cta="ادخل الميدان" type="button">التحدي (/challenge)</button>
               <button class="chip-btn" data-ann-route="/glory-road" data-ann-cta="طريق المجد" type="button">المجد (/glory-road)</button>
               <button class="chip-btn" data-ann-route="/library" data-ann-cta="افتح المكتبة" type="button">المكتبة (/library)</button>
+              <button class="chip-btn" data-ann-route="/inbox" data-ann-cta="صندوق البريد" type="button">البريد (/inbox)</button>
+              <button class="chip-btn" data-ann-route="/diwan" data-ann-cta="ديوان الأحفاد" type="button">الديوان (/diwan)</button>
+              <button class="chip-btn" data-ann-route="/guilds" data-ann-cta="كتائب الفرسان" type="button">الكتائب (/guilds)</button>
+              <button class="chip-btn" data-ann-route="/live-arena" data-ann-cta="البطولات الحية" type="button">الساحات (/live-arena)</button>
             </div>
 
             <div class="form-row">
@@ -1091,6 +1116,77 @@
               <button id="btn-grant-compensation" class="btn btn-gold btn-block" type="submit" disabled>منح التعويض وتسجيله في التدقيق</button>
             </form>
           </div>
+
+          <div class="panel glass-card">
+            <h2 class="panel-title">🛡️ الصلاحيات والحظر الفردي</h2>
+            <p class="muted-text mb-md">التحكم في حظر اللاعب، منعه من الديوان/الكتائب/الأونلاين، أو تفويض استضافة البطولات.</p>
+            <form id="player-permissions-form" class="stack-sm">
+              <input id="perm-user-id" type="hidden" />
+              <div class="switch-row">
+                <div>
+                  <strong>حظر الحساب بالكامل 🚫</strong>
+                  <p class="muted-text">منع اللاعب من تسجيل الدخول والمشاركة</p>
+                </div>
+                <label class="switch">
+                  <input id="perm-is-banned" type="checkbox" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="field-label" for="perm-ban-duration">مدة الحظر</label>
+                  <select id="perm-ban-duration" class="input">
+                    <option value="24">24 ساعة (يوم)</option>
+                    <option value="168">7 أيام (أسبوع)</option>
+                    <option value="720">30 يوماً (شهر)</option>
+                    <option value="permanent">حظر دائم ⛔</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="field-label" for="perm-ban-reason">سبب الحظر</label>
+                  <input id="perm-ban-reason" class="input" type="text" placeholder="سبب الحظر الظاهر للاعب..." />
+                </div>
+              </div>
+              <div class="switch-row">
+                <div><strong>المعارك الجماعية أونلاين ⚔️</strong></div>
+                <label class="switch">
+                  <input id="perm-can-online" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="switch-row">
+                <div><strong>ديوان الأحفاد والمحادثة 💬</strong></div>
+                <label class="switch">
+                  <input id="perm-can-diwan" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="switch-row">
+                <div><strong>الكتائب والمساهمة 🛡️</strong></div>
+                <label class="switch">
+                  <input id="perm-can-guilds" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="perm-host-arena">استضافة البطولات الحية (Live Arena)</label>
+                <select id="perm-host-arena" class="input">
+                  <option value="inherit">حسب السياسة العامة (افتراضي)</option>
+                  <option value="allowed">تفويض معلم — مسموح دائماً 🎓</option>
+                  <option value="denied">ممنوع فردياً 🚫</option>
+                </select>
+              </div>
+              <div id="player-diwan-mute-box" class="selected-pill hidden">
+                <span>اللاعب مكتوم في الديوان</span>
+                <button id="btn-quick-unmute-web" class="btn btn-outline btn-sm" type="button">فك الكتم 🕊️</button>
+              </div>
+              <div class="form-group">
+                <label class="field-label" for="perm-notes">ملاحظات إدارية سرية</label>
+                <input id="perm-notes" class="input" type="text" placeholder="ملاحظات المشرفين (لا تظهر للاعب)..." />
+              </div>
+              <button id="btn-save-player-perms" class="btn btn-gold btn-block" type="submit" disabled>حفظ الصلاحيات والحظر</button>
+            </form>
+          </div>
         </section>
       </div>
     </main>
@@ -1148,6 +1244,45 @@
               <span id="audit-count-pill" class="badge-pill">0</span>
             </div>
             <div id="audit-logs-list" class="items-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Tab 8: Diwan & Guilds Moderation Suite -->
+    <main id="tab-moderation" class="tab-panel">
+      <div class="two-col-grid">
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🚨 بلاغات الديوان المعلقة</h2>
+              <span id="diwan-reports-count-pill" class="badge-pill">0</span>
+            </div>
+            <div id="diwan-reports-list" class="items-list"></div>
+          </div>
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🔇 اللاعبون المكتومون حالياً</h2>
+              <span id="diwan-muted-count-pill" class="badge-pill">0</span>
+            </div>
+            <div id="diwan-muted-list" class="items-list"></div>
+          </div>
+        </section>
+
+        <section class="stack-md">
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🏟️ ساحات البطولات الحية</h2>
+              <span id="arenas-count-pill" class="badge-pill">0</span>
+            </div>
+            <div id="admin-live-arenas-list" class="items-list"></div>
+          </div>
+          <div class="panel glass-card">
+            <div class="panel-header-row">
+              <h2 class="panel-title">🛡️ كتائب الفرسان المسجلة</h2>
+              <span id="guilds-count-pill" class="badge-pill">0</span>
+            </div>
+            <div id="admin-guilds-list" class="items-list"></div>
           </div>
         </section>
       </div>

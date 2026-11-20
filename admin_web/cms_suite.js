@@ -1026,6 +1026,53 @@
       <div class="mb-md"><strong>المقتنيات (${inv.length}):</strong><div class="record-actions mt-xs">${invHtml}</div></div>
       <div><strong>آخر النزالات:</strong>${matchesHtml}</div>
     `;
+
+    // Permissions card hydration
+    const permForm = document.getElementById('player-permissions-form');
+    const permUid = document.getElementById('perm-user-id');
+    const permBtn = document.getElementById('btn-save-player-perms');
+    const perms = d?.permissions || {};
+    const diwanMod = d?.diwan_moderation;
+
+    if (permForm && permUid && permBtn) {
+      if (hasUid) {
+        permUid.value = d.user_id;
+        permBtn.disabled = false;
+        document.getElementById('perm-is-banned').checked = Boolean(perms.is_banned);
+        document.getElementById('perm-ban-reason').value = perms.ban_reason || '';
+        document.getElementById('perm-can-online').checked = perms.can_use_online !== false;
+        document.getElementById('perm-can-diwan').checked = perms.can_use_diwan !== false;
+        document.getElementById('perm-can-guilds').checked = perms.can_use_guilds !== false;
+        document.getElementById('perm-notes').value = perms.notes || '';
+
+        // Ban duration
+        const durSel = document.getElementById('perm-ban-duration');
+        if (perms.banned_until) {
+          const diffHours = (new Date(perms.banned_until).getTime() - Date.now()) / (1000 * 3600);
+          if (diffHours <= 24) durSel.value = '24';
+          else if (diffHours <= 168) durSel.value = '168';
+          else if (diffHours <= 720) durSel.value = '720';
+          else durSel.value = 'permanent';
+        } else {
+          durSel.value = perms.is_banned ? 'permanent' : '24';
+        }
+
+        // Host arena tri-state
+        const hostSel = document.getElementById('perm-host-arena');
+        if (perms.can_host_live_arenas === true) hostSel.value = 'allowed';
+        else if (perms.can_host_live_arenas === false) hostSel.value = 'denied';
+        else hostSel.value = 'inherit';
+
+        // Diwan mute box
+        const muteBox = document.getElementById('player-diwan-mute-box');
+        const isMuted = Boolean(perms.is_diwan_muted || diwanMod);
+        muteBox.classList.toggle('hidden', !isMuted);
+      } else {
+        permUid.value = '';
+        permBtn.disabled = true;
+        document.getElementById('player-diwan-mute-box').classList.add('hidden');
+      }
+    }
   }
 
   async function handleGrantCompensation(e) {
@@ -1087,6 +1134,86 @@
       toast(`فشل منح التعويض: ${err.message}`, true);
     } finally {
       btn.disabled = false;
+    }
+  }
+
+  async function handleSavePlayerPermissions(e) {
+    e.preventDefault();
+    const client = sb();
+    if (!client) return;
+    const uid = document.getElementById('perm-user-id').value.trim();
+    if (!uid) {
+      toast('اختر لاعباً مسجّلاً أولاً.', true);
+      return;
+    }
+
+    const isBanned = document.getElementById('perm-is-banned').checked;
+    const durVal = document.getElementById('perm-ban-duration').value;
+    const banHours =
+      isBanned && durVal !== 'permanent' ? Number.parseInt(durVal, 10) : null;
+    const banReason = document.getElementById('perm-ban-reason').value.trim();
+    const canOnline = document.getElementById('perm-can-online').checked;
+    const canDiwan = document.getElementById('perm-can-diwan').checked;
+    const canGuilds = document.getElementById('perm-can-guilds').checked;
+    const hostVal = document.getElementById('perm-host-arena').value;
+    const canHost =
+      hostVal === 'allowed' ? true : hostVal === 'denied' ? false : null;
+    const notes = document.getElementById('perm-notes').value.trim();
+
+    const btn = document.getElementById('btn-save-player-perms');
+    btn.disabled = true;
+    try {
+      const { data, error } = await client.rpc(
+        'admin_upsert_player_permissions',
+        {
+          p_user_id: uid,
+          p_is_banned: isBanned,
+          p_ban_hours: banHours,
+          p_ban_reason: banReason,
+          p_can_use_online: canOnline,
+          p_can_use_diwan: canDiwan,
+          p_can_use_guilds: canGuilds,
+          p_can_host_live_arenas: canHost,
+          p_notes: notes,
+        },
+      );
+      if (error) throw error;
+      toast('تم حفظ صلاحيات وحظر اللاعب بنجاح ✅');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.(
+        data?.player_code || 'SINGLE',
+        uid,
+      );
+      await Promise.all([
+        loadPlayerDetail(uid, null),
+        loadAuditLogs(),
+        bumpOverview(),
+      ]);
+    } catch (err) {
+      toast(`فشل حفظ الصلاحيات: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function handleQuickUnmuteWeb() {
+    const client = sb();
+    const uid = document.getElementById('perm-user-id').value.trim();
+    if (!client || !uid) return;
+    try {
+      const { data, error } = await client.rpc('admin_moderate_diwan', {
+        p_action: 'unmute_user',
+        p_target_user_id: uid,
+        p_reason: 'فك كتم فوري من ملف الدعم بالويب',
+      });
+      if (error) throw error;
+      toast('تم فك كتم اللاعب بنجاح 🕊️');
+      window.SahabaAdminBridge?.broadcastWebControlPing?.(
+        data?.player_code || 'SINGLE',
+        uid,
+      );
+      await loadPlayerDetail(uid, null);
+    } catch (err) {
+      toast(`فشل فك الكتم: ${err.message}`, true);
     }
   }
 
@@ -1416,6 +1543,8 @@
     });
     document.getElementById('btn-export-players-csv')?.addEventListener('click', exportPlayersCsv);
     document.getElementById('compensation-form')?.addEventListener('submit', handleGrantCompensation);
+    document.getElementById('player-permissions-form')?.addEventListener('submit', handleSavePlayerPermissions);
+    document.getElementById('btn-quick-unmute-web')?.addEventListener('click', handleQuickUnmuteWeb);
     document.getElementById('btn-target-player-msg')?.addEventListener('click', () => {
       const d = cmsState.currentPlayerDetail;
       if (!d) return;
@@ -1491,6 +1620,314 @@
     await Promise.all([loadResourceHealth(), loadAuditLogs()]);
   }
 
+  // ==================== DIWAN & GUILDS MODERATION SUITE ====================
+
+  async function loadDiwanModerationQueue() {
+    const client = sb();
+    if (!client) return;
+    try {
+      const { data, error } = await client.rpc(
+        'admin_list_diwan_moderation_queue',
+        { p_limit: 50 },
+      );
+      if (error) throw error;
+      const queue = data || {};
+      const reports = Array.isArray(queue.reports) ? queue.reports : [];
+      const muted = Array.isArray(queue.muted_users) ? queue.muted_users : [];
+
+      document.getElementById('diwan-reports-count-pill').textContent =
+        reports.length;
+      document.getElementById('diwan-muted-count-pill').textContent =
+        muted.length;
+
+      renderDiwanReports(reports);
+      renderDiwanMuted(muted);
+    } catch (err) {
+      toast(`تعذر جلب طابور إشراف الديوان: ${err.message}`, true);
+    }
+  }
+
+  function renderDiwanReports(reports) {
+    const el = document.getElementById('diwan-reports-list');
+    if (!el) return;
+    if (!reports.length) {
+      el.innerHTML =
+        '<p class="muted-text">طابور البلاغات نظيف ✨ لا توجد بلاغات معلقة.</p>';
+      return;
+    }
+    el.innerHTML = reports
+      .map(
+        (r) => `
+        <article class="record-card danger-tint">
+          <div class="record-top">
+            <div>
+              <strong>${esc(r.sender_name || 'فارس')} (${esc(r.sender_code || (r.sender_id || '').slice(0, 8))})</strong>
+              <div class="muted-text">السبب: ${esc(r.latest_reason)} • ${esc(r.reports_count)} بلاغات</div>
+            </div>
+            <span class="badge-pill danger-pill">${esc(r.reports_count)} ⚠️</span>
+          </div>
+          <div class="quote-box mt-xs">"${esc(r.content)}"</div>
+          <div class="record-actions mt-xs">
+            <button class="btn btn-outline btn-sm" type="button" data-diwan-dismiss="${esc(r.message_id)}">تجاهل</button>
+            <button class="btn btn-danger-outline btn-sm" type="button" data-diwan-delete="${esc(r.message_id)}">حذف الرسالة</button>
+            <button class="btn btn-gold btn-sm" type="button" data-diwan-mute="${esc(r.sender_id)}" data-reason="${esc(r.latest_reason)}">كتم 24 ساعة</button>
+          </div>
+        </article>
+      `,
+      )
+      .join('');
+
+    el.querySelectorAll('button[data-diwan-dismiss]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateDiwanWeb('dismiss_reports', b.dataset.diwanDismiss),
+      );
+    });
+    el.querySelectorAll('button[data-diwan-delete]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateDiwanWeb(
+          'delete_message',
+          b.dataset.diwanDelete,
+          null,
+          'حذف عبر الإدارة',
+        ),
+      );
+    });
+    el.querySelectorAll('button[data-diwan-mute]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateDiwanWeb(
+          'mute_user',
+          null,
+          b.dataset.diwanMute,
+          b.dataset.reason,
+          24,
+        ),
+      );
+    });
+  }
+
+  function renderDiwanMuted(muted) {
+    const el = document.getElementById('diwan-muted-list');
+    if (!el) return;
+    if (!muted.length) {
+      el.innerHTML =
+        '<p class="muted-text">لا يوجد لاعبون مكتومون حالياً 🕊️</p>';
+      return;
+    }
+    el.innerHTML = muted
+      .map((u) => {
+        const remainingHours = u.muted_until
+          ? Math.max(
+              0,
+              Math.round(
+                (new Date(u.muted_until).getTime() - Date.now()) /
+                  (1000 * 3600),
+              ),
+            )
+          : 0;
+        return `
+        <article class="record-card">
+          <div class="record-top">
+            <div>
+              <strong>${esc(u.display_name || 'لاعب')} (${esc(u.player_code || (u.user_id || '').slice(0, 8))})</strong>
+              <div class="muted-text">متبقي: ${remainingHours > 0 ? `${remainingHours} ساعة` : 'أقل من ساعة'} • السبب: ${esc(u.reason || 'مخالفة')}</div>
+            </div>
+            <button class="btn btn-gold btn-sm" type="button" data-unmute-uid="${esc(u.user_id)}">فك الكتم 🕊️</button>
+          </div>
+        </article>
+      `;
+      })
+      .join('');
+
+    el.querySelectorAll('button[data-unmute-uid]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateDiwanWeb(
+          'unmute_user',
+          null,
+          b.dataset.unmuteUid,
+          'فك الكتم بقرار إداري',
+        ),
+      );
+    });
+  }
+
+  async function moderateDiwanWeb(
+    action,
+    messageId = null,
+    targetUserId = null,
+    reason = '',
+    muteHours = 24,
+  ) {
+    const client = sb();
+    if (!client) return;
+    try {
+      const { data, error } = await client.rpc('admin_moderate_diwan', {
+        p_action: action,
+        p_message_id: messageId,
+        p_target_user_id: targetUserId,
+        p_mute_hours: muteHours,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      toast('تم تنفيذ إجراء إشراف الديوان بنجاح ✅');
+      if (action === 'mute_user' || action === 'unmute_user') {
+        window.SahabaAdminBridge?.broadcastWebControlPing?.(
+          data?.player_code || 'SINGLE',
+          targetUserId,
+        );
+      }
+      await Promise.all([loadDiwanModerationQueue(), loadAuditLogs()]);
+    } catch (err) {
+      toast(`فشل الإجراء: ${err.message}`, true);
+    }
+  }
+
+  async function loadGuildsAndArenas() {
+    const client = sb();
+    if (!client) return;
+    try {
+      const { data, error } = await client.rpc('admin_list_guilds_and_arenas', {
+        p_limit: 50,
+      });
+      if (error) throw error;
+      const snapshot = data || {};
+      const guilds = Array.isArray(snapshot.guilds) ? snapshot.guilds : [];
+      const arenas = Array.isArray(snapshot.live_sessions)
+        ? snapshot.live_sessions
+        : [];
+
+      document.getElementById('guilds-count-pill').textContent = guilds.length;
+      document.getElementById('arenas-count-pill').textContent = arenas.length;
+
+      renderAdminGuilds(guilds);
+      renderAdminArenas(arenas);
+    } catch (err) {
+      toast(`تعذر جلب الكتائب والساحات: ${err.message}`, true);
+    }
+  }
+
+  function renderAdminArenas(arenas) {
+    const el = document.getElementById('admin-live-arenas-list');
+    if (!el) return;
+    if (!arenas.length) {
+      el.innerHTML =
+        '<p class="muted-text">لا توجد ساحات بطولات حية نشطة حالياً.</p>';
+      return;
+    }
+    el.innerHTML = arenas
+      .map((a) => {
+        const isActive = a.status === 'active' || a.status === 'waiting';
+        return `
+        <article class="record-card">
+          <div class="record-top">
+            <div>
+              <strong>PIN: ${esc(a.pin_code)} • ${esc(a.title)}</strong>
+              <div class="muted-text">المضيف: ${esc(a.host_name)} • ${esc(a.participants_count)} فرسان • الحالة: ${esc(a.status)}</div>
+            </div>
+            <span class="badge-pill ${a.status === 'active' ? 'emerald-text' : ''}">${esc(a.status)}</span>
+          </div>
+          <div class="record-actions mt-xs">
+            ${isActive ? `<button class="btn btn-danger-outline btn-sm" type="button" data-force-finish-arena="${esc(a.id)}">🛑 إنهاء فوري وبث النتيجة</button>` : ''}
+            <button class="btn btn-outline btn-sm" type="button" data-delete-arena="${esc(a.id)}">حذف الجلسة</button>
+          </div>
+        </article>
+      `;
+      })
+      .join('');
+
+    el.querySelectorAll('button[data-force-finish-arena]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateGuildArenaWeb(
+          'force_finish_session',
+          b.dataset.forceFinishArena,
+          'إنهاء إداري للساحة',
+        ),
+      );
+    });
+    el.querySelectorAll('button[data-delete-arena]').forEach((b) => {
+      b.addEventListener('click', () =>
+        moderateGuildArenaWeb('delete_session', b.dataset.deleteArena),
+      );
+    });
+  }
+
+  function renderAdminGuilds(guilds) {
+    const el = document.getElementById('admin-guilds-list');
+    if (!el) return;
+    if (!guilds.length) {
+      el.innerHTML = '<p class="muted-text">لا توجد كتائب مسجلة حتى الآن.</p>';
+      return;
+    }
+    el.innerHTML = guilds
+      .map(
+        (g) => `
+        <article class="record-card">
+          <div class="record-top">
+            <div>
+              <strong>${esc(g.name)}</strong>
+              <div class="muted-text">القائد: ${esc(g.leader_name)} • ${esc(g.members_count)}/${esc(g.max_members)} عضو • رصيد: ${esc(g.weekly_score)}</div>
+            </div>
+            <span class="badge-pill">${esc(g.total_score)} إجمالي</span>
+          </div>
+          <div class="record-actions mt-xs">
+            <button class="btn btn-outline btn-sm" type="button" data-reset-guild="${esc(g.id)}">تصفير رصيد الكتيبة</button>
+            <button class="btn btn-danger-outline btn-sm" type="button" data-delete-guild="${esc(g.id)}">حل وحذف الكتيبة</button>
+          </div>
+        </article>
+      `,
+      )
+      .join('');
+
+    el.querySelectorAll('button[data-reset-guild]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (window.confirm('هل أنت متأكد من تصفير رصيد هذه الكتيبة؟')) {
+          moderateGuildArenaWeb(
+            'reset_single_guild_score',
+            b.dataset.resetGuild,
+            'تصفير رصيد الكتيبة إدارياً',
+          );
+        }
+      });
+    });
+    el.querySelectorAll('button[data-delete-guild]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (window.confirm('هل أنت متأكد من حل هذه الكتيبة وحذفها نهائياً؟')) {
+          moderateGuildArenaWeb(
+            'delete_guild',
+            b.dataset.deleteGuild,
+            'حل الكتيبة بقرار إداري',
+          );
+        }
+      });
+    });
+  }
+
+  async function moderateGuildArenaWeb(action, targetId, reason = '') {
+    const client = sb();
+    if (!client || !targetId) return;
+    try {
+      const { data, error } = await client.rpc(
+        'admin_moderate_guild_or_arena',
+        {
+          p_action: action,
+          p_target_id: targetId,
+          p_reason: reason,
+        },
+      );
+      if (error) throw error;
+      toast('تم تنفيذ الإجراء بنجاح ✅');
+      if (action === 'force_finish_session') {
+        const lb = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
+        await window.SahabaAdminBridge?.broadcastLiveArenaFinish?.(
+          targetId,
+          lb,
+        );
+      }
+      await Promise.all([loadGuildsAndArenas(), loadAuditLogs()]);
+    } catch (err) {
+      toast(`فشل الإجراء: ${err.message}`, true);
+    }
+  }
+
   async function ensureTabLoaded(tabName, force = false) {
     if (!tabName) return;
     if (!force && cmsState.loadedTabs.has(tabName)) return;
@@ -1502,7 +1939,14 @@
     } else if (tabName === 'players') {
       await searchPlayersForInspector();
     } else if (tabName === 'telemetry') {
-      await Promise.all([loadResourceHealth(), loadGhosts(), loadAuditLogs(), loadAdminsRoster()]);
+      await Promise.all([
+        loadResourceHealth(),
+        loadGhosts(),
+        loadAuditLogs(),
+        loadAdminsRoster(),
+      ]);
+    } else if (tabName === 'moderation') {
+      await Promise.all([loadDiwanModerationQueue(), loadGuildsAndArenas()]);
     }
   }
 

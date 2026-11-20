@@ -20,11 +20,20 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
   final _gemsCtrl = TextEditingController(text: '0');
   final _xpCtrl = TextEditingController(text: '0');
   final _reasonCtrl = TextEditingController();
+  final _banReasonCtrl = TextEditingController();
+  final _permNotesCtrl = TextEditingController();
   final _compFormKey = GlobalKey<FormState>();
 
   bool _isSearching = true;
   bool _isLoadingDetail = false;
   bool _isCompensating = false;
+  bool _isSavingPerms = false;
+  bool _isBanned = false;
+  int? _banHours = 24;
+  bool _canUseOnline = true;
+  bool _canUseDiwan = true;
+  bool _canUseGuilds = true;
+  bool? _canHostLiveArenas;
   List<AdminPlayerSearchResult> _players = const [];
   AdminPlayerDetail? _detail;
 
@@ -41,6 +50,8 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
     _gemsCtrl.dispose();
     _xpCtrl.dispose();
     _reasonCtrl.dispose();
+    _banReasonCtrl.dispose();
+    _permNotesCtrl.dispose();
     super.dispose();
   }
 
@@ -82,11 +93,117 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
       setState(() {
         _detail = detail;
         _isLoadingDetail = false;
+        if (detail != null) {
+          _isBanned = detail.permissions.isBanned;
+          _banReasonCtrl.text = detail.permissions.banReason;
+          _permNotesCtrl.text = detail.permissions.notes;
+          _canUseOnline = detail.permissions.canUseOnline;
+          _canUseDiwan = detail.permissions.canUseDiwan;
+          _canUseGuilds = detail.permissions.canUseGuilds;
+          _canHostLiveArenas = detail.permissions.canHostLiveArenas;
+          if (detail.permissions.bannedUntil != null) {
+            final diff = detail.permissions.bannedUntil!
+                .difference(DateTime.now().toUtc())
+                .inHours;
+            if (diff <= 24) {
+              _banHours = 24;
+            } else if (diff <= 168) {
+              _banHours = 168;
+            } else if (diff <= 720) {
+              _banHours = 720;
+            } else {
+              _banHours = null;
+            }
+          } else {
+            _banHours = _isBanned ? null : 24;
+          }
+        }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoadingDetail = false);
       showAdminFeedback(context, 'تعذر تحميل ملف اللاعب: $e', isError: true);
+    }
+  }
+
+  Future<void> _savePlayerPermissions() async {
+    final detail = _detail;
+    if (detail == null || !detail.canManagePermissions) {
+      showAdminFeedback(
+        context,
+        'لا يمكن تعديل صلاحيات حساب غير مسجل سحابياً.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _isSavingPerms = true);
+    try {
+      final res = await AdminService().upsertPlayerPermissions(
+        userId: detail.userId!,
+        isBanned: _isBanned,
+        banHours: _isBanned ? _banHours : null,
+        banReason: _banReasonCtrl.text.trim(),
+        canUseOnline: _canUseOnline,
+        canUseDiwan: _canUseDiwan,
+        canUseGuilds: _canUseGuilds,
+        canHostLiveArenas: _canHostLiveArenas,
+        notes: _permNotesCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      if (res != null) {
+        showAdminFeedback(context, 'تم حفظ صلاحيات اللاعب بنجاح ✅');
+        final updated = await AdminService().getPlayerDetail(
+          userId: detail.userId,
+          playerCode: detail.playerCode,
+        );
+        if (mounted && updated != null) {
+          setState(() {
+            _detail = updated;
+            _isBanned = updated.permissions.isBanned;
+            _banReasonCtrl.text = updated.permissions.banReason;
+            _permNotesCtrl.text = updated.permissions.notes;
+            _canUseOnline = updated.permissions.canUseOnline;
+            _canUseDiwan = updated.permissions.canUseDiwan;
+            _canUseGuilds = updated.permissions.canUseGuilds;
+            _canHostLiveArenas = updated.permissions.canHostLiveArenas;
+          });
+        }
+      } else {
+        showAdminFeedback(context, 'تعذر حفظ الصلاحيات', isError: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        showAdminFeedback(context, 'فشل حفظ الصلاحيات: $e', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingPerms = false);
+    }
+  }
+
+  Future<void> _quickUnmutePlayer() async {
+    final detail = _detail;
+    if (detail == null || detail.userId == null) return;
+    try {
+      final res = await AdminService().moderateDiwan(
+        action: 'unmute_user',
+        targetUserId: detail.userId,
+        reason: 'فك كتم فوري من ملف الدعم',
+      );
+      if (!mounted) return;
+      if (res != null) {
+        showAdminFeedback(context, 'تم فك كتم اللاعب بنجاح 🕊️');
+        final updated = await AdminService().getPlayerDetail(
+          userId: detail.userId,
+          playerCode: detail.playerCode,
+        );
+        if (mounted && updated != null) {
+          setState(() => _detail = updated);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showAdminFeedback(context, 'فشل فك الكتم: $e', isError: true);
+      }
     }
   }
 
@@ -441,6 +558,296 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
                 )
               : const Text(
                   'حساب ضيف محلي غير مربوط بحساب سحابي؛ لا يمكن شحن رصيده سحابياً قبل ربط Google.',
+                  style: TextStyle(fontFamily: 'Cairo', color: Colors.amberAccent),
+                ),
+        ),
+        const SizedBox(height: 16),
+        AdminSectionCard(
+          key: const Key('player_permissions_card'),
+          title: 'الصلاحيات والحظر الفردي 🛡️',
+          icon: Icons.security_rounded,
+          accentColor: const Color(0xFF38BDF8),
+          child: d.canManagePermissions
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: const Key('player_ban_switch'),
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: Colors.redAccent,
+                      title: const Text(
+                        'حظر الحساب بالكامل 🚫',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _isBanned
+                            ? 'اللاعب محظور حالياً ويمنع من دخول اللعبة'
+                            : 'الحساب نشط وغير محظور',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: _isBanned ? Colors.redAccent : Colors.white60,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      value: _isBanned,
+                      onChanged: (v) {
+                        setState(() => _isBanned = v);
+                      },
+                    ),
+                    if (_isBanned) ...[
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<int?>(
+                        key: const Key('player_ban_duration_dropdown'),
+                        isExpanded: true,
+                        value: _banHours,
+                        dropdownColor: AppCustomTheme.of(context).surfaceCard,
+                        decoration: const InputDecoration(
+                          labelText: 'مدة الحظر',
+                          labelStyle: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Colors.white70,
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem<int?>(
+                            value: 24,
+                            child: Text(
+                              '24 ساعة (يوم واحد)',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem<int?>(
+                            value: 168,
+                            child: Text(
+                              '7 أيام (أسبوع)',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem<int?>(
+                            value: 720,
+                            child: Text(
+                              '30 يوماً (شهر)',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text(
+                              'حظر دائم ⛔',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) => setState(() => _banHours = val),
+                      ),
+                      const SizedBox(height: 8),
+                      AdminTextField(
+                        key: const Key('player_ban_reason_input'),
+                        controller: _banReasonCtrl,
+                        label: 'سبب الحظر (يظهر للاعب)',
+                      ),
+                    ],
+                    const Divider(color: Colors.white24, height: 24),
+                    const Text(
+                      'التحكم الدقيق في الميزات:',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white70,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SwitchListTile.adaptive(
+                      key: const Key('perm_switch_online'),
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF38BDF8),
+                      title: const Text(
+                        'المعارك الجماعية أونلاين ⚔️',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                      value: _canUseOnline,
+                      onChanged: (v) => setState(() => _canUseOnline = v),
+                    ),
+                    SwitchListTile.adaptive(
+                      key: const Key('perm_switch_diwan'),
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF38BDF8),
+                      title: const Text(
+                        'ديوان الأحفاد والمحادثة 💬',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                      value: _canUseDiwan,
+                      onChanged: (v) => setState(() => _canUseDiwan = v),
+                    ),
+                    SwitchListTile.adaptive(
+                      key: const Key('perm_switch_guilds'),
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF38BDF8),
+                      title: const Text(
+                        'الكتائب والمساهمة 🛡️',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                      value: _canUseGuilds,
+                      onChanged: (v) => setState(() => _canUseGuilds = v),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'صلاحية استضافة البطولات الحية (Live Arena):',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<bool?>(
+                      key: const Key('player_perm_host_arena_dropdown'),
+                      isExpanded: true,
+                      value: _canHostLiveArenas,
+                      dropdownColor: AppCustomTheme.of(context).surfaceCard,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem<bool?>(
+                          value: null,
+                          child: Text(
+                            'حسب السياسة العامة (افتراضي)',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        DropdownMenuItem<bool?>(
+                          value: true,
+                          child: Text(
+                            'تفويض معلم — مسموح دائماً 🎓',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: Colors.greenAccent,
+                            ),
+                          ),
+                        ),
+                        DropdownMenuItem<bool?>(
+                          value: false,
+                          child: Text(
+                            'ممنوع فردياً 🚫',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) =>
+                          setState(() => _canHostLiveArenas = val),
+                    ),
+                    if (d.permissions.isEffectivelyDiwanMutedNow ||
+                        d.diwanModeration != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.amberAccent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.amberAccent.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.volume_off_rounded,
+                              color: Colors.amberAccent,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'اللاعب مكتوم حالياً في الديوان',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: Colors.amberAccent,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              key: const Key('btn_quick_unmute_player'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                              ),
+                              onPressed: _quickUnmutePlayer,
+                              child: const Text(
+                                'فك الكتم',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    AdminTextField(
+                      controller: _permNotesCtrl,
+                      label: 'ملاحظات إدارية خاصة (لا تظهر للاعب)',
+                    ),
+                    const SizedBox(height: 14),
+                    AdminPrimaryButton(
+                      key: const Key('btn_save_player_permissions'),
+                      label: 'حفظ الصلاحيات والحظر',
+                      icon: Icons.save_rounded,
+                      backgroundColor: const Color(0xFF38BDF8),
+                      foregroundColor: Colors.white,
+                      isLoading: _isSavingPerms,
+                      onPressed: _savePlayerPermissions,
+                    ),
+                  ],
+                )
+              : const Text(
+                  'حساب ضيف محلي غير مربوط بحساب سحابي؛ لا يمكن فرض حظر أو صلاحيات سحابية عليه قبل ربط Google.',
                   style: TextStyle(fontFamily: 'Cairo', color: Colors.amberAccent),
                 ),
         ),
