@@ -102,11 +102,14 @@ serve(async (req) => {
       });
     }
 
-    const { data: adminRow } = await supabase
-      .from("admin_users")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const adminEmail = (user.email ?? "").trim().toLowerCase();
+    const { data: adminRow } = adminEmail
+      ? await supabase
+          .from("app_admins")
+          .select("email")
+          .eq("email", adminEmail)
+          .maybeSingle()
+      : { data: null };
 
     if (!adminRow) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {

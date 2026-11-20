@@ -55,3 +55,6 @@ build_log*.txt
 
 # Local Credentials Reference
 CREDENTIALS_AND_SECRETS.md
+
+# Supabase CLI temp files
+supabase/.temp/
