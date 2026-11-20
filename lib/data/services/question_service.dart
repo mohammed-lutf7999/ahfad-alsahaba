@@ -175,15 +175,46 @@ class QuestionService {
     );
   }
 
-  /// Loads an ordered list of questions deterministically from `category:level:index` specs.
+  /// Loads an ordered list of questions deterministically from `category:level:index`
+  /// and `cms:<questionId>` specs.
   Future<List<Question>> loadQuestionsBySpecs(
     List<String> specs, {
     int? seed,
     String? fallbackCategoryId,
   }) async {
+    final cmsSpecs = specs.where((s) => s.startsWith('cms:')).toList();
+    if (cmsSpecs.isNotEmpty) {
+      final hasMissingCms = cmsSpecs.any((spec) {
+        final id = spec.substring(4).trim();
+        return id.isNotEmpty &&
+            !CmsCacheService.instance.snapshot.quizQuestions.containsKey(id);
+      });
+      if (hasMissingCms) {
+        try {
+          await CmsCacheService.instance.syncIfNeeded(
+            serverCmsVersion: CmsCacheService.instance.snapshot.cmsVersion + 1,
+            force: true,
+          );
+        } catch (e) {
+          debugPrint('QuestionService CMS spec sync notice: $e');
+        }
+      }
+    }
+
     final questions = <Question>[];
+    final cmsMap = CmsCacheService.instance.snapshot.quizQuestions;
     for (var slot = 0; slot < specs.length; slot++) {
-      final parts = specs[slot].split(':');
+      final rawSpec = specs[slot].trim();
+      if (rawSpec.startsWith('cms:')) {
+        final cmsId = rawSpec.substring(4).trim();
+        final dynQ = cmsMap[cmsId];
+        if (dynQ != null && dynQ.options.length >= 2) {
+          final optionRng = seed != null ? Random(seed + slot * 31) : null;
+          questions.add(_mapDynamicQuestion(dynQ, optionRandom: optionRng));
+        }
+        continue;
+      }
+      final parts = rawSpec.split(':');
       if (parts.length < 3) continue;
       final q = await loadQuestionBySpec(
         categoryId: parts[0],
@@ -195,13 +226,73 @@ class QuestionService {
       if (q != null) questions.add(q);
     }
     if (questions.isEmpty && fallbackCategoryId != null) {
-      final fallback = await loadQuestions(
-        categoryId: fallbackCategoryId,
-        levelNumber: 1,
-      );
-      return fallback.take(8).toList();
+      try {
+        final fallback = await loadAllQuestionsForCategory(
+          fallbackCategoryId,
+          shuffleQuestions: true,
+          shuffleOptions: true,
+        );
+        return fallback.take(8).toList();
+      } catch (_) {
+        return const [];
+      }
     }
     return questions;
+  }
+
+  /// Builds shareable question specs (`category:level:slot` and `cms:<id>`)
+  /// for Live Arena host sessions across built-in and cloud CMS categories.
+  Future<List<String>> buildLiveArenaQuestionSpecs({
+    required String categoryId,
+    int? levelNumber,
+    int count = 8,
+  }) async {
+    await _ensureBaseCategoryLoaded(categoryId);
+    final specs = <String>[];
+    final baseData = _baseAssetCache[categoryId];
+    final levels = baseData?['levels'] as Map<String, dynamic>?;
+
+    final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
+        .where((q) =>
+            q.categoryId == categoryId &&
+            q.isVisible &&
+            q.options.length == 4 &&
+            (levelNumber == null || q.levelNumber == levelNumber))
+        .toList();
+    final cloudById = {for (final q in cloudQuestions) q.id: q};
+    final seenCloudIds = <String>{};
+
+    if (levels != null) {
+      final targetKeys = levelNumber != null
+          ? [levelNumber.toString()]
+          : levels.keys.toList();
+      for (final lk in targetKeys) {
+        final lv = int.tryParse(lk) ?? 1;
+        final list = levels[lk] as List?;
+        if (list == null) continue;
+        for (var i = 0; i < list.length; i++) {
+          final raw = list[i] as Map;
+          final rawId = (raw['id'] ?? '').toString();
+          final override = rawId.isNotEmpty ? cloudById[rawId] : null;
+          if (override != null) {
+            seenCloudIds.add(rawId);
+            if (override.isVisible) {
+              specs.add('cms:${override.id}');
+            }
+            continue;
+          }
+          specs.add('$categoryId:$lv:$i');
+        }
+      }
+    }
+
+    for (final q in cloudQuestions) {
+      if (seenCloudIds.contains(q.id)) continue;
+      specs.add('cms:${q.id}');
+    }
+
+    specs.shuffle(_random);
+    return specs.take(count.clamp(1, 20)).toList();
   }
 
   /// Builds visible solo questions for `(categoryId, levelNumber)` merging

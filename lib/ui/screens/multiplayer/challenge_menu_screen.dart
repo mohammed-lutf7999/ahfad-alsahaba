@@ -6,6 +6,7 @@ import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../data/models/app_control_models.dart';
 import '../../../data/services/app_control_service.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../data/services/nearby_service.dart';
 import 'create_challenge_screen.dart';
 import 'join_challenge_screen.dart';
@@ -348,115 +349,159 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
                     child: ValueListenableBuilder<AppFeatureFlags>(
                       valueListenable:
                           AppControlService.instance.featureFlagsNotifier,
-                      builder: (context, flags, _) => Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // VS Icon
-                          _buildVsIcon(),
+                      builder: (context, flags, _) =>
+                          ValueListenableBuilder<PlayerPermissions>(
+                        valueListenable:
+                            AppControlService.instance.playerPermissionsNotifier,
+                        builder: (context, perms, _) {
+                          final isAdmin =
+                              AppControlService.instance.isAdminNotifier.value;
+                          final isLoggedIn = AuthService().isLoggedIn;
+                          final banned = !isAdmin && perms.isEffectivelyBannedNow;
+                          final onlineOk = !banned && (isAdmin || perms.canUseOnline);
+                          final privateAllowed =
+                              (isAdmin || flags.privateRooms) && onlineOk;
+                          final quickOnlineAllowed =
+                              (isAdmin || flags.onlineMultiplayer) && onlineOk;
+                          final diwanAllowed =
+                              (isAdmin || flags.diwanChat) &&
+                              !banned &&
+                              (isAdmin || !isLoggedIn || perms.canUseDiwan);
+                          final guildsAllowed =
+                              (isAdmin || flags.guildsArenas) &&
+                              !banned &&
+                              (isAdmin || !isLoggedIn || perms.canUseGuilds);
+                          final privateDisabledMsg = !flags.privateRooms
+                              ? 'غرف التحدي الخاصة متوقفة مؤقتاً للصيانة والتحديث 🛡️'
+                              : 'تم تقييد اللعب الأونلاين على هذا الحساب من الإدارة 🔒';
+                          final quickOnlineDisabledMsg = !flags.onlineMultiplayer
+                              ? 'الميدان السريع الأونلاين متوقف مؤقتاً للصيانة والتحديث 🛡️'
+                              : 'تم تقييد اللعب الأونلاين على هذا الحساب من الإدارة 🔒';
+                          final diwanDisabledMsg = !flags.diwanChat
+                              ? 'ديوان الأحفاد متوقف مؤقتاً للصيانة والتحديث 🛡️'
+                              : 'تم تقييد المشاركة في ديوان الأحفاد من الإدارة 🔒';
+                          final guildsDisabledMsg = !flags.guildsArenas
+                              ? 'الكتائب والبطولات الحية متوقفة مؤقتاً للصيانة والتحديث 🛡️'
+                              : 'تم تقييد نظام الكتائب على هذا الحساب من الإدارة 🔒';
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // VS Icon
+                              _buildVsIcon(),
 
-                          const SizedBox(height: 24),
+                              const SizedBox(height: 24),
 
-                          // 1. Private Rooms (Code & WhatsApp Invite) - Zero Permission Barrier
-                          _buildMenuButton(
-                            icon: Icons.castle_rounded,
-                            title: 'غرف التحدي الخاصة 🏰',
-                            subtitle: flags.privateRooms
-                                ? 'كود سداسي ودعوة الأصدقاء عبر واتساب'
-                                : 'متوفرة قريباً — متوقفة مؤقتاً للصيانة 🔒',
-                            color: AppTheme.accentColor,
-                            isEnabled: flags.privateRooms,
-                            onTap: () => _handleGatedTap(
-                              isEnabled: flags.privateRooms,
-                              featureName: 'غرف التحدي الخاصة',
-                              onProceed: () =>
-                                  _navigateTo(const PrivateRoomHubScreen()),
-                            ),
-                          ),
+                              // 1. Private Rooms (Code & WhatsApp Invite) - Zero Permission Barrier
+                              _buildMenuButton(
+                                icon: Icons.castle_rounded,
+                                title: 'غرف التحدي الخاصة 🏰',
+                                subtitle: privateAllowed
+                                    ? 'كود سداسي ودعوة الأصدقاء عبر واتساب'
+                                    : (!flags.privateRooms
+                                        ? 'متوفرة قريباً — متوقفة مؤقتاً للصيانة 🔒'
+                                        : 'تم تقييد اللعب الأونلاين على هذا الحساب 🔒'),
+                                color: AppTheme.accentColor,
+                                isEnabled: privateAllowed,
+                                onTap: () => _handleGatedTap(
+                                  isEnabled: privateAllowed,
+                                  disabledMessage: privateDisabledMsg,
+                                  onProceed: () =>
+                                      _navigateTo(const PrivateRoomHubScreen()),
+                                ),
+                              ),
 
-                          const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                          // 2. Quick Matchmaking (Online Arena) - Zero Permission Barrier
-                          _buildMenuButton(
-                            icon: Icons.radar_rounded,
-                            title: 'الميدان السريع المباشر ⚔️',
-                            subtitle: flags.onlineMultiplayer
-                                ? 'مطابقة أونلاين فورية أو ضد البوت'
-                                : 'المباريات الأونلاين متوقفة مؤقتاً للصيانة 🔒',
-                            color: AppTheme.accentLight,
-                            isEnabled: flags.onlineMultiplayer,
-                            onTap: () => _handleGatedTap(
-                              isEnabled: flags.onlineMultiplayer,
-                              featureName: 'الميدان السريع الأونلاين',
-                              onProceed: () => _navigateTo(const LobbyScreen()),
-                            ),
-                          ),
+                              // 2. Quick Matchmaking (Online Arena) - Zero Permission Barrier
+                              _buildMenuButton(
+                                icon: Icons.radar_rounded,
+                                title: 'الميدان السريع المباشر ⚔️',
+                                subtitle: quickOnlineAllowed
+                                    ? 'مطابقة أونلاين فورية أو ضد البوت'
+                                    : (!flags.onlineMultiplayer
+                                        ? 'المباريات الأونلاين متوقفة مؤقتاً للصيانة 🔒'
+                                        : 'تم تقييد اللعب الأونلاين على هذا الحساب 🔒'),
+                                color: AppTheme.accentLight,
+                                isEnabled: quickOnlineAllowed,
+                                onTap: () => _handleGatedTap(
+                                  isEnabled: quickOnlineAllowed,
+                                  disabledMessage: quickOnlineDisabledMsg,
+                                  onProceed: () => _navigateTo(const LobbyScreen()),
+                                ),
+                              ),
 
-                          const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                          // 3. Local Bluetooth Challenge (Offline Nearby with Role Selection)
-                          _buildMenuButton(
-                            icon: Icons.bluetooth_searching_rounded,
-                            title: 'تحدي البلوتوث المحلي 📡',
-                            subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
-                            color: Colors.blueAccent,
-                            onTap: _showLocalBluetoothOptions,
-                          ),
+                              // 3. Local Bluetooth Challenge (Offline Nearby with Role Selection)
+                              _buildMenuButton(
+                                icon: Icons.bluetooth_searching_rounded,
+                                title: 'تحدي البلوتوث المحلي 📡',
+                                subtitle: 'تنافس بدون إنترنت مع الأجهزة القريبة',
+                                color: Colors.blueAccent,
+                                onTap: _showLocalBluetoothOptions,
+                              ),
 
-                          if (flags.dailyChallenges) ...[
-                            const SizedBox(height: 16),
+                              if (flags.dailyChallenges) ...[
+                                const SizedBox(height: 16),
 
-                            // 4. Daily Seeded Challenge (Dynamic Cloud Flag)
-                            _buildMenuButton(
-                              icon: Icons.auto_awesome_rounded,
-                              title: 'التحدي اليومي المتجدد 🌟',
-                              subtitle: 'جولة يومية متجددة عبر السحابة والمواسم',
-                              color: const Color(0xFF10B981),
-                              onTap: _launchDailyChallenge,
-                            ),
-                          ],
+                                // 4. Daily Seeded Challenge (Dynamic Cloud Flag)
+                                _buildMenuButton(
+                                  icon: Icons.auto_awesome_rounded,
+                                  title: 'التحدي اليومي المتجدد 🌟',
+                                  subtitle: 'جولة يومية متجددة عبر السحابة والمواسم',
+                                  color: const Color(0xFF10B981),
+                                  onTap: _launchDailyChallenge,
+                                ),
+                              ],
 
-                          const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                          // 5. Diwan Al-Ahfad Live Chat & Instant Invites (M11)
-                          _buildMenuButton(
-                            icon: Icons.forum_rounded,
-                            title: 'ديوان الأحفاد 💬',
-                            subtitle: flags.diwanChat
-                                ? 'التعارف المهذب وإطلاق تحديات الغرف الخاصة'
-                                : 'الديوان متوقف مؤقتاً للصيانة 🔒',
-                            color: const Color(0xFF38BDF8),
-                            isEnabled: flags.diwanChat,
-                            onTap: () => _handleGatedTap(
-                              isEnabled: flags.diwanChat,
-                              featureName: 'ديوان الأحفاد',
-                              onProceed: () => GlobalChatBottomSheet.show(context),
-                            ),
-                          ),
+                              // 5. Diwan Al-Ahfad Live Chat & Instant Invites (M11)
+                              _buildMenuButton(
+                                icon: Icons.forum_rounded,
+                                title: 'ديوان الأحفاد 💬',
+                                subtitle: diwanAllowed
+                                    ? 'التعارف المهذب وإطلاق تحديات الغرف الخاصة'
+                                    : (!flags.diwanChat
+                                        ? 'الديوان متوقف مؤقتاً للصيانة 🔒'
+                                        : 'تم تقييد المشاركة في الديوان من الإدارة 🔒'),
+                                color: const Color(0xFF38BDF8),
+                                isEnabled: diwanAllowed,
+                                onTap: () => _handleGatedTap(
+                                  isEnabled: diwanAllowed,
+                                  disabledMessage: diwanDisabledMsg,
+                                  onProceed: () => GlobalChatBottomSheet.show(context),
+                                ),
+                              ),
 
-                          const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                          // 6. Guilds ("معركة الجمعة") & Live Kahoot Arenas (M13)
-                          _buildMenuButton(
-                            icon: Icons.shield_rounded,
-                            title: 'الكتائب والبطولات الحية 🛡️',
-                            subtitle: flags.guildsArenas
-                                ? 'رايات الكتائب، معركة الجمعة، وغرف 100 مشارك'
-                                : 'الكتائب متوقفة مؤقتاً للصيانة 🔒',
-                            color: Colors.amber,
-                            isEnabled: flags.guildsArenas,
-                            onTap: () => _handleGatedTap(
-                              isEnabled: flags.guildsArenas,
-                              featureName: 'الكتائب والبطولات الحية',
-                              onProceed: () =>
-                                  _navigateTo(const GuildDashboardScreen()),
-                            ),
-                          ),
+                              // 6. Guilds ("معركة الجمعة") & Live Kahoot Arenas (M13)
+                              _buildMenuButton(
+                                icon: Icons.shield_rounded,
+                                title: 'الكتائب والبطولات الحية 🛡️',
+                                subtitle: guildsAllowed
+                                    ? 'رايات الكتائب، معركة الجمعة، وغرف 100 مشارك'
+                                    : (!flags.guildsArenas
+                                        ? 'الكتائب متوقفة مؤقتاً للصيانة 🔒'
+                                        : 'تم تقييد نظام الكتائب من الإدارة 🔒'),
+                                color: Colors.amber,
+                                isEnabled: guildsAllowed,
+                                onTap: () => _handleGatedTap(
+                                  isEnabled: guildsAllowed,
+                                  disabledMessage: guildsDisabledMsg,
+                                  onProceed: () =>
+                                      _navigateTo(const GuildDashboardScreen()),
+                                ),
+                              ),
 
-                          const SizedBox(height: 32),
+                              const SizedBox(height: 32),
 
-                          // Instructions
-                          _buildInstructions(),
-                        ],
+                              // Instructions
+                              _buildInstructions(),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -567,13 +612,13 @@ class _ChallengeMenuScreenState extends State<ChallengeMenuScreen>
 
   void _handleGatedTap({
     required bool isEnabled,
-    required String featureName,
+    required String disabledMessage,
     required VoidCallback onProceed,
   }) {
     if (!isEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$featureName متوقف مؤقتاً للصيانة والتحديث 🛡️'),
+          content: Text(disabledMessage),
           behavior: SnackBarBehavior.floating,
         ),
       );

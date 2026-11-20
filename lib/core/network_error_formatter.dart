@@ -25,6 +25,18 @@ class NetworkErrorFormatter {
       return 'يرجى تسجيل الدخول أولاً لتتمكن من المنافسة عبر الإنترنت.';
     }
 
+    // Preserve explicit Arabic server moderation, ban, or maintenance messages
+    final msgMatch = RegExp(r'message:\s*([^,)]+)').firstMatch(str);
+    final extracted = (msgMatch?.group(1) ?? str).trim();
+    if (extracted.contains('حظر') ||
+        extracted.contains('منع') ||
+        extracted.contains('كتم') ||
+        extracted.contains('متوقف') ||
+        extracted.contains('محصور') ||
+        extracted.contains('غير مصرح')) {
+      return extracted;
+    }
+
     if (str.contains('42702') || str.contains('ambiguous') || str.contains('PGRST') || str.contains('PostgrestException')) {
       return 'تعذر إتمام المطابقة مع الخادم حالياً، يرجى إعادة المحاولة.';
     }

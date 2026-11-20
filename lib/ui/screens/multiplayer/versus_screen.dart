@@ -330,6 +330,9 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
   
   void _showQuickPhraseBanner(String phrase, {required bool isMine}) {
     if (!mounted) return;
+    if (!AppControlService.instance.featureFlagsNotifier.value.quickPhrases) {
+      return;
+    }
     _phraseTimer?.cancel();
     setState(() {
       _activeQuickPhrase = phrase;
@@ -607,11 +610,14 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
                              ),
                            ),
                          ],
-                         const SizedBox(height: 8),
-                         QuickPhrasesBar(
-                           compact: true,
-                           onPhraseSelected: _sendQuickPhrase,
-                         ),
+                         if (AppControlService
+                             .instance.featureFlagsNotifier.value.quickPhrases) ...[
+                           const SizedBox(height: 8),
+                           QuickPhrasesBar(
+                             compact: true,
+                             onPhraseSelected: _sendQuickPhrase,
+                           ),
+                         ],
                          if (widget.isFriendly) ...[
                            const SizedBox(height: 6),
                            Container(

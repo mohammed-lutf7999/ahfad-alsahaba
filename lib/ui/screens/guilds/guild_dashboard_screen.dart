@@ -4,6 +4,7 @@ import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/guild_model.dart';
 import '../../../data/services/app_control_service.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../data/services/guild_service.dart';
 import '../../widgets/avatar_selector.dart';
 import '../live_arena/host_control_screen.dart';
@@ -29,6 +30,9 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _guilds.addListener(_onChanged);
+    AppControlService.instance.featureFlagsNotifier.addListener(_onChanged);
+    AppControlService.instance.playerPermissionsNotifier.addListener(_onChanged);
+    AppControlService.instance.isAdminNotifier.addListener(_onChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _guilds.fetchOverview();
     });
@@ -41,6 +45,9 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
   @override
   void dispose() {
     _guilds.removeListener(_onChanged);
+    AppControlService.instance.featureFlagsNotifier.removeListener(_onChanged);
+    AppControlService.instance.playerPermissionsNotifier.removeListener(_onChanged);
+    AppControlService.instance.isAdminNotifier.removeListener(_onChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -80,8 +87,18 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
     final accent = customTheme.sovereignAccent;
-    final enabled =
-        AppControlService.instance.featureFlagsNotifier.value.guildsArenas;
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    final isLoggedIn = AuthService().isLoggedIn;
+    final flags = control.featureFlagsNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    final enabled = (isAdmin || flags.guildsArenas) &&
+        (isAdmin ||
+            (!perms.isEffectivelyBannedNow &&
+                (!isLoggedIn || perms.canUseGuilds)));
+    final disabledReason = !flags.guildsArenas
+        ? 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة.'
+        : 'تم تقييد استخدام نظام الكتائب على هذا الحساب من الإدارة.';
     final data = _guilds.overview;
 
     return Directionality(
@@ -94,14 +111,14 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
               children: [
                 _buildHeader(accent),
                 if (!enabled)
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(24),
                         child: Text(
-                          'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة.',
+                          disabledReason,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Cairo',
                             color: Colors.white70,
                             fontSize: 15,
@@ -505,6 +522,12 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
   }
 
   Widget _buildLiveArenaQuickCard(AppCustomTheme customTheme, Color accent) {
+    final control = AppControlService.instance;
+    final canHost = control.canHostLiveArena();
+    final hostDeniedReason =
+        control.playerPermissionsNotifier.value.canHostLiveArenas == false
+            ? 'تم منعك فردياً من إنشاء البطولات الحية من الإدارة 🔒'
+            : 'إنشاء البطولات الحية محصور حالياً بالمعلمين والمشرفين المعتمدين 🎓';
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -532,6 +555,17 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
               ),
             ],
           ),
+          if (!canHost) ...[
+            const SizedBox(height: 6),
+            Text(
+              hostDeniedReason,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.amberAccent,
+                fontSize: 11.5,
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -542,6 +576,10 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
                     key: const Key('arena_host_entry_btn'),
                     onPressed: () {
                       SoundService().playClick();
+                      if (!canHost) {
+                        setState(() => _statusMsg = hostDeniedReason);
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -550,8 +588,11 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF38BDF8),
-                      foregroundColor: AppTheme.primaryDark,
+                      backgroundColor: canHost
+                          ? const Color(0xFF38BDF8)
+                          : Colors.blueGrey.shade700,
+                      foregroundColor:
+                          canHost ? AppTheme.primaryDark : Colors.white70,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 8,
@@ -560,11 +601,11 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const FittedBox(
+                    child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'إنشاء بطولة (معلم)',
-                        style: TextStyle(
+                        canHost ? 'إنشاء بطولة (معلم)' : 'للمعلمين فقط 🔒',
+                        style: const TextStyle(
                           fontFamily: 'Cairo',
                           fontWeight: FontWeight.bold,
                           fontSize: 12.5,

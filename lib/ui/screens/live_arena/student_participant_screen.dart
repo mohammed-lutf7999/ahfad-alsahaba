@@ -5,6 +5,7 @@ import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/live_session_model.dart';
 import '../../../data/models/question_model.dart';
+import '../../../data/services/app_control_service.dart';
 import '../../../data/services/live_tournament_service.dart';
 import '../../../data/services/question_service.dart';
 
@@ -22,6 +23,8 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
   final TextEditingController _pinCtrl = TextEditingController();
   StreamSubscription<LiveArenaBroadcastEvent>? _sub;
   List<Question> _questions = [];
+  List<LiveParticipantModel> _revealBoard = const [];
+  bool _showMidRoundReveal = false;
   int? _answeredIndex;
   int? _selectedOption;
   String? _error;
@@ -41,8 +44,20 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
     if (!mounted) return;
     if (event.type == 'question') {
       setState(() {
+        _showMidRoundReveal = false;
         _answeredIndex = null;
         _selectedOption = null;
+      });
+    } else if (event.type == 'reveal') {
+      setState(() {
+        _showMidRoundReveal = true;
+        _revealBoard = event.leaderboard.isNotEmpty
+            ? event.leaderboard
+            : List<LiveParticipantModel>.from(_arena.participants);
+      });
+    } else if (event.type == 'finish') {
+      setState(() {
+        _showMidRoundReveal = false;
       });
     }
   }
@@ -94,6 +109,12 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
     final accent = customTheme.sovereignAccent;
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    final flags = control.featureFlagsNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    final arenaEnabled =
+        (isAdmin || flags.guildsArenas) && (isAdmin || !perms.isEffectivelyBannedNow);
     final session = _arena.activeSession;
 
     return Directionality(
@@ -131,14 +152,37 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
                     ],
                   ),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    child: session == null
-                        ? _buildPinEntry(customTheme, accent)
-                        : _buildSessionView(customTheme, accent, session),
+                if (!arenaEnabled && session == null)
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          !flags.guildsArenas
+                              ? 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة.'
+                              : 'تم حظر هذا الحساب من الإدارة ولا يمكنه دخول البطولات الحية.',
+                          key: const Key('student_arena_blocked_msg'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Colors.white70,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      child: session == null
+                          ? _buildPinEntry(customTheme, accent)
+                          : _buildSessionView(customTheme, accent, session),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -270,13 +314,17 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
     }
 
     if (session.status == 'finished' ||
+        _questions.isEmpty ||
+        session.currentQuestionIndex < 0 ||
         session.currentQuestionIndex >= _questions.length) {
       final board = _arena.participants;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'انتهت البطولة — الترتيب النهائي 🏆',
+            session.status == 'finished'
+                ? 'انتهت البطولة — الترتيب النهائي 🏆'
+                : 'جارٍ مزامنة أسئلة البطولة...',
             style: TextStyle(
               fontFamily: 'Cairo',
               color: accent,
@@ -327,6 +375,132 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
               ),
             ),
         ],
+      );
+    }
+
+    if (_showMidRoundReveal) {
+      final board = _revealBoard.isNotEmpty ? _revealBoard : _arena.participants;
+      final myUid = _arena.currentUserId;
+      final myRankIdx = myUid == null
+          ? -1
+          : board.indexWhere((p) => p.userId == myUid);
+      return Container(
+        key: const Key('student_mid_round_reveal_card'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: customTheme.surfaceCard.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.4),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الترتيب المرحلي المباشر 🏆',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                color: accent,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (myRankIdx >= 0) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: accent.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  'مرتبتك الحالية: #${myRankIdx + 1} — نقاطك: ${board[myRankIdx].score} ⭐',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (board.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'جارٍ تحديث لوحة الصدارة...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Cairo', color: Colors.white70),
+                ),
+              )
+            else
+              for (var i = 0; i < board.length && i < 10; i++)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (myUid != null && board[i].userId == myUid)
+                        ? accent.withValues(alpha: 0.18)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (myUid != null && board[i].userId == myUid)
+                          ? accent
+                          : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '#${i + 1}',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: accent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          board[i].displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${board[i].score} ⭐',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Color(0xFF10B981),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            const SizedBox(height: 8),
+            const Text(
+              'في انتظار طرح السؤال التالي من المعلم...',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                color: Colors.white60,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       );
     }
 

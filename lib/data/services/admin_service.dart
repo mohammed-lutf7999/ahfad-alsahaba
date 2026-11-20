@@ -174,6 +174,49 @@ class AdminService {
   })? resourceCleanupOverride;
 
   @visibleForTesting
+  Future<Map<String, dynamic>?> Function({
+    required String userId,
+    required bool isBanned,
+    int? banHours,
+    required String banReason,
+    required bool canUseOnline,
+    required bool canUseDiwan,
+    required bool canUseGuilds,
+    bool? canHostLiveArenas,
+    required String notes,
+  })? playerPermissionsUpserterOverride;
+
+  @visibleForTesting
+  Future<AdminDiwanModerationQueue?> Function({int limit})?
+      diwanQueueFetcherOverride;
+
+  @visibleForTesting
+  Future<Map<String, dynamic>?> Function({
+    required String action,
+    String? messageId,
+    String? targetUserId,
+    int muteHours,
+    required String reason,
+  })? diwanModeratorOverride;
+
+  @visibleForTesting
+  Future<AdminGuildsAndArenasSnapshot?> Function({int limit})?
+      guildsArenasFetcherOverride;
+
+  @visibleForTesting
+  Future<Map<String, dynamic>?> Function({
+    required String action,
+    required String targetId,
+    required String reason,
+  })? guildArenaModeratorOverride;
+
+  @visibleForTesting
+  Future<void> Function(
+    String sessionId,
+    List<Map<String, dynamic>> leaderboard,
+  )? liveArenaFinishBroadcasterOverride;
+
+  @visibleForTesting
   void resetForTesting() {
     _cloudVerifiedAdmin = null;
     overviewFetcherOverride = null;
@@ -204,6 +247,12 @@ class AdminService {
     adminManagerOverride = null;
     resourceHealthFetcherOverride = null;
     resourceCleanupOverride = null;
+    playerPermissionsUpserterOverride = null;
+    diwanQueueFetcherOverride = null;
+    diwanModeratorOverride = null;
+    guildsArenasFetcherOverride = null;
+    guildArenaModeratorOverride = null;
+    liveArenaFinishBroadcasterOverride = null;
   }
 
   SupabaseClient? get _supabase {
@@ -1136,6 +1185,245 @@ class AdminService {
       },
     ).timeout(const Duration(seconds: 8));
     return res is Map ? Map<String, dynamic>.from(res) : null;
+  }
+
+  /// Upserts per-player dynamic permissions & ban state (`admin_upsert_player_permissions`)
+  /// and sends a targeted silent sync ping so ONLY that player updates in `<1s`.
+  Future<Map<String, dynamic>?> upsertPlayerPermissions({
+    required String userId,
+    required bool isBanned,
+    int? banHours,
+    String banReason = '',
+    bool canUseOnline = true,
+    bool canUseDiwan = true,
+    bool canUseGuilds = true,
+    bool? canHostLiveArenas,
+    String notes = '',
+  }) async {
+    Map<String, dynamic>? result;
+    if (playerPermissionsUpserterOverride != null) {
+      result = await playerPermissionsUpserterOverride!(
+        userId: userId,
+        isBanned: isBanned,
+        banHours: banHours,
+        banReason: banReason,
+        canUseOnline: canUseOnline,
+        canUseDiwan: canUseDiwan,
+        canUseGuilds: canUseGuilds,
+        canHostLiveArenas: canHostLiveArenas,
+        notes: notes,
+      );
+    } else {
+      final client = _supabase;
+      if (client == null) return null;
+      final res = await client.rpc(
+        'admin_upsert_player_permissions',
+        params: {
+          'p_user_id': userId.trim(),
+          'p_is_banned': isBanned,
+          'p_ban_hours': banHours,
+          'p_ban_reason': banReason.trim(),
+          'p_can_use_online': canUseOnline,
+          'p_can_use_diwan': canUseDiwan,
+          'p_can_use_guilds': canUseGuilds,
+          'p_can_host_live_arenas': canHostLiveArenas,
+          'p_notes': notes.trim(),
+        },
+      ).timeout(const Duration(seconds: 6));
+      if (res is Map) {
+        result = Map<String, dynamic>.from(res);
+      }
+    }
+    if (result != null) {
+      final playerCode = result['player_code']?.toString();
+      unawaited(
+        broadcastControlPing(
+          targetCode:
+              (playerCode != null && playerCode.trim().isNotEmpty)
+                  ? playerCode.trim()
+                  : 'SINGLE',
+          targetUserId: userId.trim(),
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Fetches Diwan reports, active muted users, and recent messages (`admin_list_diwan_moderation_queue`).
+  Future<AdminDiwanModerationQueue> getDiwanModerationQueue({
+    int limit = 50,
+  }) async {
+    if (diwanQueueFetcherOverride != null) {
+      return (await diwanQueueFetcherOverride!(limit: limit)) ??
+          const AdminDiwanModerationQueue();
+    }
+    final client = _supabase;
+    if (client == null) return const AdminDiwanModerationQueue();
+    final res = await client.rpc(
+      'admin_list_diwan_moderation_queue',
+      params: {'p_limit': limit.clamp(1, 100)},
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminDiwanModerationQueue.fromJson(Map<String, dynamic>.from(res));
+    }
+    return const AdminDiwanModerationQueue();
+  }
+
+  /// Executes Diwan moderation (`delete_message`, `dismiss_reports`, `mute_user`, `unmute_user`, `cleanup_24h`).
+  Future<Map<String, dynamic>?> moderateDiwan({
+    required String action,
+    String? messageId,
+    String? targetUserId,
+    int muteHours = 24,
+    String reason = '',
+  }) async {
+    final cleanAction = action.trim().toLowerCase();
+    Map<String, dynamic>? result;
+    if (diwanModeratorOverride != null) {
+      result = await diwanModeratorOverride!(
+        action: cleanAction,
+        messageId: messageId,
+        targetUserId: targetUserId,
+        muteHours: muteHours,
+        reason: reason,
+      );
+    } else {
+      final client = _supabase;
+      if (client == null) return null;
+      final res = await client.rpc(
+        'admin_moderate_diwan',
+        params: {
+          'p_action': cleanAction,
+          if (messageId != null && messageId.trim().isNotEmpty)
+            'p_message_id': messageId.trim(),
+          if (targetUserId != null && targetUserId.trim().isNotEmpty)
+            'p_target_user_id': targetUserId.trim(),
+          'p_mute_hours': muteHours.clamp(1, 720),
+          'p_reason': reason.trim(),
+        },
+      ).timeout(const Duration(seconds: 6));
+      if (res is Map) {
+        result = Map<String, dynamic>.from(res);
+      }
+    }
+    if (result != null &&
+        (cleanAction == 'mute_user' || cleanAction == 'unmute_user') &&
+        targetUserId != null &&
+        targetUserId.trim().isNotEmpty) {
+      final playerCode = result['player_code']?.toString();
+      unawaited(
+        broadcastControlPing(
+          targetCode:
+              (playerCode != null && playerCode.trim().isNotEmpty)
+                  ? playerCode.trim()
+                  : 'SINGLE',
+          targetUserId: targetUserId.trim(),
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Lists active Guilds & Live Quiz Arena sessions (`admin_list_guilds_and_arenas`).
+  Future<AdminGuildsAndArenasSnapshot> listGuildsAndArenas({
+    int limit = 50,
+  }) async {
+    if (guildsArenasFetcherOverride != null) {
+      return (await guildsArenasFetcherOverride!(limit: limit)) ??
+          const AdminGuildsAndArenasSnapshot();
+    }
+    final client = _supabase;
+    if (client == null) return const AdminGuildsAndArenasSnapshot();
+    final res = await client.rpc(
+      'admin_list_guilds_and_arenas',
+      params: {'p_limit': limit.clamp(1, 100)},
+    ).timeout(const Duration(seconds: 6));
+    if (res is Map) {
+      return AdminGuildsAndArenasSnapshot.fromJson(
+        Map<String, dynamic>.from(res),
+      );
+    }
+    return const AdminGuildsAndArenasSnapshot();
+  }
+
+  /// Moderates a Guild or Live Arena (`delete_guild`, `reset_single_guild_score`,
+  /// `force_finish_session`, `delete_session`). On `force_finish_session`, immediately
+  /// broadcasts a `finish` event over REST `httpSend` on `live_arena_<targetId>`
+  /// so connected Host and Students exit the active round immediately.
+  Future<Map<String, dynamic>?> moderateGuildOrArena({
+    required String action,
+    required String targetId,
+    String reason = '',
+  }) async {
+    final cleanAction = action.trim().toLowerCase();
+    final cleanTarget = targetId.trim();
+    Map<String, dynamic>? result;
+    if (guildArenaModeratorOverride != null) {
+      result = await guildArenaModeratorOverride!(
+        action: cleanAction,
+        targetId: cleanTarget,
+        reason: reason,
+      );
+    } else {
+      final client = _supabase;
+      if (client == null) return null;
+      final res = await client.rpc(
+        'admin_moderate_guild_or_arena',
+        params: {
+          'p_action': cleanAction,
+          'p_target_id': cleanTarget,
+          'p_reason': reason.trim(),
+        },
+      ).timeout(const Duration(seconds: 6));
+      if (res is Map) {
+        result = Map<String, dynamic>.from(res);
+      }
+    }
+
+    if (result != null && cleanAction == 'force_finish_session') {
+      final lbRaw = result['leaderboard'];
+      final leaderboard = lbRaw is List
+          ? lbRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : const <Map<String, dynamic>>[];
+      await broadcastLiveArenaFinish(
+        sessionId: cleanTarget,
+        leaderboard: leaderboard,
+      );
+    }
+    return result;
+  }
+
+  /// Broadcasts an immediate `finish` event over REST `httpSend` on `live_arena_<sessionId>`
+  /// (never gated by `liveAnnouncementPing` because participants are already on the arena channel).
+  Future<void> broadcastLiveArenaFinish({
+    required String sessionId,
+    List<Map<String, dynamic>> leaderboard = const [],
+  }) async {
+    final cleanId = sessionId.trim();
+    if (cleanId.isEmpty) return;
+    if (liveArenaFinishBroadcasterOverride != null) {
+      await liveArenaFinishBroadcasterOverride!(cleanId, leaderboard);
+      return;
+    }
+    final client = _supabase;
+    if (client == null) return;
+    try {
+      final ch = client.channel('live_arena_$cleanId');
+      await ch.httpSend(
+        event: 'arena_event',
+        payload: {
+          'type': 'finish',
+          'question_index': 999,
+          'leaderboard': leaderboard,
+        },
+        timeout: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      debugPrint('AdminService broadcastLiveArenaFinish notice: $e');
+    }
   }
 
   void _syncAndBroadcastAll() {

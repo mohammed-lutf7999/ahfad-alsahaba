@@ -9,6 +9,7 @@ import '../../core/sound_service.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
 import '../../data/services/app_control_service.dart';
+import '../../data/services/auth_service.dart';
 import '../screens/chat/global_chat_bottom_sheet.dart';
 import '../widgets/top_notification.dart';
 
@@ -109,13 +110,27 @@ class AppControlVisuals {
 
     if (!context.mounted) return;
     final flags = AppControlService.instance.featureFlagsNotifier.value;
+    final perms = AppControlService.instance.playerPermissionsNotifier.value;
+    final isAdmin = AppControlService.instance.isAdminNotifier.value;
+    final isLoggedIn = AuthService().isLoggedIn;
     final normalizedRoute = target.startsWith('/') ? target : '/$target';
 
+    if (normalizedRoute == AppRoutes.royalInbox && !isAdmin && !flags.royalInbox) {
+      TopNotification.showWarning(
+        context,
+        'صندوق البريد الملكي متوقف مؤقتاً للصيانة 🛡️',
+      );
+      return;
+    }
+
     if (normalizedRoute == '/diwan') {
-      if (!flags.diwanChat) {
+      final diwanRestricted = isLoggedIn && !perms.canUseDiwan;
+      if (!isAdmin && (!flags.diwanChat || diwanRestricted)) {
         TopNotification.showWarning(
           context,
-          'ديوان الأحفاد متوقف مؤقتاً للصيانة والتحديث 🛡️',
+          !flags.diwanChat
+              ? 'ديوان الأحفاد متوقف مؤقتاً للصيانة والتحديث 🛡️'
+              : 'تم تقييد المشاركة في ديوان الأحفاد من الإدارة 🔒',
         );
         return;
       }
@@ -125,10 +140,16 @@ class AppControlVisuals {
 
     if ((normalizedRoute == AppRoutes.guilds ||
             normalizedRoute == AppRoutes.liveArena) &&
-        !flags.guildsArenas) {
+        !isAdmin &&
+        (!flags.guildsArenas ||
+            (normalizedRoute == AppRoutes.guilds &&
+                isLoggedIn &&
+                !perms.canUseGuilds))) {
       TopNotification.showWarning(
         context,
-        'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة 🛡️',
+        !flags.guildsArenas
+            ? 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة 🛡️'
+            : 'تم تقييد استخدام نظام الكتائب من الإدارة 🔒',
       );
       return;
     }

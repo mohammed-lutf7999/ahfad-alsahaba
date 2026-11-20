@@ -217,6 +217,12 @@ void main() {
         return {'ok': true};
       };
 
+      AppControlService.instance.playerPermissionsNotifier.value =
+          const PlayerPermissions(
+        canHostLiveArenas: true,
+        effectiveCanHostLiveArenas: true,
+      );
+
       await tester.pumpWidget(_wrap360(const HostControlScreen()));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('host_create_arena_btn')));

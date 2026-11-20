@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/live_session_model.dart';
+import 'app_control_service.dart';
 import 'profile_service.dart';
 
 typedef LiveRpcHandler = Future<Map<String, dynamic>> Function(
@@ -58,6 +59,8 @@ class LiveTournamentService extends ChangeNotifier {
     return _safeClient()?.auth.currentUser != null;
   }
 
+  String? get currentUserId => _safeClient()?.auth.currentUser?.id;
+
   bool _isRunningUnderFlutterTest() {
     try {
       return WidgetsBinding.instance.runtimeType.toString().contains('Test');
@@ -79,11 +82,38 @@ class LiveTournamentService extends ChangeNotifier {
     _eventController = null;
   }
 
+  void _assertArenaEnabled({required bool forHost}) {
+    final control = AppControlService.instance;
+    final flags = control.featureFlagsNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    final isAdmin = control.isAdminNotifier.value;
+
+    if (!isAdmin && !flags.guildsArenas) {
+      throw Exception('نظام الكتائب والبطولات الجماعية متوقف مؤقتاً من الإدارة');
+    }
+    if (!isAdmin && perms.isEffectivelyBannedNow) {
+      throw Exception(
+        perms.banReason.trim().isNotEmpty
+            ? 'تم حظر حسابك من الإدارة: ${perms.banReason.trim()}'
+            : 'تم حظر حسابك مؤقتاً أو دائماً من الإدارة',
+      );
+    }
+    if (forHost && !control.canHostLiveArena()) {
+      if (perms.canHostLiveArenas == false) {
+        throw Exception('تم منعك فردياً من إنشاء البطولات الحية من الإدارة');
+      }
+      throw Exception(
+        'إنشاء البطولات الحية محصور حالياً بالمعلمين والمشرفين المعتمدين',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>?> createSession({
     required String title,
     required String categoryId,
     required List<String> questionIds,
   }) async {
+    _assertArenaEnabled(forHost: true);
     if (!isAuthenticated) {
       throw Exception('يلزم تسجيل الدخول بحساب Google لإنشاء بطولة حية');
     }
@@ -118,6 +148,7 @@ class LiveTournamentService extends ChangeNotifier {
   }
 
   Future<LiveSessionModel> joinByPin(String pinCode) async {
+    _assertArenaEnabled(forHost: false);
     if (!isAuthenticated) {
       throw Exception('يلزم تسجيل الدخول بحساب Google للانضمام للبطولة');
     }
@@ -288,13 +319,17 @@ class LiveTournamentService extends ChangeNotifier {
     ch
         .onBroadcast(
           event: 'arena_event',
-          callback: (payload) => _handleIncomingPayload(payload),
+          callback: (payload) => handleIncomingPayload(payload),
         )
         .subscribe();
     _channel = ch;
   }
 
-  void _handleIncomingPayload(Map<String, dynamic> payload) {
+  /// Processes an incoming Realtime broadcast payload (`participant_joined`,
+  /// `score_update`, `question`, `reveal`, `finish`). Updates `_activeSession`
+  /// and `_participants` immediately so UI reflects final standings on `finish`.
+  @visibleForTesting
+  void handleIncomingPayload(Map<String, dynamic> payload) {
     final type = (payload['type'] ?? '').toString();
     final qIdx = (payload['question_index'] as num?)?.toInt() ?? 0;
 
@@ -309,17 +344,32 @@ class LiveTournamentService extends ChangeNotifier {
       );
       if (p.userId.isNotEmpty) {
         _upsertParticipant(p);
-        notifyListeners();
       }
     }
 
     final boardRaw = payload['leaderboard'];
-    final board = boardRaw is List
+    final List<LiveParticipantModel>? incomingBoard = boardRaw is List
         ? boardRaw
             .whereType<Map>()
-            .map((e) => LiveParticipantModel.fromJson(Map<String, dynamic>.from(e)))
+            .map(
+              (e) => LiveParticipantModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
             .toList()
-        : participants;
+        : null;
+
+    if (incomingBoard != null &&
+        incomingBoard.isNotEmpty &&
+        (type == 'finish' || type == 'reveal' || type == 'question')) {
+      for (final entry in incomingBoard) {
+        if (entry.userId.isNotEmpty) {
+          _upsertParticipant(entry);
+        }
+      }
+    }
+
+    final board = incomingBoard ?? participants;
 
     if (type == 'question' && _activeSession != null) {
       _activeSession = LiveSessionModel(

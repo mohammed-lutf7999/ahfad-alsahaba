@@ -199,7 +199,9 @@ class MultiplayerService {
         );
       }
     } catch (e) {
-      return MatchmakingResult(error: e.toString());
+      return MatchmakingResult(
+        error: e is PostgrestException ? e.message : e.toString(),
+      );
     }
   }
 
@@ -702,7 +704,9 @@ class MultiplayerService {
       );
     } catch (e) {
       debugPrint('Error creating instant rematch: $e');
-      return MatchmakingResult(error: e.toString());
+      return MatchmakingResult(
+        error: e is PostgrestException ? e.message : e.toString(),
+      );
     }
   }
 
@@ -745,7 +749,9 @@ class MultiplayerService {
       );
     } catch (e) {
       debugPrint('Error creating private room: $e');
-      return PrivateRoomResult(error: e.toString());
+      return PrivateRoomResult(
+        error: e is PostgrestException ? e.message : e.toString(),
+      );
     }
   }
 
@@ -781,7 +787,9 @@ class MultiplayerService {
       );
     } catch (e) {
       debugPrint('Error joining private room: $e');
-      return PrivateRoomResult(error: e.toString());
+      return PrivateRoomResult(
+        error: e is PostgrestException ? e.message : e.toString(),
+      );
     }
   }
 
@@ -869,7 +877,9 @@ class MultiplayerService {
       );
     } catch (e) {
       debugPrint('Error finding ghost match: $e');
-      return GhostMatchResult(error: e.toString());
+      return GhostMatchResult(
+        error: e is PostgrestException ? e.message : e.toString(),
+      );
     }
   }
 

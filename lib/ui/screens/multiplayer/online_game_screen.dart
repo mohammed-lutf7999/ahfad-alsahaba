@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../core/sound_service.dart';
+import '../../../data/services/app_control_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/question_service.dart';
 import '../../../data/services/profile_service.dart';
@@ -119,6 +120,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   @override
   void dispose() {
+    SoundService().stopTimerTick();
     _ghostPlaybackService?.dispose();
     _botTimer?.cancel();
     _questionTimer?.cancel();
@@ -291,6 +293,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
   void _showQuickPhrase(String phrase) {
     if (!mounted) return;
+    if (!AppControlService.instance.featureFlagsNotifier.value.quickPhrases) {
+      return;
+    }
     _quickPhraseBannerTimer?.cancel();
     setState(() => _incomingQuickPhrase = phrase);
     _quickPhraseBannerTimer = Timer(const Duration(seconds: 3), () {
@@ -910,43 +915,48 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                                 GameReactionsRibbon(
                                   onReactionSelected: _sendReaction,
                                 ),
-                                InkWell(
-                                  key: const Key('toggle_quick_phrases_btn'),
-                                  borderRadius: BorderRadius.circular(18),
-                                  onTap: () {
-                                    SoundService().playClick();
-                                    setState(
-                                      () => _showQuickPhrases = !_showQuickPhrases,
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _showQuickPhrases
-                                          ? AppTheme.accentColor
-                                          : Colors.white.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: AppTheme.accentColor.withValues(
-                                          alpha: 0.5,
+                                if (AppControlService.instance
+                                    .featureFlagsNotifier.value.quickPhrases)
+                                  InkWell(
+                                    key: const Key('toggle_quick_phrases_btn'),
+                                    borderRadius: BorderRadius.circular(18),
+                                    onTap: () {
+                                      SoundService().playClick();
+                                      setState(
+                                        () => _showQuickPhrases =
+                                            !_showQuickPhrases,
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 7,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _showQuickPhrases
+                                            ? AppTheme.accentColor
+                                            : Colors.white.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: AppTheme.accentColor.withValues(
+                                            alpha: 0.5,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    child: Icon(
-                                      Icons.chat_rounded,
-                                      size: 18,
-                                      color: _showQuickPhrases
-                                          ? AppTheme.primaryDark
-                                          : AppTheme.accentColor,
+                                      child: Icon(
+                                        Icons.chat_rounded,
+                                        size: 18,
+                                        color: _showQuickPhrases
+                                            ? AppTheme.primaryDark
+                                            : AppTheme.accentColor,
+                                      ),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
-                            if (_showQuickPhrases) ...[
+                            if (_showQuickPhrases &&
+                                AppControlService.instance
+                                    .featureFlagsNotifier.value.quickPhrases) ...[
                               const SizedBox(height: 6),
                               QuickPhrasesBar(
                                 compact: true,

@@ -47,11 +47,18 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
   void initState() {
     super.initState();
     _chat.addListener(_onChatUpdated);
+    AppControlService.instance.featureFlagsNotifier.addListener(_onControlUpdated);
+    AppControlService.instance.playerPermissionsNotifier.addListener(_onControlUpdated);
+    AppControlService.instance.isAdminNotifier.addListener(_onControlUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _chat.openChannel(widget.channel);
       }
     });
+  }
+
+  void _onControlUpdated() {
+    if (mounted) setState(() {});
   }
 
   void _onChatUpdated() {
@@ -71,11 +78,93 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
   @override
   void dispose() {
     _chat.removeListener(_onChatUpdated);
+    AppControlService.instance.featureFlagsNotifier.removeListener(_onControlUpdated);
+    AppControlService.instance.playerPermissionsNotifier.removeListener(_onControlUpdated);
+    AppControlService.instance.isAdminNotifier.removeListener(_onControlUpdated);
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     // Crucial Free-Plan guard: release chat Realtime socket immediately on close.
     unawaited(_chat.closeChannel());
     super.dispose();
+  }
+
+  Future<void> _showReportReasonDialog(ChatMessageModel msg) async {
+    if (!_chat.isCurrentUserAuthenticated) {
+      TopNotification.showWarning(context, 'سجّل الدخول للإبلاغ عن مخالفة');
+      return;
+    }
+    const reasons = <String>[
+      'ألفاظ غير لائقة',
+      'رابط أو إعلان مخالف',
+      'إزعاج وتكرار/سبام',
+    ];
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: AppTheme.primaryDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'سبب الإبلاغ عن الرسالة 🛡️',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final reason in reasons)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(reason),
+                    child: Text(
+                      reason,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text(
+                'إلغاء',
+                style: TextStyle(fontFamily: 'Cairo', color: Colors.white60),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    final ok = await _chat.reportMessage(msg.id, reason: selected);
+    if (!mounted) return;
+    TopNotification.showSuccess(
+      context,
+      ok ? 'تم استلام البلاغ للمراجعة ($selected) 🛡️' : 'تعذر إرسال البلاغ حالياً',
+    );
   }
 
   Future<void> _send() async {
@@ -158,9 +247,14 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
     final accent = customTheme.sovereignAccent;
-    final diwanEnabled =
-        AppControlService.instance.featureFlagsNotifier.value.diwanChat;
-    final isAdmin = AppControlService.instance.isAdminNotifier.value;
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    final diwanEnabled = isAdmin || control.featureFlagsNotifier.value.diwanChat;
+    final perms = control.playerPermissionsNotifier.value;
+    final canWriteInDiwan = isAdmin ||
+        (!perms.isEffectivelyBannedNow &&
+            perms.canUseDiwan &&
+            !perms.isEffectivelyDiwanMutedNow);
     final myUid = _chat.currentUserId;
     final media = MediaQuery.of(context);
     final sheetHeight = (media.size.height * 0.82).clamp(380.0, 680.0);
@@ -226,7 +320,9 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
                           ],
                         ),
                       ),
-                      if (diwanEnabled && _chat.isCurrentUserAuthenticated)
+                      if (diwanEnabled &&
+                          _chat.isCurrentUserAuthenticated &&
+                          canWriteInDiwan)
                         SizedBox(
                           height: 36,
                           child: ElevatedButton.icon(
@@ -320,16 +416,7 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
                                 onJoinChallenge: msg.isChallengeInvite
                                     ? () => _joinChallengeInvite(msg)
                                     : null,
-                                onReport: () async {
-                                  final ok = await _chat.reportMessage(msg.id);
-                                  if (!mounted) return;
-                                  TopNotification.showSuccess(
-                                    this.context,
-                                    ok
-                                        ? 'تم استلام البلاغ للمراجعة 🛡️'
-                                        : 'سجّل الدخول للإبلاغ',
-                                  );
-                                },
+                                onReport: () => _showReportReasonDialog(msg),
                                 onAdminDelete: () => _chat.adminModerate(
                                   action: 'delete_message',
                                   messageId: msg.id,
@@ -401,6 +488,55 @@ class _GlobalChatBottomSheetState extends State<GlobalChatBottomSheet> {
                   fontFamily: 'Cairo',
                   color: Colors.white70,
                   fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    if (!isAdmin && (!perms.canUseDiwan || perms.isEffectivelyDiwanMutedNow)) {
+      final isMuted = perms.isEffectivelyDiwanMutedNow;
+      final until = perms.diwanMutedUntil?.toLocal();
+      final untilLabel = until != null
+          ? '${until.year}-${until.month.toString().padLeft(2, '0')}-${until.day.toString().padLeft(2, '0')} '
+            '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}'
+          : null;
+      final reasonText = perms.diwanMuteReason.trim();
+      final statusMessage = !perms.canUseDiwan
+          ? 'تم تقييد المشاركة في ديوان الأحفاد على هذا الحساب من الإدارة.'
+          : 'تم كتم مشاركتك في الديوان مؤقتاً'
+            '${reasonText.isNotEmpty ? ' ($reasonText)' : ''}'
+            '${untilLabel != null ? ' — ينتهي: $untilLabel' : ''}.';
+      return Container(
+        key: const Key('diwan_muted_status_bar'),
+        margin: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isMuted ? Icons.volume_off_rounded : Icons.block_rounded,
+              color: Colors.amberAccent,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                statusMessage,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  color: Colors.white,
+                  fontSize: 12,
+                  height: 1.4,
                 ),
               ),
             ),

@@ -14,6 +14,8 @@ class AppFeatureFlags {
   final bool wiseTeacherMode;
   final bool diwanChat;
   final bool guildsArenas;
+  final bool quickPhrases;
+  final bool liveArenaHostRestricted;
   final Map<String, bool> rawFlags;
 
   const AppFeatureFlags({
@@ -28,6 +30,8 @@ class AppFeatureFlags {
     this.wiseTeacherMode = true,
     this.diwanChat = true,
     this.guildsArenas = true,
+    this.quickPhrases = true,
+    this.liveArenaHostRestricted = true,
     this.rawFlags = const {
       'online_multiplayer': true,
       'ghost_matches': true,
@@ -40,6 +44,8 @@ class AppFeatureFlags {
       'wise_teacher_mode': true,
       'diwan_chat': true,
       'guilds_arenas': true,
+      'quick_phrases': true,
+      'live_arena_host_restricted': true,
     },
   });
 
@@ -66,6 +72,8 @@ class AppFeatureFlags {
       wiseTeacherMode: map['wise_teacher_mode'] ?? true,
       diwanChat: map['diwan_chat'] ?? true,
       guildsArenas: map['guilds_arenas'] ?? true,
+      quickPhrases: map['quick_phrases'] ?? true,
+      liveArenaHostRestricted: map['live_arena_host_restricted'] ?? true,
       rawFlags: map.isEmpty ? const AppFeatureFlags().rawFlags : map,
     );
   }
@@ -86,6 +94,109 @@ class AppFeatureFlags {
         'wise_teacher_mode': wiseTeacherMode,
         'diwan_chat': diwanChat,
         'guilds_arenas': guildsArenas,
+        'quick_phrases': quickPhrases,
+        'live_arena_host_restricted': liveArenaHostRestricted,
+      };
+}
+
+/// Per-player dynamic moderation, ban, mute & tri-state Live Arena hosting permissions.
+class PlayerPermissions {
+  final bool isBanned;
+  final DateTime? bannedUntil;
+  final String banReason;
+  final bool isDiwanMuted;
+  final DateTime? diwanMutedUntil;
+  final String diwanMuteReason;
+  final bool canUseOnline;
+  final bool canUseDiwan;
+  final bool canUseGuilds;
+
+  /// Tri-state override:
+  /// - `null`: inherit global `live_arena_host_restricted` policy
+  /// - `true`: authorized Teacher/Host override (always allowed when `guilds_arenas` is ON)
+  /// - `false`: explicitly denied individually (even in open mode)
+  final bool? canHostLiveArenas;
+  final bool effectiveCanHostLiveArenas;
+  final String notes;
+
+  const PlayerPermissions({
+    this.isBanned = false,
+    this.bannedUntil,
+    this.banReason = '',
+    this.isDiwanMuted = false,
+    this.diwanMutedUntil,
+    this.diwanMuteReason = '',
+    this.canUseOnline = true,
+    this.canUseDiwan = true,
+    this.canUseGuilds = true,
+    this.canHostLiveArenas,
+    this.effectiveCanHostLiveArenas = false,
+    this.notes = '',
+  });
+
+  bool isEffectivelyBannedAt(DateTime nowUtc) {
+    if (!isBanned) return false;
+    if (bannedUntil == null) return true;
+    return bannedUntil!.toUtc().isAfter(nowUtc.toUtc());
+  }
+
+  bool get isEffectivelyBannedNow => isEffectivelyBannedAt(DateTime.now().toUtc());
+
+  bool isEffectivelyDiwanMutedAt(DateTime nowUtc) {
+    if (!isDiwanMuted) return false;
+    if (diwanMutedUntil == null) return true;
+    return diwanMutedUntil!.toUtc().isAfter(nowUtc.toUtc());
+  }
+
+  bool get isEffectivelyDiwanMutedNow =>
+      isEffectivelyDiwanMutedAt(DateTime.now().toUtc());
+
+  factory PlayerPermissions.fromJson(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return const PlayerPermissions();
+    final rawHost = json['can_host_live_arenas'];
+    bool? parsedHost;
+    if (rawHost is bool) {
+      parsedHost = rawHost;
+    } else if (rawHost is String) {
+      final norm = rawHost.trim().toLowerCase();
+      if (norm == 'true') parsedHost = true;
+      if (norm == 'false') parsedHost = false;
+    }
+    return PlayerPermissions(
+      isBanned: json['is_banned'] as bool? ?? false,
+      bannedUntil: json['banned_until'] != null
+          ? DateTime.tryParse(json['banned_until'].toString())
+          : null,
+      banReason: (json['ban_reason'] as String?) ?? '',
+      isDiwanMuted: json['is_diwan_muted'] as bool? ?? false,
+      diwanMutedUntil: json['diwan_muted_until'] != null
+          ? DateTime.tryParse(json['diwan_muted_until'].toString())
+          : null,
+      diwanMuteReason: (json['diwan_mute_reason'] as String?) ?? '',
+      canUseOnline: json['can_use_online'] as bool? ?? true,
+      canUseDiwan: json['can_use_diwan'] as bool? ?? true,
+      canUseGuilds: json['can_use_guilds'] as bool? ?? true,
+      canHostLiveArenas: parsedHost,
+      effectiveCanHostLiveArenas:
+          json['effective_can_host_live_arenas'] as bool? ??
+              (parsedHost ?? false),
+      notes: (json['notes'] as String?) ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'is_banned': isBanned,
+        'banned_until': bannedUntil?.toUtc().toIso8601String(),
+        'ban_reason': banReason,
+        'is_diwan_muted': isDiwanMuted,
+        'diwan_muted_until': diwanMutedUntil?.toUtc().toIso8601String(),
+        'diwan_mute_reason': diwanMuteReason,
+        'can_use_online': canUseOnline,
+        'can_use_diwan': canUseDiwan,
+        'can_use_guilds': canUseGuilds,
+        'can_host_live_arenas': canHostLiveArenas,
+        'effective_can_host_live_arenas': effectiveCanHostLiveArenas,
+        'notes': notes,
       };
 }
 
@@ -446,6 +557,7 @@ class AppControlSnapshot {
   final int configVersion;
   final int cmsVersion;
   final bool isAdmin;
+  final PlayerPermissions playerPermissions;
   final AppReleaseConfig releaseConfig;
   final AppDynamicEvent? activeEvent;
   final List<AppAnnouncement> announcements;
@@ -455,6 +567,7 @@ class AppControlSnapshot {
     this.configVersion = 0,
     this.cmsVersion = 1,
     this.isAdmin = false,
+    this.playerPermissions = const PlayerPermissions(),
     this.releaseConfig = const AppReleaseConfig(),
     this.activeEvent,
     this.announcements = const [],
@@ -467,6 +580,7 @@ class AppControlSnapshot {
     final releaseRaw = json['release_config'];
     final eventRaw = json['active_event'];
     final annRaw = json['announcements'];
+    final permsRaw = json['player_permissions'];
     final parsedRelease = releaseRaw is Map
         ? AppReleaseConfig.fromJson(Map<String, dynamic>.from(releaseRaw))
         : const AppReleaseConfig();
@@ -475,6 +589,9 @@ class AppControlSnapshot {
       cmsVersion:
           (json['cms_version'] as num?)?.toInt() ?? parsedRelease.cmsVersion,
       isAdmin: json['is_admin'] as bool? ?? false,
+      playerPermissions: permsRaw is Map
+          ? PlayerPermissions.fromJson(Map<String, dynamic>.from(permsRaw))
+          : const PlayerPermissions(),
       releaseConfig: parsedRelease,
       activeEvent: eventRaw is Map
           ? AppDynamicEvent.fromJson(Map<String, dynamic>.from(eventRaw))
@@ -495,6 +612,7 @@ class AppControlSnapshot {
     int? configVersion,
     int? cmsVersion,
     bool? isAdmin,
+    PlayerPermissions? playerPermissions,
     AppReleaseConfig? releaseConfig,
     AppDynamicEvent? activeEvent,
     bool clearActiveEvent = false,
@@ -505,6 +623,7 @@ class AppControlSnapshot {
       configVersion: configVersion ?? this.configVersion,
       cmsVersion: cmsVersion ?? this.cmsVersion,
       isAdmin: isAdmin ?? this.isAdmin,
+      playerPermissions: playerPermissions ?? this.playerPermissions,
       releaseConfig: releaseConfig ?? this.releaseConfig,
       activeEvent: clearActiveEvent ? null : (activeEvent ?? this.activeEvent),
       announcements: announcements ?? this.announcements,
@@ -516,6 +635,7 @@ class AppControlSnapshot {
         'config_version': configVersion,
         'cms_version': cmsVersion,
         'is_admin': isAdmin,
+        'player_permissions': playerPermissions.toJson(),
         'release_config': releaseConfig.toJson(),
         'active_event': activeEvent?.toJson(),
         'announcements': announcements.map((a) => a.toJson()).toList(),
@@ -740,6 +860,8 @@ class AdminPlayerDetail {
   final Map<String, dynamic>? leaderboard;
   final List<AdminPlayerInventoryItem> inventory;
   final List<AdminPlayerMatchRecord> recentMatches;
+  final PlayerPermissions permissions;
+  final Map<String, dynamic>? diwanModeration;
 
   const AdminPlayerDetail({
     this.userId,
@@ -749,6 +871,8 @@ class AdminPlayerDetail {
     this.leaderboard,
     this.inventory = const [],
     this.recentMatches = const [],
+    this.permissions = const PlayerPermissions(),
+    this.diwanModeration,
   });
 
   String get displayName =>
@@ -774,9 +898,13 @@ class AdminPlayerDetail {
   bool get canReceiveCompensation =>
       userId != null && userId!.isNotEmpty && progress != null;
 
+  bool get canManagePermissions => userId != null && userId!.isNotEmpty;
+
   factory AdminPlayerDetail.fromJson(Map<String, dynamic> json) {
     final invRaw = json['inventory'];
     final matchesRaw = json['recent_matches'];
+    final permsRaw = json['permissions'];
+    final diwanRaw = json['diwan_moderation'];
     return AdminPlayerDetail(
       userId: json['user_id']?.toString(),
       playerCode: json['player_code']?.toString(),
@@ -803,6 +931,12 @@ class AdminPlayerDetail {
                   AdminPlayerMatchRecord.fromJson(Map<String, dynamic>.from(e)))
               .toList()
           : const [],
+      permissions: permsRaw is Map
+          ? PlayerPermissions.fromJson(Map<String, dynamic>.from(permsRaw))
+          : const PlayerPermissions(),
+      diwanModeration: diwanRaw is Map
+          ? Map<String, dynamic>.from(diwanRaw)
+          : null,
     );
   }
 }
@@ -1071,4 +1205,283 @@ class AdminResourceHealth {
     );
   }
 }
+
+/// Aggregated report row from `admin_list_diwan_moderation_queue`.
+class AdminDiwanReport {
+  final String messageId;
+  final String senderId;
+  final String senderName;
+  final String? senderCode;
+  final String content;
+  final String channel;
+  final int reportsCount;
+  final String latestReason;
+  final DateTime? latestReportedAt;
+
+  const AdminDiwanReport({
+    required this.messageId,
+    required this.senderId,
+    this.senderName = 'فارس',
+    this.senderCode,
+    required this.content,
+    this.channel = 'global',
+    this.reportsCount = 1,
+    this.latestReason = 'مخالفة آداب الديوان',
+    this.latestReportedAt,
+  });
+
+  factory AdminDiwanReport.fromJson(Map<String, dynamic> json) {
+    return AdminDiwanReport(
+      messageId: (json['message_id'] ?? '').toString(),
+      senderId: (json['sender_id'] ?? '').toString(),
+      senderName: (json['sender_name'] ?? 'فارس').toString(),
+      senderCode: json['sender_code']?.toString(),
+      content: (json['content'] ?? '').toString(),
+      channel: (json['channel'] ?? 'global').toString(),
+      reportsCount: (json['reports_count'] as num?)?.toInt() ?? 1,
+      latestReason: (json['latest_reason'] ?? 'مخالفة آداب الديوان').toString(),
+      latestReportedAt: json['latest_reported_at'] != null
+          ? DateTime.tryParse(json['latest_reported_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Active muted user row from `admin_list_diwan_moderation_queue`.
+class AdminMutedUser {
+  final String userId;
+  final String displayName;
+  final String? playerCode;
+  final DateTime? mutedUntil;
+  final String reason;
+
+  const AdminMutedUser({
+    required this.userId,
+    this.displayName = 'لاعب',
+    this.playerCode,
+    this.mutedUntil,
+    this.reason = '',
+  });
+
+  factory AdminMutedUser.fromJson(Map<String, dynamic> json) {
+    return AdminMutedUser(
+      userId: (json['user_id'] ?? '').toString(),
+      displayName: (json['display_name'] ?? 'لاعب').toString(),
+      playerCode: json['player_code']?.toString(),
+      mutedUntil: json['muted_until'] != null
+          ? DateTime.tryParse(json['muted_until'].toString())
+          : null,
+      reason: (json['reason'] ?? '').toString(),
+    );
+  }
+}
+
+/// Recent Diwan message preview returned inside `admin_list_diwan_moderation_queue`.
+class AdminDiwanMessagePreview {
+  final String id;
+  final String userId;
+  final String? playerCode;
+  final String displayName;
+  final String userRank;
+  final String content;
+  final String channel;
+  final DateTime? createdAt;
+
+  const AdminDiwanMessagePreview({
+    required this.id,
+    required this.userId,
+    this.playerCode,
+    this.displayName = 'فارس',
+    this.userRank = 'فارس',
+    required this.content,
+    this.channel = 'global',
+    this.createdAt,
+  });
+
+  factory AdminDiwanMessagePreview.fromJson(Map<String, dynamic> json) {
+    return AdminDiwanMessagePreview(
+      id: (json['id'] ?? '').toString(),
+      userId: (json['user_id'] ?? '').toString(),
+      playerCode: json['player_code']?.toString(),
+      displayName: (json['display_name'] ?? 'فارس').toString(),
+      userRank: (json['user_rank'] ?? 'فارس').toString(),
+      content: (json['content'] ?? '').toString(),
+      channel: (json['channel'] ?? 'global').toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Full Diwan moderation snapshot returned by `admin_list_diwan_moderation_queue`.
+class AdminDiwanModerationQueue {
+  final List<AdminDiwanReport> reports;
+  final List<AdminMutedUser> mutedUsers;
+  final List<AdminDiwanMessagePreview> recentMessages;
+
+  const AdminDiwanModerationQueue({
+    this.reports = const [],
+    this.mutedUsers = const [],
+    this.recentMessages = const [],
+  });
+
+  factory AdminDiwanModerationQueue.fromJson(Map<String, dynamic> json) {
+    final repRaw = json['reports'];
+    final mutRaw = json['muted_users'];
+    final recRaw = json['recent_messages'];
+    return AdminDiwanModerationQueue(
+      reports: repRaw is List
+          ? repRaw
+              .whereType<Map>()
+              .map((e) => AdminDiwanReport.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      mutedUsers: mutRaw is List
+          ? mutRaw
+              .whereType<Map>()
+              .map((e) => AdminMutedUser.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      recentMessages: recRaw is List
+          ? recRaw
+              .whereType<Map>()
+              .map((e) =>
+                  AdminDiwanMessagePreview.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+}
+
+/// Guild summary row returned by `admin_list_guilds_and_arenas`.
+class AdminGuildSummary {
+  final String id;
+  final String name;
+  final String description;
+  final int bannerIcon;
+  final int weeklyScore;
+  final int totalScore;
+  final int membersCount;
+  final int maxMembers;
+  final String leaderId;
+  final String leaderName;
+  final DateTime? createdAt;
+
+  const AdminGuildSummary({
+    required this.id,
+    required this.name,
+    this.description = '',
+    this.bannerIcon = 0,
+    this.weeklyScore = 0,
+    this.totalScore = 0,
+    this.membersCount = 1,
+    this.maxMembers = 30,
+    this.leaderId = '',
+    this.leaderName = 'قائد',
+    this.createdAt,
+  });
+
+  factory AdminGuildSummary.fromJson(Map<String, dynamic> json) {
+    return AdminGuildSummary(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      bannerIcon: (json['banner_icon'] as num?)?.toInt() ?? 0,
+      weeklyScore: (json['weekly_score'] as num?)?.toInt() ?? 0,
+      totalScore: (json['total_score'] as num?)?.toInt() ?? 0,
+      membersCount: (json['members_count'] as num?)?.toInt() ?? 1,
+      maxMembers: (json['max_members'] as num?)?.toInt() ?? 30,
+      leaderId: (json['leader_id'] ?? '').toString(),
+      leaderName: (json['leader_name'] ?? 'قائد').toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Live tournament session summary row returned by `admin_list_guilds_and_arenas`.
+class AdminLiveSessionSummary {
+  final String id;
+  final String pinCode;
+  final String title;
+  final String categoryId;
+  final String hostId;
+  final String hostName;
+  final String status;
+  final int currentQuestionIndex;
+  final int participantsCount;
+  final DateTime? expiresAt;
+  final DateTime? createdAt;
+
+  const AdminLiveSessionSummary({
+    required this.id,
+    required this.pinCode,
+    required this.title,
+    this.categoryId = 'quran',
+    this.hostId = '',
+    this.hostName = 'مضيف',
+    this.status = 'waiting',
+    this.currentQuestionIndex = 0,
+    this.participantsCount = 0,
+    this.expiresAt,
+    this.createdAt,
+  });
+
+  bool get isActiveOrWaiting => status == 'waiting' || status == 'active';
+
+  factory AdminLiveSessionSummary.fromJson(Map<String, dynamic> json) {
+    return AdminLiveSessionSummary(
+      id: (json['id'] ?? '').toString(),
+      pinCode: (json['pin_code'] ?? '').toString(),
+      title: (json['title'] ?? 'بطولة الفرسان').toString(),
+      categoryId: (json['category_id'] ?? 'quran').toString(),
+      hostId: (json['host_id'] ?? '').toString(),
+      hostName: (json['host_name'] ?? 'مضيف').toString(),
+      status: (json['status'] ?? 'waiting').toString(),
+      currentQuestionIndex:
+          (json['current_question_index'] as num?)?.toInt() ?? 0,
+      participantsCount: (json['participants_count'] as num?)?.toInt() ?? 0,
+      expiresAt: json['expires_at'] != null
+          ? DateTime.tryParse(json['expires_at'].toString())
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+}
+
+/// Combined Guilds & Live Arenas moderation snapshot from `admin_list_guilds_and_arenas`.
+class AdminGuildsAndArenasSnapshot {
+  final List<AdminGuildSummary> guilds;
+  final List<AdminLiveSessionSummary> liveSessions;
+
+  const AdminGuildsAndArenasSnapshot({
+    this.guilds = const [],
+    this.liveSessions = const [],
+  });
+
+  factory AdminGuildsAndArenasSnapshot.fromJson(Map<String, dynamic> json) {
+    final gRaw = json['guilds'];
+    final sRaw = json['live_sessions'];
+    return AdminGuildsAndArenasSnapshot(
+      guilds: gRaw is List
+          ? gRaw
+              .whereType<Map>()
+              .map((e) => AdminGuildSummary.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+      liveSessions: sRaw is List
+          ? sRaw
+              .whereType<Map>()
+              .map((e) =>
+                  AdminLiveSessionSummary.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
+    );
+  }
+}
+
 

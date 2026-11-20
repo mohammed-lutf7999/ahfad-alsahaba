@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/profanity_filter.dart';
 import '../models/chat_message_model.dart';
+import 'admin_service.dart';
 import 'app_control_service.dart';
 import 'multiplayer_service.dart';
 import 'profile_service.dart';
@@ -141,6 +142,7 @@ class ChatService extends ChangeNotifier {
         }
       }
 
+      if (_activeChannelName != normalized) return;
       _messages
         ..clear()
         ..addAll(rawList.map(ChatMessageModel.fromJson));
@@ -236,6 +238,30 @@ class ChatService extends ChangeNotifier {
     return profile.effectiveTitle;
   }
 
+  String? _guardDiwanParticipation() {
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    if (!isAdmin && !control.featureFlagsNotifier.value.diwanChat) {
+      return 'ديوان الأحفاد متوقف مؤقتاً من الإدارة';
+    }
+    if (!isCurrentUserAuthenticated) {
+      return 'يلزم تسجيل الدخول بحساب Google للمشاركة في الديوان';
+    }
+    final perms = control.playerPermissionsNotifier.value;
+    if (!isAdmin && perms.isEffectivelyBannedNow) {
+      return perms.banReason.trim().isNotEmpty
+          ? 'تم حظر حسابك من الإدارة: ${perms.banReason.trim()}'
+          : 'تم حظر حسابك مؤقتاً أو دائماً من الإدارة';
+    }
+    if (!isAdmin && !perms.canUseDiwan) {
+      return 'تم منعك من المشاركة في ديوان الأحفاد من الإدارة';
+    }
+    if (!isAdmin && perms.isEffectivelyDiwanMutedNow) {
+      return 'تم كتم مشاركتك في الديوان مؤقتاً بسبب مخالفة الآداب';
+    }
+    return null;
+  }
+
   /// Sends a text or challenge_invite message via `send_diwan_message` with
   /// client + server profanity guard and 3-second cooldown.
   Future<String?> sendMessage(
@@ -244,11 +270,9 @@ class ChatService extends ChangeNotifier {
     String messageKind = 'text',
     String? inviteRoomCode,
   }) async {
-    if (!AppControlService.instance.featureFlagsNotifier.value.diwanChat) {
-      return 'ديوان الأحفاد متوقف مؤقتاً من الإدارة';
-    }
-    if (!isCurrentUserAuthenticated) {
-      return 'يلزم تسجيل الدخول بحساب Google للمشاركة في الديوان';
+    final guardErr = _guardDiwanParticipation();
+    if (guardErr != null) {
+      return guardErr;
     }
 
     final validationError = ProfanityFilter.validateMessage(rawContent);
@@ -313,13 +337,16 @@ class ChatService extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      final msg = e.toString().replaceAll('PostgrestException(message:', '').trim();
+      final msg = e is PostgrestException ? e.message.trim() : e.toString().trim();
       if (msg.contains('انتظر')) return 'انتظر 3 ثوانٍ قبل إرسال رسالة جديدة';
       if (msg.contains('الآداب')) {
         return 'يرجى الالتزام بالآداب الإسلامية وتجنب الألفاظ أو الروابط المخالفة';
       }
-      if (msg.contains('كتم')) {
-        return 'تم كتم مشاركتك في الديوان مؤقتاً';
+      if (msg.contains('حظر') ||
+          msg.contains('منع') ||
+          msg.contains('كتم') ||
+          msg.contains('متوقف')) {
+        return msg;
       }
       debugPrint('ChatService sendMessage notice: $e');
       return 'تعذر إرسال الرسالة، حاول مجدداً';
@@ -335,6 +362,10 @@ class ChatService extends ChangeNotifier {
       return PrivateRoomResult(
         error: 'يلزم تسجيل الدخول بحساب Google لإنشاء تحدٍ من الديوان',
       );
+    }
+    final diwanGuard = _guardDiwanParticipation();
+    if (diwanGuard != null) {
+      return PrivateRoomResult(error: diwanGuard);
     }
 
     final room = challengeCreatorOverride != null
@@ -359,13 +390,19 @@ class ChatService extends ChangeNotifier {
     return room;
   }
 
-  Future<bool> reportMessage(String messageId) async {
+  Future<bool> reportMessage(
+    String messageId, {
+    String reason = 'مخالفة آداب الديوان',
+  }) async {
     final client = _safeClient();
     if (client == null || !isCurrentUserAuthenticated) return false;
     try {
       await client.rpc(
         'report_diwan_message',
-        params: {'p_message_id': messageId},
+        params: {
+          'p_message_id': messageId,
+          'p_reason': reason.trim().isEmpty ? 'مخالفة آداب الديوان' : reason.trim(),
+        },
       ).timeout(const Duration(seconds: 5));
       return true;
     } catch (e) {
@@ -378,23 +415,37 @@ class ChatService extends ChangeNotifier {
     required String action,
     String? messageId,
     String? targetUserId,
+    int muteHours = 24,
     String reason = '',
   }) async {
     final client = _safeClient();
     if (client == null) return false;
     try {
-      await client.rpc(
+      final res = await client.rpc(
         'admin_moderate_diwan',
         params: {
           'p_action': action,
           if (messageId != null) 'p_message_id': messageId,
           if (targetUserId != null) 'p_target_user_id': targetUserId,
+          'p_mute_hours': muteHours.clamp(1, 720),
           'p_reason': reason,
         },
       ).timeout(const Duration(seconds: 6));
       if (action == 'delete_message' && messageId != null) {
         _messages.removeWhere((m) => m.id == messageId);
         notifyListeners();
+      }
+      if ((action == 'mute_user' || action == 'unmute_user') &&
+          targetUserId != null) {
+        final playerCode = res is Map ? res['player_code']?.toString() : null;
+        unawaited(
+          AdminService().broadcastControlPing(
+            targetCode: (playerCode != null && playerCode.trim().isNotEmpty)
+                ? playerCode.trim()
+                : 'SINGLE',
+            targetUserId: targetUserId,
+          ),
+        );
       }
       return true;
     } catch (e) {

@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/app_constants.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/question_model.dart';
+import '../../../data/services/app_control_service.dart';
+import '../../../data/services/cms_cache_service.dart';
 import '../../../data/services/live_tournament_service.dart';
 import '../../../data/services/question_service.dart';
 
@@ -23,13 +26,45 @@ class _HostControlScreenState extends State<HostControlScreen> {
     text: 'بطولة الفرسان المعرفية',
   );
   String _categoryId = AppConstants.quranCategory;
+  int _selectedLevel = 1; // 0 = mixed across levels
+  int _questionCount = 8;
   List<Question> _questions = [];
   String? _error;
+
+  static const List<({String id, String name, int totalLevels})> _builtInCategories = [
+    (id: AppConstants.quranCategory, name: 'القرآن الكريم', totalLevels: 10),
+    (id: AppConstants.hadithCategory, name: 'الحديث الشريف', totalLevels: 10),
+    (id: AppConstants.seerahCategory, name: 'السيرة النبوية', totalLevels: 10),
+    (id: AppConstants.fiqhCategory, name: 'الفقه', totalLevels: 10),
+    (id: AppConstants.historyCategory, name: 'التاريخ الإسلامي', totalLevels: 10),
+    (id: AppConstants.aqeedahCategory, name: 'العقيدة', totalLevels: 10),
+  ];
+
+  List<({String id, String name, int totalLevels})> _availableCategories() {
+    final map = <String, ({String id, String name, int totalLevels})>{
+      for (final c in _builtInCategories) c.id: c,
+    };
+    final cmsCats = CmsCacheService.instance.snapshot.quizCategories.values.toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    for (final cat in cmsCats) {
+      if (!cat.isVisible) {
+        map.remove(cat.id);
+        continue;
+      }
+      map[cat.id] = (
+        id: cat.id,
+        name: cat.name.trim().isEmpty ? cat.id : cat.name.trim(),
+        totalLevels: cat.totalLevels.clamp(1, 50),
+      );
+    }
+    return map.values.toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _arena.addListener(_onUpdated);
+    CmsCacheService.instance.addListener(_onUpdated);
   }
 
   void _onUpdated() {
@@ -39,6 +74,7 @@ class _HostControlScreenState extends State<HostControlScreen> {
   @override
   void dispose() {
     _arena.removeListener(_onUpdated);
+    CmsCacheService.instance.removeListener(_onUpdated);
     _titleCtrl.dispose();
     unawaited(_arena.leaveSession());
     super.dispose();
@@ -48,13 +84,14 @@ class _HostControlScreenState extends State<HostControlScreen> {
     SoundService().playClick();
     setState(() => _error = null);
     try {
-      final levelQuestions = await QuestionService().loadQuestions(
+      final qSpecs = await QuestionService().buildLiveArenaQuestionSpecs(
         categoryId: _categoryId,
-        levelNumber: 1,
+        levelNumber: _selectedLevel == 0 ? null : _selectedLevel,
+        count: _questionCount,
       );
-      final slots = List<int>.generate(levelQuestions.length, (i) => i)
-        ..shuffle();
-      final qSpecs = slots.take(8).map((slot) => '$_categoryId:1:$slot').toList();
+      if (qSpecs.isEmpty) {
+        throw Exception('لا توجد أسئلة متاحة في هذا القسم والمستوى حالياً');
+      }
       final sessionRaw = await _arena.createSession(
         title: _titleCtrl.text,
         categoryId: _categoryId,
@@ -66,10 +103,84 @@ class _HostControlScreenState extends State<HostControlScreen> {
         seed: pinSeed,
         fallbackCategoryId: _categoryId,
       );
+      if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString().replaceAll('Exception: ', ''));
       }
+    }
+  }
+
+  Future<void> _confirmExitActiveSession() async {
+    final session = _arena.activeSession;
+    if (session == null ||
+        (session.status != 'waiting' && session.status != 'active')) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    final shouldEnd = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: AppTheme.primaryDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'إنهاء البطولة والخروج؟',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          content: const Text(
+            'ما تزال غرفة البطولة نشطة للمشاركين. هل تريد إنهاء البطولة للجميع قبل المغادرة؟',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: Colors.white70,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text(
+                'البقاء في الغرفة',
+                style: TextStyle(fontFamily: 'Cairo', color: Colors.white60),
+              ),
+            ),
+            ElevatedButton(
+              key: const Key('host_confirm_finish_exit_btn'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'إنهاء البطولة للجميع والخروج',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (shouldEnd == true) {
+      await _arena.hostPushState(
+        status: 'finished',
+        questionIndex: _questions.length,
+      );
+      await _arena.leaveSession();
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
@@ -86,28 +197,56 @@ class _HostControlScreenState extends State<HostControlScreen> {
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
     final accent = customTheme.sovereignAccent;
+    final control = AppControlService.instance;
+    final flags = control.featureFlagsNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    final canHost = control.canHostLiveArena();
     final session = _arena.activeSession;
     final participants = _arena.participants;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(gradient: customTheme.backgroundGradient),
-          child: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+    final blockedMessage = !flags.guildsArenas
+        ? 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة من الإدارة.'
+        : (perms.isEffectivelyBannedNow
+            ? 'تم حظر هذا الحساب مؤقتاً أو دائماً من الإدارة.'
+            : (perms.canHostLiveArenas == false
+                ? 'تم منعك فردياً من إنشاء البطولات الحية من الإدارة 🔒'
+                : 'إنشاء البطولات الحية محصور حالياً بالمعلمين والمشرفين المعتمدين 🎓'));
+
+    final hasLiveSession = session != null &&
+        (session.status == 'waiting' || session.status == 'active');
+
+    return PopScope(
+      canPop: !hasLiveSession,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && hasLiveSession) {
+          unawaited(_confirmExitActiveSession());
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Container(
+            decoration: BoxDecoration(gradient: customTheme.backgroundGradient),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (hasLiveSession) {
+                              unawaited(_confirmExitActiveSession());
+                            } else {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
                       Expanded(
                         child: Text(
                           'غرفة إدارة المعلم/المشرف 🎓',
@@ -124,28 +263,72 @@ class _HostControlScreenState extends State<HostControlScreen> {
                     ],
                   ),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-                    child: session == null
-                        ? _buildSetupForm(customTheme, accent)
-                        : _buildLiveConsole(
-                            customTheme,
-                            accent,
-                            session,
-                            participants,
-                          ),
+                if (!canHost && session == null)
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lock_person_rounded,
+                              color: accent,
+                              size: 46,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              blockedMessage,
+                              key: const Key('host_arena_blocked_msg'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white70,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                height: 1.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+                      child: session == null
+                          ? _buildSetupForm(customTheme, accent)
+                          : _buildLiveConsole(
+                              customTheme,
+                              accent,
+                              session,
+                              participants,
+                            ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         ),
       ),
+      ),
     );
   }
 
   Widget _buildSetupForm(AppCustomTheme customTheme, Color accent) {
+    final categories = _availableCategories();
+    final safeCategoryId = categories.any((c) => c.id == _categoryId)
+        ? _categoryId
+        : (categories.isNotEmpty ? categories.first.id : AppConstants.quranCategory);
+    final selectedCat = categories.firstWhere(
+      (c) => c.id == safeCategoryId,
+      orElse: () => (id: safeCategoryId, name: safeCategoryId, totalLevels: 10),
+    );
+    final maxLevels = selectedCat.totalLevels.clamp(1, 50);
+    final safeLevel = _selectedLevel > maxLevels ? 0 : _selectedLevel;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -178,24 +361,115 @@ class _HostControlScreenState extends State<HostControlScreen> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _categoryId,
+            key: const Key('host_category_dropdown'),
+            value: safeCategoryId,
+            isExpanded: true,
             dropdownColor: AppTheme.primaryDark,
             style: const TextStyle(fontFamily: 'Cairo', color: Colors.white),
             decoration: const InputDecoration(
-              labelText: 'مجال الأسئلة',
+              labelText: 'مجال الأسئلة (يشمل أقسام السحابة)',
               labelStyle: TextStyle(fontFamily: 'Cairo', color: Colors.white70),
             ),
-            items: const [
-              DropdownMenuItem(value: AppConstants.quranCategory, child: Text('القرآن الكريم')),
-              DropdownMenuItem(value: AppConstants.hadithCategory, child: Text('الحديث الشريف')),
-              DropdownMenuItem(value: AppConstants.seerahCategory, child: Text('السيرة النبوية')),
-              DropdownMenuItem(value: AppConstants.fiqhCategory, child: Text('الفقه')),
-              DropdownMenuItem(value: AppConstants.historyCategory, child: Text('التاريخ الإسلامي')),
-              DropdownMenuItem(value: AppConstants.aqeedahCategory, child: Text('العقيدة')),
+            items: [
+              for (final cat in categories)
+                DropdownMenuItem(
+                  value: cat.id,
+                  child: Text(cat.name, overflow: TextOverflow.ellipsis),
+                ),
             ],
             onChanged: (v) {
-              if (v != null) setState(() => _categoryId = v);
+              if (v != null) {
+                setState(() {
+                  _categoryId = v;
+                  _selectedLevel = 1;
+                });
+              }
             },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<int>(
+                  key: const Key('host_level_dropdown'),
+                  value: safeLevel,
+                  isExpanded: true,
+                  dropdownColor: AppTheme.primaryDark,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'المستوى',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white70,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text(
+                        'مختلط (كل المستويات)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    for (var lv = 1; lv <= maxLevels; lv++)
+                      DropdownMenuItem(
+                        value: lv,
+                        child: Text(
+                          'المستوى $lv',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _selectedLevel = v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<int>(
+                  key: const Key('host_count_dropdown'),
+                  value: _questionCount,
+                  isExpanded: true,
+                  dropdownColor: AppTheme.primaryDark,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'عدد الأسئلة',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: Colors.white70,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 5,
+                      child: Text('5 أسئلة', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: 8,
+                      child: Text('8 أسئلة', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: 10,
+                      child: Text('10 أسئلة', overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _questionCount = v);
+                  },
+                ),
+              ),
+            ],
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
@@ -274,22 +548,46 @@ class _HostControlScreenState extends State<HostControlScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    session.pinCode,
-                    key: const Key('host_arena_pin_text'),
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      color: accent,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 6,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        session.pinCode,
+                        key: const Key('host_arena_pin_text'),
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: accent,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 5,
+                        ),
+                      ),
                     ),
                   ),
                   IconButton(
+                    tooltip: 'نسخ الرمز',
+                    visualDensity: VisualDensity.compact,
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: session.pinCode));
                     },
                     icon: Icon(Icons.copy_rounded, color: accent),
+                  ),
+                  IconButton(
+                    key: const Key('host_share_pin_btn'),
+                    tooltip: 'مشاركة رمز البطولة',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      SoundService().playClick();
+                      unawaited(
+                        SharePlus.instance.share(
+                          ShareParams(
+                            text:
+                                'انضم الآن إلى بطولة "${session.title}" في معركة أحفاد الصحابة ⚔️\nرمز الانضمام (PIN): ${session.pinCode}',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.share_rounded, color: accent),
                   ),
                 ],
               ),

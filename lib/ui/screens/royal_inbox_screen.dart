@@ -26,6 +26,8 @@ class _RoyalInboxScreenState extends State<RoyalInboxScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _inbox.addListener(_onInboxChanged);
+    AppControlService.instance.featureFlagsNotifier.addListener(_onInboxChanged);
+    AppControlService.instance.isAdminNotifier.addListener(_onInboxChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _inbox.fetchInbox();
@@ -39,6 +41,8 @@ class _RoyalInboxScreenState extends State<RoyalInboxScreen>
   @override
   void dispose() {
     _inbox.removeListener(_onInboxChanged);
+    AppControlService.instance.featureFlagsNotifier.removeListener(_onInboxChanged);
+    AppControlService.instance.isAdminNotifier.removeListener(_onInboxChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -46,8 +50,9 @@ class _RoyalInboxScreenState extends State<RoyalInboxScreen>
   @override
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
+    final control = AppControlService.instance;
     final isEnabled =
-        AppControlService.instance.featureFlagsNotifier.value.royalInbox;
+        control.isAdminNotifier.value || control.featureFlagsNotifier.value.royalInbox;
     final unread = _inbox.unreadCount;
 
     return Directionality(

@@ -25,6 +25,7 @@ import 'store/knights_store_screen.dart';
 import 'chat/global_chat_bottom_sheet.dart';
 import '../../core/size_config.dart';
 import '../widgets/coach_mark_overlay.dart';
+import '../widgets/top_notification.dart';
 import '../widgets/navigation/royal_bottom_nav_bar.dart';
 import 'home/widgets/home_logo_with_effects.dart';
 import 'home/widgets/home_start_button.dart';
@@ -84,6 +85,9 @@ class _HomeScreenState extends State<HomeScreen>
     AppControlService.instance.pendingAnnouncementsNotifier.addListener(
       _onControlStateChanged,
     );
+    AppControlService.instance.playerPermissionsNotifier.addListener(
+      _onControlStateChanged,
+    );
     
     // Load quotes asynchronously off the critical startup build path
     _loadQuotes();
@@ -110,6 +114,8 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {});
     final service = AppControlService.instance;
     final hasPendingGate = service.releaseConfigNotifier.value.maintenanceMode ||
+        (!service.isAdminNotifier.value &&
+            service.playerPermissionsNotifier.value.isEffectivelyBannedNow) ||
         service.releaseConfigNotifier.value.isForceUpdateRequired(
           service.effectiveBuildNumber,
         ) ||
@@ -213,6 +219,9 @@ class _HomeScreenState extends State<HomeScreen>
     AppControlService.instance.pendingAnnouncementsNotifier.removeListener(
       _onControlStateChanged,
     );
+    AppControlService.instance.playerPermissionsNotifier.removeListener(
+      _onControlStateChanged,
+    );
     _controller.dispose();
     super.dispose();
   }
@@ -300,39 +309,45 @@ class _HomeScreenState extends State<HomeScreen>
           child: Center(
             child: ValueListenableBuilder<int>(
               valueListenable: RoyalInboxService.instance.unreadCountNotifier,
-              builder: (context, unreadCount, _) => Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedAvatarFrame(
-                    size: 46,
-                    frameKey: profile.equippedFrame,
-                    winStreak: profile.winStreak,
-                    child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 38),
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white, width: 1.2),
-                        ),
-                        child: Text(
-                          unreadCount > 9 ? '9+' : '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            height: 1.1,
+              builder: (context, unreadCount, _) {
+                final control = AppControlService.instance;
+                final showInboxBadge = unreadCount > 0 &&
+                    (control.isAdminNotifier.value ||
+                        control.featureFlagsNotifier.value.royalInbox);
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedAvatarFrame(
+                      size: 46,
+                      frameKey: profile.equippedFrame,
+                      winStreak: profile.winStreak,
+                      child: ProfileAvatar(avatarIndex: profile.avatarIndex, size: 38),
+                    ),
+                    if (showInboxBadge)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          child: Text(
+                            unreadCount > 9 ? '9+' : '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              height: 1.1,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                );
+              },
             ),
           ),
         ) : null,
@@ -552,8 +567,21 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _openPlayerHubMenu(BuildContext context, String playerCode) async {
     final customTheme = AppCustomTheme.of(context);
     final unread = RoyalInboxService.instance.unreadCount;
-    final inboxEnabled =
-        AppControlService.instance.featureFlagsNotifier.value.royalInbox;
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    final isLoggedIn = AuthService().isLoggedIn;
+    final flags = control.featureFlagsNotifier.value;
+    final perms = control.playerPermissionsNotifier.value;
+    final banned = !isAdmin && perms.isEffectivelyBannedNow;
+    final inboxEnabled = isAdmin || flags.royalInbox;
+    final diwanEnabled =
+        (isAdmin || flags.diwanChat) &&
+        !banned &&
+        (isAdmin || !isLoggedIn || perms.canUseDiwan);
+    final guildsEnabled =
+        (isAdmin || flags.guildsArenas) &&
+        !banned &&
+        (isAdmin || !isLoggedIn || perms.canUseGuilds);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -616,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen>
                       fontSize: 12,
                     ),
                   ),
-                  trailing: unread > 0
+                  trailing: inboxEnabled && unread > 0
                       ? Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -635,14 +663,23 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ),
                         )
-                      : const Icon(
-                          Icons.arrow_forward_ios_rounded,
+                      : Icon(
+                          inboxEnabled
+                              ? Icons.arrow_forward_ios_rounded
+                              : Icons.lock_outline_rounded,
                           size: 15,
                           color: Colors.white54,
                         ),
                   onTap: () async {
                     Navigator.pop(sheetCtx);
                     SoundService().playClick();
+                    if (!inboxEnabled) {
+                      TopNotification.showError(
+                        context,
+                        'صندوق البريد الملكي متوقف مؤقتاً للصيانة ⚙️',
+                      );
+                      return;
+                    }
                     await Navigator.pushNamed(context, AppRoutes.royalInbox);
                     if (mounted) _refreshProfile();
                   },
@@ -671,27 +708,36 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   subtitle: Text(
-                    AppControlService
-                            .instance
-                            .featureFlagsNotifier
-                            .value
-                            .diwanChat
+                    diwanEnabled
                         ? 'دردشة الفرسان المباشرة وتحدي الأعضاء'
-                        : 'متوقف مؤقتاً للصيانة من الإدارة',
+                        : (!flags.diwanChat
+                            ? 'متوقف مؤقتاً للصيانة من الإدارة'
+                            : 'تم تقييد المشاركة في الديوان من الإدارة 🔒'),
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       color: Colors.white.withValues(alpha: 0.72),
                       fontSize: 12,
                     ),
                   ),
-                  trailing: const Icon(
-                    Icons.arrow_forward_ios_rounded,
+                  trailing: Icon(
+                    diwanEnabled
+                        ? Icons.arrow_forward_ios_rounded
+                        : Icons.lock_outline_rounded,
                     size: 15,
                     color: Colors.white54,
                   ),
                   onTap: () async {
                     Navigator.pop(sheetCtx);
                     SoundService().playClick();
+                    if (!diwanEnabled) {
+                      TopNotification.showError(
+                        context,
+                        !flags.diwanChat
+                            ? 'ديوان الأحفاد متوقف مؤقتاً للصيانة ⚙️'
+                            : 'تم تقييد المشاركة في ديوان الأحفاد من الإدارة 🔒',
+                      );
+                      return;
+                    }
                     await GlobalChatBottomSheet.show(context);
                   },
                 ),
@@ -719,27 +765,36 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                   subtitle: Text(
-                    AppControlService
-                            .instance
-                            .featureFlagsNotifier
-                            .value
-                            .guildsArenas
+                    guildsEnabled
                         ? 'رايات الكتائب ومعركة الجمعة وغرف 100 مشارك'
-                        : 'متوقف مؤقتاً للصيانة من الإدارة',
+                        : (!flags.guildsArenas
+                            ? 'متوقف مؤقتاً للصيانة من الإدارة'
+                            : 'تم تقييد نظام الكتائب من الإدارة 🔒'),
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       color: Colors.white.withValues(alpha: 0.72),
                       fontSize: 12,
                     ),
                   ),
-                  trailing: const Icon(
-                    Icons.arrow_forward_ios_rounded,
+                  trailing: Icon(
+                    guildsEnabled
+                        ? Icons.arrow_forward_ios_rounded
+                        : Icons.lock_outline_rounded,
                     size: 15,
                     color: Colors.white54,
                   ),
                   onTap: () async {
                     Navigator.pop(sheetCtx);
                     SoundService().playClick();
+                    if (!guildsEnabled) {
+                      TopNotification.showError(
+                        context,
+                        !flags.guildsArenas
+                            ? 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً للصيانة ⚙️'
+                            : 'تم تقييد نظام الكتائب على هذا الحساب من الإدارة 🔒',
+                      );
+                      return;
+                    }
                     await Navigator.pushNamed(context, AppRoutes.guilds);
                   },
                 ),

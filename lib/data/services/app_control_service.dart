@@ -74,6 +74,8 @@ class AppControlService extends ChangeNotifier {
   final ValueNotifier<AppDynamicEvent?> activeEventNotifier =
       ValueNotifier<AppDynamicEvent?>(null);
   final ValueNotifier<bool> isAdminNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<PlayerPermissions> playerPermissionsNotifier =
+      ValueNotifier<PlayerPermissions>(const PlayerPermissions());
   final ValueNotifier<List<AppAnnouncement>> pendingAnnouncementsNotifier =
       ValueNotifier<List<AppAnnouncement>>(const []);
 
@@ -231,10 +233,11 @@ class AppControlService extends ChangeNotifier {
     final nowMs = nowUtc.millisecondsSinceEpoch;
     final lastSyncMs = SharedPrefsService.getLastAppControlSyncMs();
     final inMaintenance = _snapshot.releaseConfig.maintenanceMode;
+    final inBan = _snapshot.playerPermissions.isEffectivelyBannedAt(nowUtc);
 
-    // Allow faster recovery checks when locked in maintenance (15s floor),
-    // otherwise enforce the 15-minute economy TTL cooldown.
-    final effectiveCooldownMs = inMaintenance
+    // Allow faster recovery checks when locked in maintenance or ban (15s floor),
+    // otherwise enforce the 3-minute economy TTL cooldown.
+    final effectiveCooldownMs = (inMaintenance || inBan)
         ? const Duration(seconds: 15).inMilliseconds
         : Duration(minutes: cooldownMinutes).inMilliseconds;
 
@@ -291,6 +294,10 @@ class AppControlService extends ChangeNotifier {
           _snapshot.cmsVersion;
 
       if (!changed) {
+        final permsRaw = rpcResult['player_permissions'];
+        final nextPerms = permsRaw is Map
+            ? PlayerPermissions.fromJson(Map<String, dynamic>.from(permsRaw))
+            : _snapshot.playerPermissions;
         final updated = _sanitizeSnapshotForNow(
           _snapshot.copyWith(
             configVersion: serverConfigVer > 0
@@ -298,6 +305,7 @@ class AppControlService extends ChangeNotifier {
                 : _snapshot.configVersion,
             cmsVersion: serverCmsVer > 0 ? serverCmsVer : _snapshot.cmsVersion,
             isAdmin: serverIsAdmin ?? _snapshot.isAdmin,
+            playerPermissions: nextPerms,
             syncedAt: nowUtc,
           ),
         );
@@ -579,6 +587,7 @@ class AppControlService extends ChangeNotifier {
       configVersion: raw.configVersion,
       cmsVersion: raw.cmsVersion,
       isAdmin: raw.isAdmin,
+      playerPermissions: raw.playerPermissions,
       releaseConfig: raw.releaseConfig,
       // Keep scheduled upcoming events cached on device so they illuminate on
       // activeEventNotifier at the exact startsAt moment with zero extra DB hits.
@@ -586,6 +595,17 @@ class AppControlService extends ChangeNotifier {
       announcements: filteredAnnouncements,
       syncedAt: raw.syncedAt,
     );
+  }
+
+  /// Dynamic Live Arena hosting truth-table evaluator (Plan 11 Section 2.b).
+  bool canHostLiveArena({bool? isAdminOverride}) {
+    final flags = featureFlagsNotifier.value;
+    if (!flags.guildsArenas) return false;
+    final isAdmin = isAdminOverride ?? isAdminNotifier.value;
+    if (isAdmin) return true;
+    final perms = playerPermissionsNotifier.value;
+    if (perms.isEffectivelyBannedAt(_nowUtc())) return false;
+    return perms.canHostLiveArenas ?? !flags.liveArenaHostRestricted;
   }
 
   Future<void> _persistSnapshot(AppControlSnapshot snap) async {
@@ -612,6 +632,12 @@ class AppControlService extends ChangeNotifier {
     }
 
     isAdminNotifier.value = next.isAdmin;
+    if (!_samePlayerPermissions(
+      playerPermissionsNotifier.value,
+      next.playerPermissions,
+    )) {
+      playerPermissionsNotifier.value = next.playerPermissions;
+    }
 
     if (!_sameAnnouncements(
       pendingAnnouncementsNotifier.value,
@@ -737,5 +763,21 @@ class AppControlService extends ChangeNotifier {
     }
     return true;
   }
+
+  bool _samePlayerPermissions(PlayerPermissions a, PlayerPermissions b) {
+    return a.isBanned == b.isBanned &&
+        a.bannedUntil == b.bannedUntil &&
+        a.banReason == b.banReason &&
+        a.isDiwanMuted == b.isDiwanMuted &&
+        a.diwanMutedUntil == b.diwanMutedUntil &&
+        a.diwanMuteReason == b.diwanMuteReason &&
+        a.canUseOnline == b.canUseOnline &&
+        a.canUseDiwan == b.canUseDiwan &&
+        a.canUseGuilds == b.canUseGuilds &&
+        a.canHostLiveArenas == b.canHostLiveArenas &&
+        a.effectiveCanHostLiveArenas == b.effectiveCanHostLiveArenas &&
+        a.notes == b.notes;
+  }
 }
 
+  

@@ -28,59 +28,73 @@ class HomeSpeedDial extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppFeatureFlags>(
       valueListenable: AppControlService.instance.featureFlagsNotifier,
-      builder: (context, flags, _) => Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: SpeedDial(
-            key: challengeKey,
-            icon: Icons.keyboard_arrow_down_rounded,
-            activeIcon: Icons.close_rounded,
-            iconTheme: const IconThemeData(color: AppTheme.primaryDark, size: 20),
-            buttonSize: const Size(40, 40),
-            childrenButtonSize: const Size(44, 44),
-            backgroundColor: AppTheme.accentColor,
-            activeBackgroundColor: Colors.red.shade400,
-            elevation: 4,
-            overlayColor: Colors.black,
-            overlayOpacity: 0.3,
-            spacing: 8,
-            spaceBetweenChildren: 8,
-            direction: SpeedDialDirection.down,
-            animationDuration: const Duration(milliseconds: 150),
-            tooltip: '',
-            heroTag: 'speed-dial',
-            children: [
-              // Online Challenge Button
-              SpeedDialChild(
-                child: Icon(
-                  flags.onlineMultiplayer
-                      ? Icons.language_rounded
-                      : Icons.lock_clock_rounded,
-                  color: flags.onlineMultiplayer
-                      ? AppTheme.primaryDark
-                      : Colors.white70,
-                  size: 22,
-                ),
-                backgroundColor: flags.onlineMultiplayer
-                    ? const Color(0xFF00E676)
-                    : Colors.blueGrey.shade700,
-                onTap: () {
-                  SoundService().playClick();
-                  if (!flags.onlineMultiplayer) {
-                    TopNotification.showError(
-                      context,
-                      'المباريات الأونلاين متوقفة مؤقتاً للصيانة ⚙️',
-                    );
-                    return;
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                  );
-                },
-              ),
+      builder: (context, flags, _) => ValueListenableBuilder<PlayerPermissions>(
+        valueListenable: AppControlService.instance.playerPermissionsNotifier,
+        builder: (context, perms, _) {
+          final isAdmin = AppControlService.instance.isAdminNotifier.value;
+          final isLoggedIn = AuthService().isLoggedIn;
+          final banned = !isAdmin && perms.isEffectivelyBannedNow;
+          final onlineAllowed =
+              (isAdmin || flags.onlineMultiplayer) && !banned && (isAdmin || perms.canUseOnline);
+          final inboxAllowed = isAdmin || flags.royalInbox;
+          final diwanAllowed = (isAdmin || flags.diwanChat) &&
+              !banned &&
+              (isAdmin || !isLoggedIn || perms.canUseDiwan);
+          return Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: SpeedDial(
+                key: challengeKey,
+                icon: Icons.keyboard_arrow_down_rounded,
+                activeIcon: Icons.close_rounded,
+                iconTheme: const IconThemeData(color: AppTheme.primaryDark, size: 20),
+                buttonSize: const Size(40, 40),
+                childrenButtonSize: const Size(44, 44),
+                backgroundColor: AppTheme.accentColor,
+                activeBackgroundColor: Colors.red.shade400,
+                elevation: 4,
+                overlayColor: Colors.black,
+                overlayOpacity: 0.3,
+                spacing: 8,
+                spaceBetweenChildren: 8,
+                direction: SpeedDialDirection.down,
+                animationDuration: const Duration(milliseconds: 150),
+                tooltip: '',
+                heroTag: 'speed-dial',
+                children: [
+                  // Online Challenge Button
+                  SpeedDialChild(
+                    child: Icon(
+                      onlineAllowed
+                          ? Icons.language_rounded
+                          : Icons.lock_clock_rounded,
+                      color: onlineAllowed
+                          ? AppTheme.primaryDark
+                          : Colors.white70,
+                      size: 22,
+                    ),
+                    backgroundColor: onlineAllowed
+                        ? const Color(0xFF00E676)
+                        : Colors.blueGrey.shade700,
+                    onTap: () {
+                      SoundService().playClick();
+                      if (!onlineAllowed) {
+                        TopNotification.showError(
+                          context,
+                          !flags.onlineMultiplayer
+                              ? 'المباريات الأونلاين متوقفة مؤقتاً للصيانة ⚙️'
+                              : 'تم تقييد اللعب الأونلاين على هذا الحساب من الإدارة 🔒',
+                        );
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LobbyScreen()),
+                      );
+                    },
+                  ),
 
             // Challenge Button
             SpeedDialChild(
@@ -150,27 +164,49 @@ class HomeSpeedDial extends StatelessWidget {
             ),
 
             SpeedDialChild(
-              child: const Icon(
-                Icons.mark_email_unread_rounded,
-                color: Colors.white,
+              child: Icon(
+                inboxAllowed
+                    ? Icons.mark_email_unread_rounded
+                    : Icons.lock_clock_rounded,
+                color: inboxAllowed ? Colors.white : Colors.white70,
                 size: 22,
               ),
-              backgroundColor: const Color(0xFF0EA5E9),
+              backgroundColor: inboxAllowed
+                  ? const Color(0xFF0EA5E9)
+                  : Colors.blueGrey.shade700,
               onTap: () {
                 SoundService().playClick();
+                if (!inboxAllowed) {
+                  TopNotification.showError(
+                    context,
+                    'صندوق البريد الملكي متوقف مؤقتاً للصيانة ⚙️',
+                  );
+                  return;
+                }
                 Navigator.pushNamed(context, AppRoutes.royalInbox);
               },
             ),
 
             SpeedDialChild(
-              child: const Icon(
-                Icons.forum_rounded,
-                color: Colors.white,
+              child: Icon(
+                diwanAllowed ? Icons.forum_rounded : Icons.lock_clock_rounded,
+                color: diwanAllowed ? Colors.white : Colors.white70,
                 size: 21,
               ),
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: diwanAllowed
+                  ? const Color(0xFF10B981)
+                  : Colors.blueGrey.shade700,
               onTap: () {
                 SoundService().playClick();
+                if (!diwanAllowed) {
+                  TopNotification.showError(
+                    context,
+                    !flags.diwanChat
+                        ? 'ديوان الأحفاد متوقف مؤقتاً للصيانة ⚙️'
+                        : 'تم تقييد المشاركة في ديوان الأحفاد من الإدارة 🔒',
+                  );
+                  return;
+                }
                 GlobalChatBottomSheet.show(context);
               },
             ),
@@ -226,6 +262,8 @@ class HomeSpeedDial extends StatelessWidget {
           ],
         ),
       ),
+    );
+        },
       ),
     );
   }

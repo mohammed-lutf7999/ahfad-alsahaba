@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/guild_model.dart';
+import 'app_control_service.dart';
 import 'profile_service.dart';
 
 typedef GuildsOverviewFetcher = Future<Map<String, dynamic>> Function({int limit});
@@ -88,11 +89,31 @@ class GuildService extends ChangeNotifier {
     return _overview;
   }
 
+  String? _guardGuildAccess() {
+    final control = AppControlService.instance;
+    final isAdmin = control.isAdminNotifier.value;
+    if (!isAdmin && !control.featureFlagsNotifier.value.guildsArenas) {
+      return 'نظام الكتائب والبطولات الجماعية متوقف مؤقتاً من الإدارة';
+    }
+    final perms = control.playerPermissionsNotifier.value;
+    if (!isAdmin && perms.isEffectivelyBannedNow) {
+      return perms.banReason.trim().isNotEmpty
+          ? 'تم حظر حسابك من الإدارة: ${perms.banReason.trim()}'
+          : 'تم حظر حسابك مؤقتاً أو دائماً من الإدارة';
+    }
+    if (!isAdmin && !perms.canUseGuilds) {
+      return 'تم منعك من استخدام نظام الكتائب من الإدارة';
+    }
+    return null;
+  }
+
   Future<String?> createGuild({
     required String name,
     String description = '',
     int bannerIcon = 0,
   }) async {
+    final accessErr = _guardGuildAccess();
+    if (accessErr != null) return accessErr;
     if (!isAuthenticated) {
       return 'يلزم تسجيل الدخول بحساب Google لتأسيس كتيبة';
     }
@@ -124,6 +145,8 @@ class GuildService extends ChangeNotifier {
   }
 
   Future<String?> joinGuild(String guildId) async {
+    final accessErr = _guardGuildAccess();
+    if (accessErr != null) return accessErr;
     if (!isAuthenticated) {
       return 'يلزم تسجيل الدخول بحساب Google للانضمام للكتيبة';
     }
@@ -168,6 +191,7 @@ class GuildService extends ChangeNotifier {
   /// Safely adds earned quiz/match points to the player's Friday Grand Battle tally.
   Future<void> contributeScore(int points) async {
     if (points <= 0 || !isAuthenticated) return;
+    if (_guardGuildAccess() != null) return;
     try {
       if (rpcOverride != null) {
         await rpcOverride!('contribute_guild_score', {'p_points': points});
@@ -184,7 +208,10 @@ class GuildService extends ChangeNotifier {
   }
 
   String _friendlyRpcError(Object err, {required String fallback}) {
-    final s = err.toString();
+    final s = err is PostgrestException ? err.message : err.toString();
+    if (s.contains('حظر') || s.contains('منع') || s.contains('متوقف')) {
+      return s;
+    }
     if (s.contains('اكتمل')) return 'اكتمل عدد أعضاء الكتيبة (30 عضواً)';
     if (s.contains('أنت منضم') || s.contains('أنت عضو')) {
       return 'أنت عضو بالفعل في كتيبة؛ غادرها أولاً للانتقال';
