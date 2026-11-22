@@ -47,6 +47,24 @@
 | **🏆 14** | **المواسم الهجرية التنافسية وخوارزمية التصفير الناعم وقاعة الشرف التذكارية** | [`14_SEASONS_AND_HALL_OF_FAME.md`](./14_SEASONS_AND_HALL_OF_FAME.md) | Milestone 22 (`1.4.0`) | 🟠 استراتيجية |
 | **🎵 15** | **منظومة الهتافات الصوتية العربية الخالصة (بدون معازف) والنبض الحسي التكتيكي المزدوج** | [`15_VOCAL_ACOUSTICS_AND_HAPTICS.md`](./15_VOCAL_ACOUSTICS_AND_HAPTICS.md) | Milestone 23 (`1.5.0`) | 🟡 تحسينية |
 | **📖 16** | **خزانة السيرة التفاعلية وتوسعة محرك «المعلم الحكيم» لمراجعة الأخطاء الذاتية** | [`16_SPACED_REPETITION_AND_LORE_VAULT.md`](./16_SPACED_REPETITION_AND_LORE_VAULT.md) | Milestone 24 (`1.6.0`) | 🟢 تعليمية |
+| **🛡️ 17** | **موسوعة فلتر الأخلاق الديناميكي، تطوير الديوان (`v2`)، طلبات الصداقة، ودردشة الكتيبة والخاص** | [`17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md`](./17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md) | Milestone 25 (`022`) | 🔥 قصوى |
+| **⚔️ 18** | **حوكمة الكتائب المتقدمة، صلاحيات القائد والنائب، محرك الاستقطاب والدعوات، والبطولات الداخلية** | [`18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md`](./18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md) | Milestone 26 (`023`) | 🔴 عالية |
+| **💰 19** | **منظومة الدخل الحلال المستدام، اشتراكات «الفارس الملكي VIP»، زر الدعم، وتوافق Google Play** | [`19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md`](./19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md) | Milestone 27 (`024`) | 🔥 سيادية |
+| **📦 20** | **الأقسام والمستويات المرنة (`10–40+`)، الاستيراد الجماعي لـ `1,000+` سؤال (`Gzip CDN`)، وتوسعة Supabase** | [`20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md`](./20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md) | Milestone 28 (`025`) | 🔥 سيادية |
+
+---
+
+## ⚠️ سجل الأخطاء والملاحظات الهندسية الحرجة وضوابط الإطلاق (Critical Audit Notes)
+
+1. **خلل الحجب الخاطئ في فلتر الأخلاق (`018_diwan_live_chat.sql` — سطر `101–120`):** وجود جذر قصير من حرفين داخل البحث المدمج بلا مسافات قد يسبب حجباً خاطئاً (`False Positive`) لكلمات عربية بريئة مثل *«اكسب»* و*«مكسرات»* — تم توثيق حله الجذري في **الخطة 17** (جدول ديناميكي + `exact_word` + `Whitelist`).
+2. **ضوابط Google Play Console والإطلاق الرسمي (`Production Access`):**
+   - عدم رفع حزم اختبار جديدة على مسار الاختبار المغلق أثناء مراجعة طلب الإنتاج (`1–7` أيام)، والاحتفاظ بحزمة `1.1.0+21` جاهزة للرفع فور الموافقة.
+   - إكمال إقرار **`Declare your trader status`** في الشريط العلوي بـ Play Console، والتسجيل في **`15% Service Fee Tier`**.
+   - **ممنوع وضع أرقام حسابات بنكية أو محافظ محلية (مثل الكريمي/جيب) داخل نسخة متجر Google Play حتى كنص بدون رابط**؛ يُعتمد `Google Play Billing` + أكواد القسائم (`Redeem Codes`) داخل التطبيق (تفاصيل كاملة في **الخطة 19**).
+   - عزل أي تطوير جديد قبل الإطلاق على فرع Git مستقل مع التزام تام بترحيلات إضافية (`Additive-Only`) لحماية النسخة الحية.
+3. **مرجع اتصالات وأمان Supabase (`khatzzpqxaiwuoodgcst`):**
+   - التطبيق و`admin_web/` يستخدمان `Project URL` + `anon key` فقط؛ و**يُمنع منعاً باتاً** وضع `DIRECT_URL (:5432)` أو `DATABASE_URL (:6543)` داخل كود العميل (تُحفظ `DIRECT_URL` في `.env` المحلي فقط للهجرات).
+   - مؤشر `6/60 conns` يعني اتصالات PostgreSQL المفتوحة في نفس الملي ثانية (وليس عدد اللاعبين)، وعند تجاوز `45/60` أو `150/200` Realtime تتم الترقية إلى `Pro` دون تعديل سطر كود واحد (تفاصيل كاملة في **الخطة 20**).
 
 ---
 
