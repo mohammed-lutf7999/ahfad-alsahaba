@@ -1,6 +1,6 @@
 # 🗺️ الدليل الشامل وخرائط الطريق التطويرية — مشروع «معركة أحفاد الصحابة»
 > **المسار الأساسي:** `docs/development_plans/`  
-> **تاريخ التحديث:** 21 نوفمبر 2026  
+> **تاريخ التحديث:** 22 نوفمبر 2026  
 > **الإصدار الحالي المستقر:** `1.1.0+21`  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
 > **معيار الجودة والهندسة:** معايير التطوير العالمية لبيئات الإنتاج (Clean Architecture + Zero-Lag Realtime + RLS Enterprise Security).
@@ -51,6 +51,7 @@
 | **⚔️ 18** | **حوكمة الكتائب المتقدمة، صلاحيات القائد والنائب، محرك الاستقطاب والدعوات، والبطولات الداخلية** | [`18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md`](./18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md) | Milestone 26 (`023`) | 🔴 عالية |
 | **💰 19** | **منظومة الدخل الحلال المستدام، اشتراكات «الفارس الملكي VIP»، زر الدعم، وتوافق Google Play** | [`19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md`](./19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md) | Milestone 27 (`024`) | 🔥 سيادية |
 | **📦 20** | **الأقسام والمستويات المرنة (`10–40+`)، الاستيراد الجماعي لـ `1,000+` سؤال (`Gzip CDN`)، وتوسعة Supabase** | [`20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md`](./20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md) | Milestone 28 (`025`) | 🔥 سيادية |
+| **🏗️ 21** | **المخطط الهندسي الشامل لإعادة الهيكلة والكود النظيف (4 موجات بصفر كسر: Flutter + `admin_web` + Supabase)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | Waves 1–4 *(Zero-Regression)* | 🔥 تأسيسية قصوى |
 
 ---
 
