@@ -1,14 +1,10 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import '../models/cms_models.dart';
 import '../models/question_model.dart';
 import 'cms_cache_service.dart';
-
-Map<String, dynamic> _decodeQuestionJson(String jsonString) {
-  return jsonDecode(jsonString) as Map<String, dynamic>;
-}
+import 'question/question_asset_loader.dart';
+import 'question/question_cms_merger.dart';
 
 /// Service for loading questions from local JSON assets merged with dynamic
 /// solo Quiz additions/edits/visibility rules cached in [CmsCacheService].
@@ -22,126 +18,33 @@ class QuestionService {
     CmsCacheService.instance.registerOnBundleApplied(() => clearCache());
   }
 
-  /// Raw decoded asset data per built-in category (immutable once loaded).
-  final Map<String, Map<String, dynamic>?> _baseAssetCache = {};
-
-  /// Coalesces concurrent asset loads per category.
-  final Map<String, Future<void>> _inFlightLoads = {};
-
+  final QuestionAssetLoader _assetLoader = QuestionAssetLoader();
   final Random _random = Random();
 
-  Future<void> _ensureBaseCategoryLoaded(String categoryId) async {
-    if (_baseAssetCache.containsKey(categoryId)) return;
+  Future<void> _ensureBaseCategoryLoaded(String categoryId) =>
+      _assetLoader.ensureLoaded(categoryId);
 
-    final existingFuture = _inFlightLoads[categoryId];
-    if (existingFuture != null) {
-      await existingFuture;
-      return;
-    }
-
-    final loadFuture = () async {
-      try {
-        final jsonString = await rootBundle.loadString(
-          'assets/questions/$categoryId.json',
-        );
-        _baseAssetCache[categoryId] =
-            await compute(_decodeQuestionJson, jsonString);
-      } catch (_) {
-        // Cloud-only categories have no bundled asset file; record null cleanly
-        // so level lookups proceed smoothly from CmsCacheService.
-        _baseAssetCache[categoryId] = null;
-      }
-    }();
-
-    _inFlightLoads[categoryId] = loadFuture;
-    try {
-      await loadFuture;
-    } finally {
-      _inFlightLoads.remove(categoryId);
-    }
-  }
-
-  Question _withOptionRandom(Question question, Random? optionRandom) {
-    final originalOptions = question.options;
-    final originalCorrectIndex = question.correctAnswerIndex;
-    if (optionRandom == null || originalOptions.isEmpty) {
-      return Question(
-        id: question.id,
-        categoryId: question.categoryId,
-        levelNumber: question.levelNumber,
-        questionText: question.questionText,
-        options: List<String>.from(originalOptions),
-        correctAnswerIndex: originalCorrectIndex.clamp(
-          0,
-          originalOptions.isEmpty ? 0 : originalOptions.length - 1,
-        ),
-        explanation: question.explanation,
-        syncScope: question.syncScope,
-        isVisible: question.isVisible,
-      );
-    }
-
-    final safeCorrect =
-        originalCorrectIndex.clamp(0, originalOptions.length - 1);
-    final correctAnswer = originalOptions[safeCorrect];
-    final indices = List<int>.generate(originalOptions.length, (i) => i);
-    indices.shuffle(optionRandom);
-
-    final shuffledOptions = indices.map((i) => originalOptions[i]).toList();
-    final newCorrectIndex = shuffledOptions.indexOf(correctAnswer);
-
-    return Question(
-      id: question.id,
-      categoryId: question.categoryId,
-      levelNumber: question.levelNumber,
-      questionText: question.questionText,
-      options: shuffledOptions,
-      correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
-      explanation: question.explanation,
-      syncScope: question.syncScope,
-      isVisible: question.isVisible,
-    );
-  }
+  Question _withOptionRandom(Question question, Random? optionRandom) =>
+      QuestionCmsMerger.withOptionRandom(question, optionRandom);
 
   Question _mapQuestionEntry(
     Map<String, dynamic> q, {
     required String categoryId,
     required int levelNumber,
     Random? optionRandom,
-  }) {
-    final originalOptions = List<String>.from(q['options'] ?? []);
-    final originalCorrectIndex = (q['correct'] as num?)?.toInt() ?? 0;
-    final baseQuestion = Question(
-      id: (q['id'] ?? '').toString(),
-      categoryId: categoryId,
-      levelNumber: levelNumber,
-      questionText: (q['question'] ?? '').toString(),
-      options: originalOptions,
-      correctAnswerIndex: originalCorrectIndex,
-      explanation: q['explanation']?.toString(),
-      syncScope: 'all_with_fallback',
-      isVisible: true,
-    );
-    return _withOptionRandom(baseQuestion, optionRandom);
-  }
+  }) =>
+      QuestionCmsMerger.mapQuestionEntry(
+        q,
+        categoryId: categoryId,
+        levelNumber: levelNumber,
+        optionRandom: optionRandom,
+      );
 
   Question _mapDynamicQuestion(
     DynamicQuizQuestionData q, {
     Random? optionRandom,
-  }) {
-    final base = Question(
-      id: q.id,
-      categoryId: q.categoryId,
-      levelNumber: q.levelNumber,
-      questionText: q.questionText,
-      options: List<String>.from(q.options),
-      correctAnswerIndex: q.correctIndex,
-      explanation: q.explanation,
-      syncScope: q.syncScope,
-      isVisible: q.isVisible,
-    );
-    return _withOptionRandom(base, optionRandom);
-  }
+  }) =>
+      QuestionCmsMerger.mapDynamicQuestion(q, optionRandom: optionRandom);
 
   /// Loads a single deterministic question by `category:level:index` specification
   /// WITHOUT shifting base list ordering, guaranteeing Device A, Device B, and
@@ -154,7 +57,7 @@ class QuestionService {
     int slotOffset = 0,
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
-    final data = _baseAssetCache[categoryId];
+    final data = _assetLoader.getCached(categoryId);
     if (data == null) return null;
 
     final levels = data['levels'] as Map<String, dynamic>?;
@@ -249,7 +152,7 @@ class QuestionService {
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
     final specs = <String>[];
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
 
     final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
@@ -303,7 +206,7 @@ class QuestionService {
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
 
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final levelKey = levelNumber.toString();
     final rawBaseList = levels?[levelKey] as List?;
@@ -378,7 +281,7 @@ class QuestionService {
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
 
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final effectiveOptionRng = shuffleOptions ? (optionRandom ?? _random) : null;
 
@@ -458,22 +361,16 @@ class QuestionService {
             q.options.length == 4);
     if (hasCloudForLevel) return true;
 
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final list = levels?[levelNumber.toString()] as List?;
     return list != null && list.isNotEmpty;
   }
 
   /// Clears cached JSON asset data (only needed explicitly in memory cleanup/tests).
-  void clearCache([String? categoryId]) {
-    if (categoryId != null) {
-      _baseAssetCache.remove(categoryId);
-    } else {
-      _baseAssetCache.clear();
-    }
-  }
+  void clearCache([String? categoryId]) => _assetLoader.clear(categoryId);
 
-  bool isCached(String categoryId) => _baseAssetCache.containsKey(categoryId);
+  bool isCached(String categoryId) => _assetLoader.isCached(categoryId);
 
   Future<void> preloadCategory(String categoryId) async {
     await _ensureBaseCategoryLoaded(categoryId);

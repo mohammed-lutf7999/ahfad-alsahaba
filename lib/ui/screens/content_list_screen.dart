@@ -40,7 +40,7 @@ class ContentListScreen extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -67,9 +67,9 @@ class ContentListScreen extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
-                             BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))
+                             BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2))
                           ],
-                          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
+                          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.1)),
                         ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -85,7 +85,7 @@ class ContentListScreen extends StatelessWidget {
                           trailing: Container(
                              padding: const EdgeInsets.all(8),
                              decoration: BoxDecoration(
-                               color: AppTheme.accentColor.withOpacity(0.1),
+                               color: AppTheme.accentColor.withValues(alpha: 0.1),
                                shape: BoxShape.circle,
                              ),
                              child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.accentColor),

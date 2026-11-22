@@ -13,6 +13,7 @@ import '../local/shared_prefs_service.dart';
 import '../models/app_control_models.dart';
 import '../models/player_profile_model.dart';
 import 'cms_cache_service.dart';
+import 'control/app_control_snapshot_differ.dart';
 import 'profile_service.dart';
 
 enum AppUpdateOutcome {
@@ -563,39 +564,13 @@ class AppControlService extends ChangeNotifier {
     return SharedPrefsService.getDevicePlayerCode();
   }
 
-  AppControlSnapshot _sanitizeSnapshotForNow(AppControlSnapshot raw) {
-    final nowUtc = _nowUtc();
-    final seenIds = SharedPrefsService.getSeenAnnouncementIds();
-    final buildCode = effectiveBuildNumber;
-    final filteredAnnouncements = raw.announcements
-        .where(
-          (a) =>
-              a.id.isNotEmpty &&
-              a.isActive &&
-              !a.isExpiredAt(nowUtc) &&
-              !seenIds.contains(a.id) &&
-              a.matchesVersion(buildCode),
-        )
-        .toList();
-
-    final event = raw.activeEvent;
-    final eventNotExpired = event != null &&
-        event.isActive &&
-        (event.endsAt == null || nowUtc.isBefore(event.endsAt!.toUtc()));
-
-    return AppControlSnapshot(
-      configVersion: raw.configVersion,
-      cmsVersion: raw.cmsVersion,
-      isAdmin: raw.isAdmin,
-      playerPermissions: raw.playerPermissions,
-      releaseConfig: raw.releaseConfig,
-      // Keep scheduled upcoming events cached on device so they illuminate on
-      // activeEventNotifier at the exact startsAt moment with zero extra DB hits.
-      activeEvent: eventNotExpired ? event : null,
-      announcements: filteredAnnouncements,
-      syncedAt: raw.syncedAt,
-    );
-  }
+  AppControlSnapshot _sanitizeSnapshotForNow(AppControlSnapshot raw) =>
+      AppControlSnapshotDiffer.sanitizeForNow(
+        raw: raw,
+        nowUtc: _nowUtc(),
+        seenAnnouncementIds: SharedPrefsService.getSeenAnnouncementIds(),
+        buildCode: effectiveBuildNumber,
+      );
 
   /// Dynamic Live Arena hosting truth-table evaluator (Plan 11 Section 2.b).
   bool canHostLiveArena({bool? isAdminOverride}) {
@@ -725,59 +700,14 @@ class AppControlService extends ChangeNotifier {
     }
   }
 
-  bool _sameReleaseConfig(AppReleaseConfig a, AppReleaseConfig b) {
-    return a.platform == b.platform &&
-        a.minVersionCode == b.minVersionCode &&
-        a.latestVersionCode == b.latestVersionCode &&
-        a.latestVersionName == b.latestVersionName &&
-        a.updateTitle == b.updateTitle &&
-        a.updateMessage == b.updateMessage &&
-        a.updateUrl == b.updateUrl &&
-        a.maintenanceMode == b.maintenanceMode &&
-        a.maintenanceTitle == b.maintenanceTitle &&
-        a.maintenanceMessage == b.maintenanceMessage &&
-        a.configVersion == b.configVersion &&
-        a.cmsVersion == b.cmsVersion &&
-        a.updatedAt == b.updatedAt &&
-        _sameBoolMaps(a.featureFlags.toJson(), b.featureFlags.toJson());
-  }
+  bool _sameReleaseConfig(AppReleaseConfig a, AppReleaseConfig b) =>
+      AppControlSnapshotDiffer.sameReleaseConfig(a, b);
 
-  bool _sameBoolMaps(Map<String, dynamic> a, Map<String, dynamic> b) {
-    if (a.length != b.length) return false;
-    for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
-    }
-    return true;
-  }
+  bool _sameAnnouncements(List<AppAnnouncement> a, List<AppAnnouncement> b) =>
+      AppControlSnapshotDiffer.sameAnnouncements(a, b);
 
-  bool _sameAnnouncements(List<AppAnnouncement> a, List<AppAnnouncement> b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id ||
-          a[i].title != b[i].title ||
-          a[i].body != b[i].body ||
-          a[i].messageType != b[i].messageType ||
-          a[i].isDismissible != b[i].isDismissible) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _samePlayerPermissions(PlayerPermissions a, PlayerPermissions b) {
-    return a.isBanned == b.isBanned &&
-        a.bannedUntil == b.bannedUntil &&
-        a.banReason == b.banReason &&
-        a.isDiwanMuted == b.isDiwanMuted &&
-        a.diwanMutedUntil == b.diwanMutedUntil &&
-        a.diwanMuteReason == b.diwanMuteReason &&
-        a.canUseOnline == b.canUseOnline &&
-        a.canUseDiwan == b.canUseDiwan &&
-        a.canUseGuilds == b.canUseGuilds &&
-        a.canHostLiveArenas == b.canHostLiveArenas &&
-        a.effectiveCanHostLiveArenas == b.effectiveCanHostLiveArenas &&
-        a.notes == b.notes;
-  }
+  bool _samePlayerPermissions(PlayerPermissions a, PlayerPermissions b) =>
+      AppControlSnapshotDiffer.samePlayerPermissions(a, b);
 }
 
   

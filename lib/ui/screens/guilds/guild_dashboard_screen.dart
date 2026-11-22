@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/cms_icon_registry.dart';
 import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/guild_model.dart';
@@ -52,10 +53,7 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
     super.dispose();
   }
 
-  IconData _iconFor(int idx) {
-    const icons = CreateGuildDialogStateIcons.all;
-    return icons[idx.clamp(0, icons.length - 1)];
-  }
+  IconData _iconFor(int idx) => CmsIconRegistry.guildBannerIconFor(idx);
 
   Future<void> _openCreateDialog() async {
     SoundService().playClick();
@@ -788,12 +786,5 @@ class _GuildDashboardScreenState extends State<GuildDashboardScreen>
 
 class CreateGuildDialogStateIcons {
   CreateGuildDialogStateIcons._();
-  static const List<IconData> all = [
-    Icons.shield_rounded,
-    Icons.mosque_rounded,
-    Icons.military_tech_rounded,
-    Icons.auto_awesome_rounded,
-    Icons.flag_rounded,
-    Icons.star_rounded,
-  ];
+  static const List<IconData> all = CmsIconRegistry.guildBannerIcons;
 }

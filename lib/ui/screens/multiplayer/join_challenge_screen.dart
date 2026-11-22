@@ -71,10 +71,10 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
   Widget build(BuildContext context) {
     final discoveredChallenges = nearby.NearbyService.instance.discoveredChallenges;
     
-    return WillPopScope(
-      onWillPop: () async {
-        await nearby.NearbyService.instance.stopAll();
-        return true;
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        nearby.NearbyService.instance.stopAll();
       },
       child: Scaffold(
         body: Container(
@@ -143,6 +143,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
             onTap: () async {
               SoundService().playClick();
               await nearby.NearbyService.instance.stopAll();
+              if (!mounted) return;
               Navigator.pop(context);
             },
             child: Container(
@@ -181,7 +182,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppTheme.accentColor.withOpacity(1 - progress),
+                          color: AppTheme.accentColor.withValues(alpha: 1 - progress),
                           width: 2,
                         ),
                       ),
@@ -192,7 +193,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.accentColor.withOpacity(0.2),
+                      color: AppTheme.accentColor.withValues(alpha: 0.2),
                     ),
                     child: const Icon(
                       Icons.search_rounded,
@@ -208,7 +209,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
           Text(
             _isSearching ? 'جاري البحث...' : 'ابحث عن تحديات قريبة',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 14,
             ),
           ),
@@ -225,14 +226,14 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
           Icon(
             Icons.wifi_tethering_off_rounded,
             size: 60,
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.white.withValues(alpha: 0.2),
           ),
           const SizedBox(height: 16),
           Text(
             'لا توجد تحديات قريبة',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 8),
@@ -240,7 +241,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
             'تأكد من تفعيل البلوتوث والموقع',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
             ),
           ),
         ],
@@ -269,12 +270,12 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppTheme.accentColor.withOpacity(0.15),
-                AppTheme.accentColor.withOpacity(0.05),
+                AppTheme.accentColor.withValues(alpha: 0.15),
+                AppTheme.accentColor.withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
@@ -284,7 +285,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
                 height: 50,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.accentColor.withOpacity(0.2),
+                  color: AppTheme.accentColor.withValues(alpha: 0.2),
                 ),
                 child: const Center(
                   child: Text('👤', style: TextStyle(fontSize: 24)),
@@ -312,14 +313,14 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
                         Icon(
                           Icons.wifi_rounded,
                           size: 14,
-                          color: Colors.green.withOpacity(0.8),
+                          color: Colors.green.withValues(alpha: 0.8),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           'متاح للانضمام',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                           ),
                         ),
                       ],
@@ -369,22 +370,22 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.refresh_rounded,
-                color: Colors.white.withOpacity(_isSearching ? 0.3 : 0.7),
+                color: Colors.white.withValues(alpha: _isSearching ? 0.3 : 0.7),
               ),
               const SizedBox(width: 8),
               Text(
                 'إعادة البحث',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(_isSearching ? 0.3 : 0.7),
+                  color: Colors.white.withValues(alpha: _isSearching ? 0.3 : 0.7),
                 ),
               ),
             ],

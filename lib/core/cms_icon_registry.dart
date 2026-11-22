@@ -59,6 +59,21 @@ class CmsIconRegistry {
     'stars': Icons.stars_rounded,
   };
 
+  /// Canonical banner icons shared across Guild creation and display screens.
+  static const List<IconData> guildBannerIcons = [
+    Icons.shield_rounded,
+    Icons.mosque_rounded,
+    Icons.military_tech_rounded,
+    Icons.auto_awesome_rounded,
+    Icons.flag_rounded,
+    Icons.star_rounded,
+  ];
+
+  /// Resolves a guild banner icon safely by index.
+  static IconData guildBannerIconFor(int index) {
+    return guildBannerIcons[index.clamp(0, guildBannerIcons.length - 1)];
+  }
+
   /// Resolves an [IconData] from an icon key name with [fallback].
   static IconData resolveIcon(
     String? iconName, {

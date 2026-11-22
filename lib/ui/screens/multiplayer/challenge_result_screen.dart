@@ -63,10 +63,11 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
     final isWinner = localPlayer?.id == result.winnerId;
     final otherPlayers = rankedPlayers.where((p) => p.id != winner.id).toList();
     
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
         await _exitToHome();
-        return false;
       },
       child: Scaffold(
         body: Container(
@@ -114,7 +115,7 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
                           Text(
                             '${otherPlayers.length} لاعبين',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -178,7 +179,7 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
           isWinner ? 'لقد تفوقت على الجميع بجدارة' : 'حظاً أوفر في المرة القادمة',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -200,7 +201,7 @@ class _ChallengeResultScreenState extends State<ChallengeResultScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.accentColor.withOpacity(0.4),
+                color: AppTheme.accentColor.withValues(alpha: 0.4),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),

@@ -212,10 +212,10 @@ class _LibrarySectionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.accentColor.withOpacity(0.1),
+              color: AppTheme.accentColor.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),

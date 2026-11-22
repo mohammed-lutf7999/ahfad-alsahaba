@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_routes.dart';
 import '../../data/local/shared_prefs_service.dart';
@@ -95,7 +94,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       'تخطي',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 16,
                         fontFamily: 'Cairo',
                       ),
@@ -138,7 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           decoration: BoxDecoration(
                             color: _currentPage == index
                                 ? AppTheme.accentColor
-                                : Colors.white.withOpacity(0.2),
+                                : Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         );
@@ -157,7 +156,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           foregroundColor: AppTheme.primaryDark,
                           elevation: 10,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          shadowColor: AppTheme.accentColor.withOpacity(0.5),
+                          shadowColor: AppTheme.accentColor.withValues(alpha: 0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -230,7 +229,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       height: 1.5,
                       fontFamily: 'Cairo', // Clean readable font for body
                     ),
@@ -259,7 +258,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  AppTheme.accentColor.withOpacity(0.2),
+                  AppTheme.accentColor.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
                 radius: 0.8,
@@ -270,14 +269,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.all(30),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   border: Border.all(
-                    color: AppTheme.accentColor.withOpacity(0.3),
+                    color: AppTheme.accentColor.withValues(alpha: 0.3),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.accentColor.withOpacity(0.2 * value),
+                      color: AppTheme.accentColor.withValues(alpha: 0.2 * value),
                       blurRadius: 30,
                       spreadRadius: 5,
                     )
