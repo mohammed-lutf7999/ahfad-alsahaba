@@ -5,7 +5,7 @@
 > **كبير المهندسين والمسؤول:** م. محمد لطف  
 > **ملف المتجر الجاهز للرفع (AAB):** `build/app/outputs/bundle/release/app-release.aab` (`1.2.1+23` — `47.8 MB` / `50,161,582` بايت)  
 > **ملف التجربة المباشر (APK arm64):** `build/app/outputs/flutter-apk/app-release.apk` (`1.2.1+23` — `23.2 MB` / `24,321,146` بايت)  
-> **لوحة الويب المستقلة:** `admin_web/` (جاهزة محلياً عبر `python admin_web/serve.py` مع `Cache-Control: no-cache, no-store, must-revalidate` ووحدة `bulk_questions_importer.js` المستقلة)  
+> **لوحة الويب المستقلة:** `admin_web/` — منشورة حياً على Vercel (`https://ahfad-alsahaba-adminweb.vercel.app`) ومحصّنة بـ `vercel.json` و`robots.txt` (`noindex` + `no-cache`)، وجاهزة محلياً عبر `python admin_web/serve.py`  
 > **التقرير الهندسي المعتمد (PDF):** `PROJECT_STATUS_REPORT.pdf` و `التقرير_الهندسي_الشامل_لمعركة_أحفاد_الصحابة.pdf` (`761 KB` — في جذر المشروع)
 
 ---
