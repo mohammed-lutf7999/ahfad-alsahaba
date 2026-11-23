@@ -451,7 +451,9 @@ void main() {
 
       // Save permissions
       final saveBtn = find.byKey(const Key('btn_save_player_permissions'));
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(saveBtn);
       await tester.pumpAndSettle();
       await tester.tap(saveBtn);
       await tester.pumpAndSettle();

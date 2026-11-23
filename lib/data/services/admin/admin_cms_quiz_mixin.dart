@@ -1,10 +1,35 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/cms_models.dart';
 import 'admin_service_base.dart';
+import 'bulk_question_json_validator.dart';
 
-/// Admin CMS domain mixin for Quiz categories and dynamic question management.
+/// Result of publishing a compressed Gzip CDN question pack from mobile admin.
+class AdminGzipPackPublishResult {
+  final String categoryId;
+  final String storagePath;
+  final int packVersion;
+  final int questionsCount;
+  final int rawBytesLength;
+  final int gzipBytesLength;
+
+  const AdminGzipPackPublishResult({
+    required this.categoryId,
+    required this.storagePath,
+    required this.packVersion,
+    required this.questionsCount,
+    required this.rawBytesLength,
+    required this.gzipBytesLength,
+  });
+}
+
+/// Admin CMS domain mixin for Quiz categories, dynamic questions, bulk JSON
+/// import, flexible level config, and Gzip CDN pack publishing.
 mixin AdminCmsQuizMixin on AdminServiceBase {
+  static const int bulkUpsertChunkSize = 200;
+  static const String questionPacksBucket = 'question-packs';
+
   @visibleForTesting
   Future<({List<DynamicQuizCategoryData> categories, List<DynamicQuizQuestionData> questions})>
       Function({String? categoryId, int? levelNumber, int limit})?
@@ -18,11 +43,26 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
   Future<DynamicQuizQuestionData?> Function(Map<String, dynamic> params)?
       quizQuestionUpserterOverride;
 
+  @visibleForTesting
+  Future<DynamicQuizCategoryData?> Function(Map<String, dynamic> params)?
+      quizCategoryConfigUpdaterOverride;
+
+  @visibleForTesting
+  Future<int> Function(String categoryId, List<Map<String, dynamic>> chunk)?
+      bulkQuizQuestionsUpserterOverride;
+
+  @visibleForTesting
+  Future<AdminGzipPackPublishResult?> Function(String categoryId)?
+      gzipPackPublisherOverride;
+
   @protected
   void resetCmsQuizForTesting() {
     quizContentFetcherOverride = null;
     quizCategoryUpserterOverride = null;
     quizQuestionUpserterOverride = null;
+    quizCategoryConfigUpdaterOverride = null;
+    bulkQuizQuestionsUpserterOverride = null;
+    gzipPackPublisherOverride = null;
   }
 
   Future<
@@ -162,5 +202,161 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
       return q;
     }
     return null;
+  }
+
+  /// Updates flexible level count, questions-per-level, and draw mode
+  /// (`fixed` or `rotating_pool`) via migration 023 RPC.
+  Future<DynamicQuizCategoryData?> updateQuizCategoryConfig({
+    required String categoryId,
+    int? totalLevels,
+    int? questionsPerLevel,
+    String? levelDrawMode,
+  }) async {
+    final cleanCat = categoryId.trim().toLowerCase();
+    final cleanMode = levelDrawMode?.trim();
+    if (cleanMode != null &&
+        cleanMode.isNotEmpty &&
+        cleanMode != 'fixed' &&
+        cleanMode != 'rotating_pool') {
+      throw ArgumentError('نمط السحب يجب أن يكون fixed أو rotating_pool');
+    }
+
+    final params = <String, dynamic>{
+      'p_category_id': cleanCat,
+      'p_total_levels': totalLevels?.clamp(1, 100),
+      'p_questions_per_level': questionsPerLevel?.clamp(1, 100),
+      'p_level_draw_mode': cleanMode,
+    };
+    if (quizCategoryConfigUpdaterOverride != null) {
+      return quizCategoryConfigUpdaterOverride!(params);
+    }
+    final client = supabaseClient;
+    if (client == null) return null;
+    final res = await client
+        .rpc('admin_update_quiz_category_config', params: params)
+        .timeout(const Duration(seconds: 8));
+    if (res is Map) {
+      final updated =
+          DynamicQuizCategoryData.fromJson(Map<String, dynamic>.from(res));
+      syncAndBroadcastAll();
+      return updated;
+    }
+    return null;
+  }
+
+  /// Atomically upserts [questions] in chunks of 200 via
+  /// `admin_bulk_upsert_quiz_questions` without overwriting existing category
+  /// draw-mode config (server auto-expands `total_levels` via `GREATEST`).
+  Future<int> bulkUpsertQuizQuestions({
+    required String categoryId,
+    required List<Map<String, dynamic>> questions,
+    void Function(int uploaded, int total)? onProgress,
+  }) async {
+    final cleanCat = categoryId.trim().toLowerCase();
+    if (questions.isEmpty) return 0;
+
+    final total = questions.length;
+    var uploaded = 0;
+
+    for (var i = 0; i < total; i += bulkUpsertChunkSize) {
+      final end = (i + bulkUpsertChunkSize).clamp(0, total);
+      final chunk = questions.sublist(i, end);
+
+      if (bulkQuizQuestionsUpserterOverride != null) {
+        uploaded += await bulkQuizQuestionsUpserterOverride!(cleanCat, chunk);
+      } else {
+        final client = supabaseClient;
+        if (client == null) {
+          throw StateError('عميل Supabase غير متصل');
+        }
+        await client.rpc(
+          'admin_bulk_upsert_quiz_questions',
+          params: {
+            'p_category_id': cleanCat,
+            'p_questions': chunk,
+          },
+        ).timeout(const Duration(seconds: 15));
+        uploaded += chunk.length;
+      }
+      onProgress?.call(uploaded, total);
+    }
+
+    if (bulkQuizQuestionsUpserterOverride == null) {
+      syncAndBroadcastAll();
+    }
+    return uploaded;
+  }
+
+  /// Exports all visible cloud questions for [categoryId], compresses them via
+  /// native `dart:io` `gzip.encode` inside an Isolate (`compute`), uploads to
+  /// `question-packs` as `application/octet-stream` (NO `Content-Encoding: gzip`
+  /// to prevent Double-Gzip), and calls `admin_publish_category_pack`.
+  Future<AdminGzipPackPublishResult?> exportAndPublishGzipPack({
+    required String categoryId,
+    void Function(String stage)? onStage,
+  }) async {
+    final cleanCat = categoryId.trim().toLowerCase();
+    if (gzipPackPublisherOverride != null) {
+      return gzipPackPublisherOverride!(cleanCat);
+    }
+    final client = supabaseClient;
+    if (client == null) return null;
+
+    onStage?.call('جارٍ تصدير أسئلة القسم ($cleanCat) من القاعدة...');
+    final rawPayload = await client
+        .rpc(
+          'admin_export_category_pack_payload',
+          params: {'p_category_id': cleanCat},
+        )
+        .timeout(const Duration(seconds: 15));
+    if (rawPayload is! Map) {
+      throw StateError('استجابة تصدير غير صالحة من السيرفر.');
+    }
+    final payload = Map<String, dynamic>.from(rawPayload);
+    final qCount = (payload['questionsCount'] as num?)?.toInt() ?? 0;
+    if (qCount <= 0) {
+      throw StateError(
+        'لا توجد أسئلة سحابية مرئية في هذا القسم لتصديرها كحزمة.',
+      );
+    }
+
+    onStage?.call('جارٍ ضغط $qCount سؤالاً عبر Gzip Isolate...');
+    final compressed = await compute(encodeJsonToGzipBytes, payload);
+    final packVer = (payload['packVersion'] as num?)?.toInt() ?? 1;
+    final storagePath = '${cleanCat}_v$packVer.json.gz';
+
+    onStage?.call(
+      'جارٍ رفع الحزمة $storagePath (${(compressed.gzBytes.length / 1024).toStringAsFixed(1)} KB)...',
+    );
+    await client.storage.from(questionPacksBucket).uploadBinary(
+          storagePath,
+          compressed.gzBytes,
+          fileOptions: const FileOptions(
+            contentType: 'application/octet-stream',
+            cacheControl: '31536000',
+            upsert: true,
+          ),
+        );
+
+    onStage?.call('جارٍ اعتماد رقم الحزمة وبث التحديث للاعبين...');
+    await client.rpc(
+      'admin_publish_category_pack',
+      params: {
+        'p_category_id': cleanCat,
+        'p_pack_storage_path': storagePath,
+        'p_questions_count': qCount,
+      },
+    ).timeout(const Duration(seconds: 10));
+
+    syncAndBroadcastAll();
+
+    return AdminGzipPackPublishResult(
+      categoryId: cleanCat,
+      storagePath: storagePath,
+      packVersion: packVer,
+      questionsCount: qCount,
+      rawBytesLength: compressed.rawBytes.length,
+      gzipBytesLength: compressed.gzBytes.length,
+    );
   }
 }
