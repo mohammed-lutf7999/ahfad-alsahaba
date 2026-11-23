@@ -257,7 +257,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
@@ -417,7 +417,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
@@ -497,7 +497,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.admin_export_category_pack_payload(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_export_category_pack_payload(TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_export_category_pack_payload(TEXT) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
@@ -566,5 +566,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) TO authenticated, service_role;

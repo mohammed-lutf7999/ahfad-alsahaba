@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -19,6 +20,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 Map<String, dynamic> _buildSyntheticPack({
   required String categoryId,
@@ -530,6 +532,179 @@ void main() {
         ...round2.map((q) => q.id),
       };
       expect(unionIds.length, equals(15));
+    });
+
+    test('CmsCacheService cache_schema_version=2 forces one-time upgrade sync, prunes packed quizQuestions & restricts v1 fallback to PGRST202/42883', () async {
+      // 1. Seed a legacy 1.1.0+21 cache (no `cache_schema_version` -> defaults to 1)
+      //    with cms_version = 10 and a raw question belonging to a category that will become packed.
+      await SharedPrefsService.setCachedCmsVersion(10);
+      await SharedPrefsService.setCachedCmsBundleJson(
+        jsonEncode({
+          'cms_version': 10,
+          'store_items': [],
+          'library_sections': [],
+          'library_items': [],
+          'quiz_categories': [
+            {'id': 'seerah', 'name': 'السيرة النبوية', 'total_levels': 10},
+            {'id': 'fiqh', 'name': 'الفقه', 'total_levels': 10},
+          ],
+          'quiz_questions': [
+            {
+              'id': 'raw_seerah_1',
+              'category_id': 'seerah',
+              'level_number': 1,
+              'question_text': 'سؤال خام قديم للسيرة؟',
+              'options': ['أ', 'ب', 'ج', 'د'],
+              'correct_index': 1,
+            },
+            {
+              'id': 'raw_fiqh_1',
+              'category_id': 'fiqh',
+              'level_number': 1,
+              'question_text': 'سؤال خام للفقه بدون حزمة؟',
+              'options': ['أ', 'ب', 'ج', 'د'],
+              'correct_index': 2,
+            },
+          ],
+        }),
+      );
+
+      await CmsCacheService.instance.initFromCache();
+      expect(CmsCacheService.instance.snapshot.cacheSchemaVersion, equals(1));
+      expect(CmsCacheService.instance.snapshot.cmsVersion, equals(10));
+
+      int? requestedClientVer;
+      var syncCalls = 0;
+      CmsCacheService.instance.bundleFetcherOverride = ({
+        required int clientCmsVersion,
+        required List<String> ownedItemIds,
+      }) async {
+        syncCalls++;
+        requestedClientVer = clientCmsVersion;
+        return {
+          'changed': true,
+          'incremental': false,
+          'cms_version': 10,
+          'store_items': [],
+          'library_sections': [],
+          'library_items': [],
+          'quiz_categories': [
+            {
+              'id': 'seerah',
+              'name': 'السيرة النبوية',
+              'total_levels': 20,
+              'questions_per_level': 15,
+              'level_draw_mode': 'rotating_pool',
+              'pack_version': 1,
+              'pack_storage_path': 'seerah_v1.json.gz',
+            },
+            {
+              'id': 'fiqh',
+              'name': 'الفقه',
+              'total_levels': 10,
+              'pack_version': 0,
+              'pack_storage_path': '',
+            },
+          ],
+          // Even if a fallback payload still included a raw question for packed `seerah`,
+          // mergeBundle MUST prune it while keeping unpacked `fiqh`!
+          'quiz_questions': [
+            {
+              'id': 'raw_seerah_1',
+              'category_id': 'seerah',
+              'level_number': 1,
+              'question_text': 'سؤال خام قديم للسيرة؟',
+              'options': ['أ', 'ب', 'ج', 'د'],
+              'correct_index': 1,
+            },
+            {
+              'id': 'raw_fiqh_1',
+              'category_id': 'fiqh',
+              'level_number': 1,
+              'question_text': 'سؤال خام للفقه بدون حزمة؟',
+              'options': ['أ', 'ب', 'ج', 'د'],
+              'correct_index': 2,
+            },
+          ],
+        };
+      };
+
+      // Even though serverCmsVersion == 10 (same as cached), schema_version < 2 MUST force full sync (clientVer = 0)
+      final didSync = await CmsCacheService.instance.syncIfNeeded(
+        serverCmsVersion: 10,
+      );
+      expect(didSync, isTrue);
+      expect(syncCalls, equals(1));
+      expect(requestedClientVer, equals(0));
+      expect(
+        CmsCacheService.instance.snapshot.cacheSchemaVersion,
+        equals(CmsCacheSnapshot.currentCacheSchemaVersion),
+      );
+      // Packed category raw questions pruned; unpacked category raw questions preserved
+      expect(
+        CmsCacheService.instance.snapshot.quizQuestions.containsKey('raw_seerah_1'),
+        isFalse,
+      );
+      expect(
+        CmsCacheService.instance.snapshot.quizQuestions.containsKey('raw_fiqh_1'),
+        isTrue,
+      );
+
+      // Subsequent sync with same cmsVersion=10 is skipped cleanly (no redundant network call)
+      final secondSync = await CmsCacheService.instance.syncIfNeeded(
+        serverCmsVersion: 10,
+      );
+      expect(secondSync, isFalse);
+      expect(syncCalls, equals(1));
+
+      // Incremental merge when `fiqh` later publishes a pack MUST also prune `raw_fiqh_1`
+      final afterIncrementalPack = CmsCacheService.instance.snapshot.mergeBundle(
+        {
+          'changed': true,
+          'incremental': true,
+          'cms_version': 11,
+          'quiz_categories': [
+            {
+              'id': 'fiqh',
+              'name': 'الفقه',
+              'total_levels': 15,
+              'pack_version': 1,
+              'pack_storage_path': 'fiqh_v1.json.gz',
+            },
+          ],
+          'quiz_questions': [],
+        },
+        DateTime.utc(2026, 11, 23),
+      );
+      expect(afterIncrementalPack.quizQuestions.containsKey('raw_fiqh_1'), isFalse);
+
+      // 2. Verify v1 fallback guard ONLY triggers for PGRST202 / 42883 (never timeouts or network errors)
+      expect(
+        CmsCacheService.isCmsV2MissingError(
+          const PostgrestException(message: 'Not found', code: 'PGRST202'),
+        ),
+        isTrue,
+      );
+      expect(
+        CmsCacheService.isCmsV2MissingError(
+          const PostgrestException(message: 'Undefined function', code: '42883'),
+        ),
+        isTrue,
+      );
+      expect(
+        CmsCacheService.isCmsV2MissingError(
+          const PostgrestException(message: 'Permission denied', code: '42501'),
+        ),
+        isFalse,
+      );
+      expect(
+        CmsCacheService.isCmsV2MissingError(TimeoutException('timeout')),
+        isFalse,
+      );
+      expect(
+        CmsCacheService.isCmsV2MissingError(const SocketException('offline')),
+        isFalse,
+      );
     });
 
     test('Unified Version Bump is 1.2.0+22', () {

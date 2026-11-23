@@ -72,6 +72,17 @@ class CmsCacheService extends ChangeNotifier {
     }
   }
 
+  /// Returns `true` ONLY when Supabase reports that `get_cms_bundle_v2` is not
+  /// yet deployed (`PGRST202` or PostgreSQL `42883`), preventing redundant
+  /// fallback retries on network / timeout failures.
+  @visibleForTesting
+  static bool isCmsV2MissingError(Object error) {
+    if (error is PostgrestException) {
+      return error.code == 'PGRST202' || error.code == '42883';
+    }
+    return false;
+  }
+
   /// Hydrates cached CMS deltas from SharedPreferences in ~0ms.
   Future<void> initFromCache() async {
     await SharedPrefsService.init();
@@ -116,7 +127,13 @@ class CmsCacheService extends ChangeNotifier {
       await initFromCache();
     }
 
-    if (!force && serverCmsVersion <= _snapshot.cmsVersion && _snapshot.cmsVersion > 0) {
+    final needsSchemaUpgrade = _snapshot.cacheSchemaVersion <
+        CmsCacheSnapshot.currentCacheSchemaVersion;
+
+    if (!force &&
+        !needsSchemaUpgrade &&
+        serverCmsVersion <= _snapshot.cmsVersion &&
+        _snapshot.cmsVersion > 0) {
       return false;
     }
 
@@ -126,7 +143,7 @@ class CmsCacheService extends ChangeNotifier {
 
     final future = _performSync(
       ownedIds: collectLocalOwnedItemIds(ownedItemIds),
-      force: force,
+      force: force || needsSchemaUpgrade,
     );
     _inFlightSync = future;
     try {
@@ -162,15 +179,19 @@ class CmsCacheService extends ChangeNotifier {
               'p_owned_item_ids': ownedIds,
             },
           ).timeout(const Duration(seconds: 5));
-        } catch (v2Err) {
-          debugPrint('CmsCacheService get_cms_bundle_v2 fallback to v1: $v2Err');
-          raw = await client.rpc(
-            'get_cms_bundle',
-            params: {
-              'p_client_cms_version': clientVer,
-              'p_owned_item_ids': ownedIds,
-            },
-          ).timeout(const Duration(seconds: 5));
+        } on PostgrestException catch (v2Err) {
+          if (isCmsV2MissingError(v2Err)) {
+            debugPrint('CmsCacheService get_cms_bundle_v2 missing (${v2Err.code}), falling back to v1');
+            raw = await client.rpc(
+              'get_cms_bundle',
+              params: {
+                'p_client_cms_version': clientVer,
+                'p_owned_item_ids': ownedIds,
+              },
+            ).timeout(const Duration(seconds: 5));
+          } else {
+            rethrow;
+          }
         }
         if (raw is Map) {
           rpcResult = Map<String, dynamic>.from(raw);
