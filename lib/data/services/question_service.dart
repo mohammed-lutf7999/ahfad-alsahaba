@@ -28,27 +28,93 @@ class QuestionService {
       _assetLoader.ensureLoaded(categoryId);
 
   /// Resolves the primary solo question dataset for [categoryId]:
-  /// 1. Published Gzip CDN pack (if `packVersion > 0 && packStoragePath` is set)
-  ///    hydrated via [QuestionPackCacheService] with offline disk cache fallback.
-  /// 2. Bundled `assets/questions/<categoryId>.json` fallback if offline or no pack.
+  /// 1. Loads bundled `assets/questions/<categoryId>.json` if it exists.
+  /// 2. If a published Gzip CDN pack exists (`packVersion > 0 && packStoragePath`),
+  ///    hydrates it via [QuestionPackCacheService] (with offline disk fallback)
+  ///    and MERGES it over the bundled asset levels so built-in levels 1..10
+  ///    remain intact when levels 11..20+ are added via a Gzip pack.
   Future<Map<String, dynamic>?> _resolveCategorySourceData(
     String categoryId, {
     bool allowPack = true,
   }) async {
-    if (allowPack) {
-      final dynCat = CmsCacheService.instance.snapshot.quizCategories[categoryId];
-      if (dynCat != null &&
-          dynCat.packVersion > 0 &&
-          dynCat.packStoragePath.isNotEmpty) {
-        final pack =
-            await QuestionPackCacheService.instance.ensurePackLoaded(dynCat);
-        if (pack != null && pack['levels'] is Map) {
-          return pack;
-        }
+    await _ensureBaseCategoryLoaded(categoryId);
+    final assetData = _assetLoader.getCached(categoryId);
+
+    if (!allowPack) {
+      return assetData;
+    }
+
+    final dynCat = CmsCacheService.instance.snapshot.quizCategories[categoryId];
+    if (dynCat == null ||
+        dynCat.packVersion <= 0 ||
+        dynCat.packStoragePath.isEmpty) {
+      return assetData;
+    }
+
+    final pack =
+        await QuestionPackCacheService.instance.ensurePackLoaded(dynCat);
+    if (pack == null || pack['levels'] is! Map) {
+      return assetData;
+    }
+
+    if (assetData == null || assetData['levels'] is! Map) {
+      return pack;
+    }
+
+    return _mergePackOverAsset(assetData, pack);
+  }
+
+  Map<String, dynamic> _mergePackOverAsset(
+    Map<String, dynamic> assetData,
+    Map<String, dynamic> packData,
+  ) {
+    final mergedLevels = <String, dynamic>{};
+    final assetLevels = assetData['levels'] as Map<String, dynamic>;
+    for (final entry in assetLevels.entries) {
+      if (entry.value is List) {
+        mergedLevels[entry.key] = List<dynamic>.from(entry.value as List);
       }
     }
-    await _ensureBaseCategoryLoaded(categoryId);
-    return _assetLoader.getCached(categoryId);
+
+    final packLevels = packData['levels'] as Map<String, dynamic>;
+    for (final entry in packLevels.entries) {
+      final rawPackList = entry.value;
+      if (rawPackList is! List) continue;
+      final existing = mergedLevels[entry.key];
+      if (existing is! List) {
+        mergedLevels[entry.key] = List<dynamic>.from(rawPackList);
+        continue;
+      }
+
+      // Merge by question id: pack overrides matching id, appends new questions
+      final combined = List<dynamic>.from(existing);
+      final indexById = <String, int>{};
+      for (var i = 0; i < combined.length; i++) {
+        final item = combined[i];
+        if (item is Map) {
+          final id = (item['id'] ?? '').toString().trim();
+          if (id.isNotEmpty) indexById[id] = i;
+        }
+      }
+      for (final rawItem in rawPackList) {
+        if (rawItem is! Map) continue;
+        final id = (rawItem['id'] ?? '').toString().trim();
+        final existingIdx = id.isNotEmpty ? indexById[id] : null;
+        if (existingIdx != null) {
+          combined[existingIdx] = rawItem;
+        } else {
+          if (id.isNotEmpty) indexById[id] = combined.length;
+          combined.add(rawItem);
+        }
+      }
+      mergedLevels[entry.key] = combined;
+    }
+
+    return <String, dynamic>{
+      ...assetData,
+      ...packData,
+      'levels': mergedLevels,
+    };
   }
 
   Question _withOptionRandom(Question question, Random? optionRandom) =>

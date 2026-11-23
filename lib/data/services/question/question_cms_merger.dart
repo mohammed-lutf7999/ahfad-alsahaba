@@ -56,7 +56,10 @@ class QuestionCmsMerger {
     Random? optionRandom,
   }) {
     final originalOptions = List<String>.from(q['options'] ?? []);
-    final originalCorrectIndex = (q['correct'] as num?)?.toInt() ?? 0;
+    final originalCorrectIndex = (q['correct'] as num?)?.toInt() ??
+        (q['correctIndex'] as num?)?.toInt() ??
+        (q['correct_index'] as num?)?.toInt() ??
+        0;
     final baseQuestion = Question(
       id: (q['id'] ?? '').toString(),
       categoryId: categoryId,

@@ -153,13 +153,25 @@ class CmsCacheService extends ChangeNotifier {
       } else {
         final client = _safeSupabase();
         if (client == null) return false;
-        final raw = await client.rpc(
-          'get_cms_bundle',
-          params: {
-            'p_client_cms_version': clientVer,
-            'p_owned_item_ids': ownedIds,
-          },
-        ).timeout(const Duration(seconds: 5));
+        dynamic raw;
+        try {
+          raw = await client.rpc(
+            'get_cms_bundle_v2',
+            params: {
+              'p_client_cms_version': clientVer,
+              'p_owned_item_ids': ownedIds,
+            },
+          ).timeout(const Duration(seconds: 5));
+        } catch (v2Err) {
+          debugPrint('CmsCacheService get_cms_bundle_v2 fallback to v1: $v2Err');
+          raw = await client.rpc(
+            'get_cms_bundle',
+            params: {
+              'p_client_cms_version': clientVer,
+              'p_owned_item_ids': ownedIds,
+            },
+          ).timeout(const Duration(seconds: 5));
+        }
         if (raw is Map) {
           rpcResult = Map<String, dynamic>.from(raw);
         }

@@ -19,11 +19,17 @@ class RotatingPoolSelection {
 /// Pure, duplicate-free `rotating_pool` selector with automatic seen-pool
 /// rollover (`Auto-Reset Seen Pool`, Plan 20).
 ///
-/// When fewer than [questionsPerLevel] unseen questions remain:
-/// 1. Takes ALL remaining unseen questions first.
-/// 2. Resets the seen set for this level (`didResetPool = true`).
-/// 3. Fills the remaining slots from the rest of [pool] while strictly
-///    excluding IDs already picked in step 1 so zero duplicates appear in a round.
+/// Safeguards:
+/// - Deduplicates duplicate question IDs in [pool] defensively.
+/// - Prunes stale IDs from [seenIds] that no longer exist in [pool].
+/// - Preserves [seenIds] untouched when [pool] is temporarily empty.
+/// - On rollover (when unseen `< questionsPerLevel`):
+///   1. Takes ALL remaining unseen questions first.
+///   2. Fills remaining slots from the rest of [pool] excluding already-picked IDs.
+///   3. Shuffles the combined [selected] round so remaining & recycled questions
+///      are interleaved evenly.
+///   4. Sets `updatedSeenIds = selected.map((q) => q.id).toSet()` so the
+///      remaining questions just played are NOT immediately repeated in the next round.
 class RotatingPoolSelector {
   RotatingPoolSelector._();
 
@@ -34,24 +40,36 @@ class RotatingPoolSelector {
     Random? random,
   }) {
     if (pool.isEmpty) {
-      return const RotatingPoolSelection(
-        selected: [],
-        updatedSeenIds: {},
+      return RotatingPoolSelection(
+        selected: const [],
+        updatedSeenIds: Set<String>.from(seenIds),
         didResetPool: false,
       );
     }
 
-    final rng = random ?? Random();
-    final int target = questionsPerLevel.clamp(1, pool.length);
+    // Defensive deduplication by ID (preserves first occurrence)
+    final uniquePool = <Question>[];
+    final validIds = <String>{};
+    for (final q in pool) {
+      if (validIds.add(q.id)) {
+        uniquePool.add(q);
+      }
+    }
 
-    final unseen = pool.where((q) => !seenIds.contains(q.id)).toList()
+    // Prune stale seen IDs that no longer exist in the current pool
+    final cleanSeen = seenIds.intersection(validIds);
+
+    final rng = random ?? Random();
+    final int target = questionsPerLevel.clamp(1, uniquePool.length);
+
+    final unseen = uniquePool.where((q) => !cleanSeen.contains(q.id)).toList()
       ..shuffle(rng);
 
     // Case A: Enough unseen questions remain — no reset needed.
     if (unseen.length >= target) {
       final picked = unseen.take(target).toList();
       final nextSeen = <String>{
-        ...seenIds,
+        ...cleanSeen,
         for (final q in picked) q.id,
       };
       return RotatingPoolSelection(
@@ -61,25 +79,22 @@ class RotatingPoolSelector {
       );
     }
 
-    // Case B: Pool exhausted (or fewer than target unseen remain).
-    // Take all remaining unseen first, then reset seen pool and fill the rest
-    // strictly excluding already-picked IDs to guarantee ZERO duplicates in this round.
+    // Case B: Pool exhausted (fewer than target unseen remain).
+    // Take all remaining unseen first, fill remaining slots excluding picked IDs,
+    // shuffle combined selection, and mark ALL selected IDs as seen for the new cycle.
     final selected = List<Question>.from(unseen);
     final pickedIds = selected.map((q) => q.id).toSet();
     final needed = target - selected.length;
 
-    final refillCandidates = pool
+    final refillCandidates = uniquePool
         .where((q) => !pickedIds.contains(q.id))
         .toList()
       ..shuffle(rng);
     final refill = refillCandidates.take(needed).toList();
     selected.addAll(refill);
+    selected.shuffle(rng);
 
-    // Mark only the newly recycled refill IDs as seen for the fresh cycle
-    // (or all selected IDs if every question in pool was needed in one round).
-    final nextSeen = refill.isNotEmpty
-        ? refill.map((q) => q.id).toSet()
-        : selected.map((q) => q.id).toSet();
+    final nextSeen = selected.map((q) => q.id).toSet();
 
     return RotatingPoolSelection(
       selected: selected,
@@ -96,6 +111,7 @@ class RotatingPoolSelector {
     required int questionsPerLevel,
     Random? random,
   }) async {
+    if (pool.isEmpty) return const [];
     final seen = SharedPrefsService.getRotatingPoolSeenIds(
       categoryId,
       levelNumber,

@@ -102,6 +102,9 @@
         warnings.push(`السؤال ${rawId} بدون شرح تاريخي/شرعي (explanation).`);
       }
 
+      const rawSyncScope = item.syncScope ?? item.sync_scope;
+      const rawIsVisible = item.isVisible !== undefined ? item.isVisible : item.is_visible;
+
       normalized.push({
         id: rawId,
         level_number: levelNum,
@@ -109,24 +112,25 @@
         options: cleanOptions,
         correct_index: correct,
         explanation,
-        sync_scope: item.syncScope === 'all_with_fallback' ? 'all_with_fallback' : 'solo_only',
+        sync_scope: rawSyncScope === 'all_with_fallback' ? 'all_with_fallback' : 'solo_only',
         sort_order: Number.isFinite(sortOrder) ? Math.trunc(sortOrder) : 100,
-        is_visible: item.isVisible !== false,
+        is_visible: rawIsVisible !== false,
       });
     };
 
     if (Array.isArray(rawData)) {
       rawData.forEach((item, idx) => pushCandidate(item, Number(item?.levelNumber ?? item?.level_number ?? 1), idx));
     } else if (rawData && typeof rawData === 'object' && rawData.levels && typeof rawData.levels === 'object') {
+      const rawDrawMode = rawData.levelDrawMode ?? rawData.level_draw_mode;
       meta = {
         categoryId: String(rawData.categoryId || rawData.category_id || '').trim().toLowerCase(),
         categoryName: String(rawData.categoryName || rawData.category_name || '').trim(),
         description: String(rawData.description || '').trim(),
         colorHex: String(rawData.colorHex || rawData.color_hex || '#1B5E20').trim(),
-        iconName: String(rawData.iconName || rawData.iconKey || 'quiz_rounded').trim(),
+        iconName: String(rawData.iconName || rawData.icon_name || rawData.iconKey || 'quiz_rounded').trim(),
         totalLevels: Number(rawData.totalLevels || rawData.total_levels || 0) || null,
         questionsPerLevel: Number(rawData.questionsPerLevel || rawData.questions_per_level || 10) || 10,
-        levelDrawMode: rawData.levelDrawMode === 'rotating_pool' ? 'rotating_pool' : 'fixed',
+        levelDrawMode: rawDrawMode === 'rotating_pool' ? 'rotating_pool' : 'fixed',
       };
       const levelKeys = Object.keys(rawData.levels).sort((a, b) => Number(a) - Number(b));
       for (const lk of levelKeys) {
@@ -172,11 +176,8 @@
     if (typeof CompressionStream === 'undefined') {
       throw new Error('المتصفح الحالي لا يدعم CompressionStream("gzip"). استخدم Edge أو Chrome حديثاً.');
     }
-    const cs = new CompressionStream('gzip');
-    const writer = cs.writable.getWriter();
-    writer.write(rawBytes);
-    writer.close();
-    const compressedBuffer = await new Response(cs.readable).arrayBuffer();
+    const stream = new Blob([rawBytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    const compressedBuffer = await new Response(stream).arrayBuffer();
     const gzBytes = new Uint8Array(compressedBuffer);
     return { rawBytes, gzBytes };
   }
@@ -343,7 +344,55 @@
     return String(document.getElementById('bulk-existing-cat')?.value || '').trim().toLowerCase();
   }
 
-  async function ensureCategoryAndConfigSaved(client) {
+  function setBusy(busy) {
+    state.isBusy = Boolean(busy);
+    const uploadBtn = document.getElementById('btn-bulk-upload-db');
+    const cfgBtn = document.getElementById('btn-bulk-save-config');
+    const pubBtn = document.getElementById('btn-bulk-publish-gzip');
+    if (cfgBtn) cfgBtn.disabled = state.isBusy;
+    if (pubBtn) pubBtn.disabled = state.isBusy;
+    if (uploadBtn) {
+      uploadBtn.disabled =
+        state.isBusy || state.validationErrors.length > 0 || state.parsedQuestions.length === 0;
+    }
+  }
+
+  function addCategoryOptionToDropdowns(catId, catName) {
+    const label = catName ? `${catName} (${catId})` : catId;
+    for (const selectId of ['bulk-existing-cat', 'quiz-filter-cat']) {
+      const sel = document.getElementById(selectId);
+      if (!sel) continue;
+      if (!Array.from(sel.options).some((o) => o.value === catId)) {
+        const opt = document.createElement('option');
+        opt.value = catId;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      }
+    }
+  }
+
+  async function hydrateConfigFieldsForCategory(catId) {
+    const client = sb();
+    if (!client || !catId) return;
+    try {
+      const { data, error } = await client
+        .from('quiz_categories')
+        .select('total_levels, questions_per_level, level_draw_mode')
+        .eq('id', catId)
+        .maybeSingle();
+      if (error || !data) return;
+      const lvlEl = document.getElementById('bulk-total-levels');
+      const qEl = document.getElementById('bulk-q-per-level');
+      const modeEl = document.getElementById('bulk-draw-mode');
+      if (lvlEl && data.total_levels) lvlEl.value = String(data.total_levels);
+      if (qEl && data.questions_per_level) qEl.value = String(data.questions_per_level);
+      if (modeEl && data.level_draw_mode) modeEl.value = String(data.level_draw_mode);
+    } catch (_) {
+      // Non-fatal; keep current UI values
+    }
+  }
+
+  async function ensureCategoryAndConfigSaved(client, { saveConfigForExisting = true } = {}) {
     const mode = document.getElementById('bulk-target-mode')?.value || 'existing';
     const catId = getActiveCategoryId();
     const totalLevels = Math.max(1, Math.min(100, Number(document.getElementById('bulk-total-levels')?.value || 10)));
@@ -373,15 +422,29 @@
         p_is_locked: false,
       });
       if (catErr) throw catErr;
+
+      const { error: cfgErr } = await client.rpc('admin_update_quiz_category_config', {
+        p_category_id: catId,
+        p_total_levels: totalLevels,
+        p_questions_per_level: qPerLevel,
+        p_level_draw_mode: drawMode,
+      });
+      if (cfgErr) throw cfgErr;
+
+      addCategoryOptionToDropdowns(catId, name);
+      return catId;
     }
 
-    const { error: cfgErr } = await client.rpc('admin_update_quiz_category_config', {
-      p_category_id: catId,
-      p_total_levels: totalLevels,
-      p_questions_per_level: qPerLevel,
-      p_level_draw_mode: drawMode,
-    });
-    if (cfgErr) throw cfgErr;
+    // Existing category: only overwrite config when explicitly requested by the Config button
+    if (saveConfigForExisting) {
+      const { error: cfgErr } = await client.rpc('admin_update_quiz_category_config', {
+        p_category_id: catId,
+        p_total_levels: totalLevels,
+        p_questions_per_level: qPerLevel,
+        p_level_draw_mode: drawMode,
+      });
+      if (cfgErr) throw cfgErr;
+    }
     return catId;
   }
 
@@ -394,10 +457,12 @@
     }
 
     const logEl = document.getElementById('bulk-progress-log');
-    state.isBusy = true;
+    setBusy(true);
     try {
-      if (logEl) logEl.textContent = 'جارٍ تجهيز القسم وإعدادات المستويات...';
-      const catId = await ensureCategoryAndConfigSaved(client);
+      if (logEl) logEl.textContent = 'جارٍ تجهيز القسم...';
+      // Do NOT silently overwrite existing category settings during a bulk upload;
+      // admin_bulk_upsert_quiz_questions auto-expands total_levels via GREATEST.
+      const catId = await ensureCategoryAndConfigSaved(client, { saveConfigForExisting: false });
 
       const total = state.parsedQuestions.length;
       let uploaded = 0;
@@ -424,7 +489,7 @@
       if (logEl) logEl.textContent = `❌ فشل الاستيراد: ${msg}`;
       toast(`فشل الاستيراد: ${msg}`, true);
     } finally {
-      state.isBusy = false;
+      setBusy(false);
     }
   }
 
@@ -436,9 +501,9 @@
       return;
     }
     const logEl = document.getElementById('bulk-progress-log');
-    state.isBusy = true;
+    setBusy(true);
     try {
-      const catId = await ensureCategoryAndConfigSaved(client);
+      const catId = await ensureCategoryAndConfigSaved(client, { saveConfigForExisting: true });
       if (logEl) logEl.textContent = `✅ تم حفظ إعدادات المستويات والنمط للقسم (${catId}).`;
       toast('تم حفظ إعدادات القسم بنجاح');
       await bridge()?.broadcastWebControlPing?.('ALL');
@@ -447,7 +512,7 @@
       if (logEl) logEl.textContent = `❌ خطأ في حفظ الإعدادات: ${msg}`;
       toast(msg, true);
     } finally {
-      state.isBusy = false;
+      setBusy(false);
     }
   }
 
@@ -465,7 +530,7 @@
     }
 
     const logEl = document.getElementById('bulk-progress-log');
-    state.isBusy = true;
+    setBusy(true);
     try {
       if (logEl) logEl.textContent = `جارٍ تصدير أسئلة القسم (${catId}) من القاعدة...`;
       const { data: payload, error: expErr } = await client.rpc('admin_export_category_pack_payload', {
@@ -512,12 +577,13 @@
       if (logEl) logEl.textContent = `❌ فشل نشر الحزمة: ${msg}`;
       toast(`فشل نشر الحزمة: ${msg}`, true);
     } finally {
-      state.isBusy = false;
+      setBusy(false);
     }
   }
 
   function bindEvents() {
     const modeSelect = document.getElementById('bulk-target-mode');
+    const existingSelect = document.getElementById('bulk-existing-cat');
     const existingWrap = document.getElementById('bulk-existing-cat-wrap');
     const newFields = document.getElementById('bulk-new-cat-fields');
     const fileInput = document.getElementById('bulk-json-file');
@@ -526,6 +592,15 @@
       const isNew = modeSelect.value === 'new';
       if (existingWrap) existingWrap.style.display = isNew ? 'none' : '';
       if (newFields) newFields.style.display = isNew ? '' : 'none';
+      if (!isNew && existingSelect?.value) {
+        hydrateConfigFieldsForCategory(existingSelect.value);
+      }
+    });
+
+    existingSelect?.addEventListener('change', () => {
+      if (existingSelect.value) {
+        hydrateConfigFieldsForCategory(existingSelect.value);
+      }
     });
 
     fileInput?.addEventListener('change', async (ev) => {
@@ -539,6 +614,11 @@
         state.parsedMeta = meta;
         state.validationErrors = errors;
         state.validationWarnings = warnings;
+
+        let maxLvl = 1;
+        for (const q of normalized) {
+          if (q.level_number > maxLvl) maxLvl = q.level_number;
+        }
 
         if (meta) {
           if (meta.totalLevels) {
@@ -554,7 +634,6 @@
             if (el) el.value = meta.levelDrawMode;
           }
           if (meta.categoryId) {
-            const existingSelect = document.getElementById('bulk-existing-cat');
             const existsInList =
               existingSelect && Array.from(existingSelect.options).some((o) => o.value === meta.categoryId);
             if (existsInList) {
@@ -575,6 +654,13 @@
             }
           }
         }
+
+        // In "new category" mode, auto-fill totalLevels with maxLvl if meta.totalLevels was absent
+        if (modeSelect?.value === 'new' && (!meta || !meta.totalLevels) && normalized.length > 0) {
+          const el = document.getElementById('bulk-total-levels');
+          if (el) el.value = String(maxLvl);
+        }
+
         renderValidationSummary();
       } catch (parseErr) {
         state.parsedQuestions = [];
@@ -589,9 +675,20 @@
     document.getElementById('btn-bulk-save-config')?.addEventListener('click', handleSaveConfigOnly);
     document.getElementById('btn-bulk-publish-gzip')?.addEventListener('click', handlePublishGzipPack);
 
-    // Sync categories whenever content tab is opened
+    // Observe #quiz-filter-cat mutations to sync categories instantly regardless of network speed
+    const filterCatEl = document.getElementById('quiz-filter-cat');
+    if (filterCatEl && typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver(() => {
+        syncCategoryDropdownFromDom();
+      });
+      observer.observe(filterCatEl, { childList: true, subtree: true });
+    }
+
     document.querySelector('[data-tab="content"]')?.addEventListener('click', () => {
-      setTimeout(syncCategoryDropdownFromDom, 400);
+      syncCategoryDropdownFromDom();
+      if (modeSelect?.value === 'existing' && existingSelect?.value) {
+        hydrateConfigFieldsForCategory(existingSelect.value);
+      }
     });
   }
 

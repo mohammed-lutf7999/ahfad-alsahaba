@@ -1,11 +1,16 @@
 -- ==============================================================================
 -- 023: Dynamic Levels, Rotating Pool, Bulk JSON Importer & Gzip CDN Question Packs
 -- ==============================================================================
--- 100% Additive-Only & Backward Compatible with Production 1.1.0+21:
+-- 100% Additive-Only & Backward Compatible with Live Production 1.1.0+21:
 --   - Adds safe defaulted columns to `public.quiz_categories`
+--   - Keeps `public.get_cms_bundle` 100% untouched for live 1.1.0+21 clients
+--   - Adds `public.get_cms_bundle_v2` for 1.2.0+22 clients (omits raw PostgreSQL
+--     `quiz_questions` rows for categories that have a published Gzip CDN pack)
 --   - Creates `question-packs` Storage bucket (public SELECT, admin-only write)
---   - Adds atomic bulk upsert & pack export/publish RPCs without touching or
---     overloading existing 1.1.0+21 RPC signatures (zero PGRST203 risk)
+--   - Adds atomic bulk upsert & pack export/publish RPCs with strict validation:
+--       * Cross-category ID collision guard
+--       * Non-empty validation for all 4 options
+--       * Safe `.json.gz` storage path guard (no `..` traversal)
 --   - Complies strictly with AGENTS.md Rule #2:
 --     `#variable_conflict use_column` + `SET search_path = public, auth`
 -- ==============================================================================
@@ -64,7 +69,121 @@ TO authenticated
 USING (bucket_id = 'question-packs' AND public.check_is_admin());
 
 -- ------------------------------------------------------------------------------
--- 3. `admin_update_quiz_category_config`: Flexible Levels & Rotating Pool Config
+-- 3. `get_cms_bundle_v2`: Pack-Aware CMS Sync for 1.2.0+22 Clients
+--    (Leaves `get_cms_bundle` untouched so live 1.1.0+21 clients never break.
+--     Omits raw `quiz_questions` rows for categories with `pack_version > 0`.)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_cms_bundle_v2(
+    p_client_cms_version BIGINT DEFAULT 0,
+    p_owned_item_ids TEXT[] DEFAULT ARRAY[]::TEXT[]
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+#variable_conflict use_column
+DECLARE
+    v_uid UUID := auth.uid();
+    v_cms_version BIGINT := 1;
+    v_client_ver BIGINT := GREATEST(0, COALESCE(p_client_cms_version, 0));
+    v_is_incremental BOOLEAN := FALSE;
+    v_owned TEXT[] := COALESCE(p_owned_item_ids, ARRAY[]::TEXT[]);
+    v_store_items JSONB := '[]'::jsonb;
+    v_lib_sections JSONB := '[]'::jsonb;
+    v_lib_items JSONB := '[]'::jsonb;
+    v_quiz_cats JSONB := '[]'::jsonb;
+    v_quiz_questions JSONB := '[]'::jsonb;
+BEGIN
+    SELECT COALESCE(cfg.cms_version, 1)
+    INTO v_cms_version
+    FROM public.app_release_config cfg
+    WHERE cfg.platform = 'android'
+    LIMIT 1;
+    v_cms_version := COALESCE(v_cms_version, 1);
+
+    IF v_client_ver > 0 AND v_client_ver >= v_cms_version THEN
+        RETURN jsonb_build_object(
+            'changed', FALSE,
+            'cms_version', v_cms_version,
+            'server_time', NOW()
+        );
+    END IF;
+
+    v_is_incremental := (v_client_ver > 0);
+
+    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.category, s.sort_order, s.min_level, s.id), '[]'::jsonb)
+    INTO v_store_items
+    FROM public.store_items s
+    WHERE (
+        v_is_incremental
+        AND s.cms_revision > v_client_ver
+    ) OR (
+        NOT v_is_incremental
+        AND (
+            s.is_visible = TRUE
+            OR s.id = ANY(v_owned)
+            OR (
+                v_uid IS NOT NULL
+                AND EXISTS (
+                    SELECT 1 FROM public.user_inventory ui
+                    WHERE ui.user_id = v_uid AND ui.item_id = s.id
+                )
+            )
+        )
+    );
+
+    SELECT COALESCE(jsonb_agg(to_jsonb(ls) ORDER BY ls.sort_order, ls.id), '[]'::jsonb)
+    INTO v_lib_sections
+    FROM public.library_sections ls
+    WHERE (v_is_incremental AND ls.cms_revision > v_client_ver)
+       OR (NOT v_is_incremental AND ls.is_visible = TRUE);
+
+    SELECT COALESCE(jsonb_agg(to_jsonb(li) ORDER BY li.section_id, li.sort_order, li.id), '[]'::jsonb)
+    INTO v_lib_items
+    FROM public.library_items li
+    WHERE (v_is_incremental AND li.cms_revision > v_client_ver)
+       OR (NOT v_is_incremental AND li.is_visible = TRUE);
+
+    -- Includes new columns: questions_per_level, level_draw_mode, pack_version, pack_storage_path
+    SELECT COALESCE(jsonb_agg(to_jsonb(qc) ORDER BY qc.sort_order, qc.id), '[]'::jsonb)
+    INTO v_quiz_cats
+    FROM public.quiz_categories qc
+    WHERE (v_is_incremental AND qc.cms_revision > v_client_ver)
+       OR (NOT v_is_incremental AND qc.is_visible = TRUE);
+
+    -- Only return raw PostgreSQL quiz_questions for categories WITHOUT a published Gzip pack
+    -- (categories with pack_version > 0 are delivered via compressed CDN Storage packs).
+    SELECT COALESCE(jsonb_agg(to_jsonb(qq) ORDER BY qq.category_id, qq.level_number, qq.sort_order, qq.id), '[]'::jsonb)
+    INTO v_quiz_questions
+    FROM public.quiz_questions qq
+    LEFT JOIN public.quiz_categories qc ON qc.id = qq.category_id
+    WHERE COALESCE(qc.pack_version, 0) = 0
+      AND (
+          (v_is_incremental AND qq.cms_revision > v_client_ver)
+          OR (NOT v_is_incremental AND qq.is_visible = TRUE)
+      );
+
+    RETURN jsonb_build_object(
+        'changed', TRUE,
+        'incremental', v_is_incremental,
+        'cms_version', v_cms_version,
+        'server_time', NOW(),
+        'store_items', v_store_items,
+        'library_sections', v_lib_sections,
+        'library_items', v_lib_items,
+        'quiz_categories', v_quiz_cats,
+        'quiz_questions', v_quiz_questions
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) TO anon, authenticated, service_role;
+
+-- ------------------------------------------------------------------------------
+-- 4. `admin_update_quiz_category_config`: Flexible Levels & Rotating Pool Config
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.admin_update_quiz_category_config(
     p_category_id TEXT,
@@ -142,7 +261,7 @@ REVOKE ALL ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, I
 GRANT EXECUTE ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
--- 4. `admin_bulk_upsert_quiz_questions`: Atomic Chunked JSON Bulk Importer (<=500/call)
+-- 5. `admin_bulk_upsert_quiz_questions`: Atomic Chunked JSON Bulk Importer (<=500/call)
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.admin_bulk_upsert_quiz_questions(
     p_category_id TEXT,
@@ -160,9 +279,11 @@ DECLARE
     v_count INTEGER;
     v_item JSONB;
     v_id TEXT;
+    v_existing_cat TEXT;
     v_lvl INTEGER;
     v_qtext TEXT;
     v_opts JSONB;
+    v_opt_idx INTEGER;
     v_correct INTEGER;
     v_expl TEXT;
     v_scope TEXT;
@@ -198,6 +319,16 @@ BEGIN
             RAISE EXCEPTION 'Invalid question id in batch: %', v_id;
         END IF;
 
+        -- Prevent cross-category ID hijacking/collision
+        SELECT qq.category_id
+        INTO v_existing_cat
+        FROM public.quiz_questions qq
+        WHERE qq.id = v_id;
+
+        IF v_existing_cat IS NOT NULL AND v_existing_cat <> v_cat THEN
+            RAISE EXCEPTION 'Cross-category ID collision: question "%" already belongs to category "%" (cannot import into "%")', v_id, v_existing_cat, v_cat;
+        END IF;
+
         v_lvl := GREATEST(1, LEAST(100, COALESCE((v_item->>'level_number')::INTEGER, 1)));
         v_qtext := BTRIM(COALESCE(v_item->>'question_text', ''));
         IF char_length(v_qtext) < 3 THEN
@@ -208,6 +339,13 @@ BEGIN
         IF v_opts IS NULL OR jsonb_typeof(v_opts) <> 'array' OR jsonb_array_length(v_opts) <> 4 THEN
             RAISE EXCEPTION 'Question % must have exactly 4 options', v_id;
         END IF;
+
+        FOR v_opt_idx IN 0..3 LOOP
+            IF jsonb_typeof(v_opts->v_opt_idx) <> 'string'
+               OR BTRIM(COALESCE(v_opts->>v_opt_idx, '')) = '' THEN
+                RAISE EXCEPTION 'Question % option % must be a non-empty string', v_id, v_opt_idx;
+            END IF;
+        END LOOP;
 
         v_correct := COALESCE((v_item->>'correct_index')::INTEGER, 0);
         IF v_correct < 0 OR v_correct > 3 THEN
@@ -233,8 +371,7 @@ BEGIN
             v_new_cms, NOW()
         )
         ON CONFLICT (id) DO UPDATE
-        SET category_id = EXCLUDED.category_id,
-            level_number = EXCLUDED.level_number,
+        SET level_number = EXCLUDED.level_number,
             question_text = EXCLUDED.question_text,
             options = EXCLUDED.options,
             correct_index = EXCLUDED.correct_index,
@@ -284,7 +421,7 @@ REVOKE ALL ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) FROM
 GRANT EXECUTE ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
--- 5. `admin_export_category_pack_payload`: Exports All Visible Questions for Gzip
+-- 6. `admin_export_category_pack_payload`: Exports All Visible Questions for Gzip
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.admin_export_category_pack_payload(
     p_category_id TEXT
@@ -364,7 +501,7 @@ REVOKE ALL ON FUNCTION public.admin_export_category_pack_payload(TEXT) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.admin_export_category_pack_payload(TEXT) TO authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
--- 6. `admin_publish_category_pack`: Records New Gzip Pack Path & Bumps Versions
+-- 7. `admin_publish_category_pack`: Records New Gzip Pack Path & Bumps Versions
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.admin_publish_category_pack(
     p_category_id TEXT,
@@ -390,6 +527,12 @@ BEGIN
 
     IF v_cat = '' OR v_path = '' THEN
         RAISE EXCEPTION 'category_id and pack_storage_path are required';
+    END IF;
+
+    IF v_path NOT LIKE '%.json.gz'
+       OR POSITION('..' IN v_path) > 0
+       OR LEFT(v_path, 1) = '/' THEN
+        RAISE EXCEPTION 'Invalid pack_storage_path: must end with .json.gz and must not contain ".." or leading slash';
     END IF;
 
     v_new_cms := public._bump_cms_version('android', v_uid);

@@ -10,6 +10,7 @@ import 'package:ahfad_alsahaba/data/models/cms_models.dart';
 import 'package:ahfad_alsahaba/data/models/player_profile_model.dart';
 import 'package:ahfad_alsahaba/data/models/question_model.dart';
 import 'package:ahfad_alsahaba/data/services/cms_cache_service.dart';
+import 'package:ahfad_alsahaba/data/services/question/question_cms_merger.dart';
 import 'package:ahfad_alsahaba/data/services/question/question_pack_cache_service.dart';
 import 'package:ahfad_alsahaba/data/services/question/rotating_pool_selector.dart';
 import 'package:ahfad_alsahaba/data/services/question_service.dart';
@@ -21,24 +22,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _buildSyntheticPack({
   required String categoryId,
+  int startLevel = 1,
   required int totalLevels,
   required int questionsPerLevelInBank,
 }) {
   final levels = <String, List<Map<String, dynamic>>>{};
-  for (var lv = 1; lv <= totalLevels; lv++) {
+  for (var lv = startLevel; lv < startLevel + totalLevels; lv++) {
     final list = <Map<String, dynamic>>[];
-    for (var i = 1; i <= questionsPerLevelInBank; i++) {
-      final qNum = (lv - 1) * questionsPerLevelInBank + i;
+    for (var i = 0; i < questionsPerLevelInBank; i++) {
+      final qNum = (lv - 1) * questionsPerLevelInBank + i + 1;
+      final correctIdx = i % 4;
       list.add({
-        'id': '${categoryId}_l${lv}_q$i',
+        'id': '${categoryId}_l${lv}_q${i + 1}',
         'question': 'سؤال تاريخي إسلامي رقم $qNum في المستوى $lv من قسم $categoryId؟',
         'options': [
-          'الإجابة الصحيحة رقم $qNum',
-          'خيار بديل أول $qNum',
-          'خيار بديل ثانٍ $qNum',
-          'خيار بديل ثالث $qNum',
+          'خيار 0 للسؤال $qNum',
+          'خيار 1 للسؤال $qNum',
+          'خيار 2 للسؤال $qNum',
+          'خيار 3 للسؤال $qNum',
         ],
-        'correctIndex': 0,
+        // Matches `admin_export_category_pack_payload` contract (`correct` = 0..3)
+        'correct': correctIdx,
         'explanation': 'توضيح علمي موثق للسؤال رقم $qNum.',
         'difficulty': 'medium',
       });
@@ -48,7 +52,7 @@ Map<String, dynamic> _buildSyntheticPack({
   return {
     'categoryId': categoryId,
     'packVersion': 1,
-    'totalLevels': totalLevels,
+    'totalLevels': startLevel + totalLevels - 1,
     'questionsPerLevel': questionsPerLevelInBank,
     'levelDrawMode': 'rotating_pool',
     'levels': levels,
@@ -64,7 +68,7 @@ List<Question> _buildPool(int count, {String prefix = 'q'}) {
       levelNumber: 1,
       questionText: 'سؤال ${i + 1}',
       options: const ['أ', 'ب', 'ج', 'د'],
-      correctAnswerIndex: 0,
+      correctAnswerIndex: i % 4,
       explanation: 'شرح ${i + 1}',
     ),
   );
@@ -83,7 +87,7 @@ void main() {
   });
 
   group('M24 — Plan 20: Gzip CDN Packs, Dynamic Levels & Rotating Pool', () {
-    test('1,000-question Gzip CDN pack decodes via Isolate with Magic Bytes & compact size', () async {
+    test('1,000-question Gzip CDN pack decodes via Isolate with Magic Bytes, compact size & real correct indices (0..3)', () async {
       final packMap = _buildSyntheticPack(
         categoryId: 'mega_sahaba',
         totalLevels: 40,
@@ -108,8 +112,19 @@ void main() {
 
       final levels = decoded['levels'] as Map<String, dynamic>;
       var totalDecoded = 0;
-      for (final list in levels.values) {
-        totalDecoded += (list as List).length;
+      final seenCorrectIndices = <int>{};
+      for (final entry in levels.entries) {
+        final lv = int.parse(entry.key);
+        for (final rawQ in (entry.value as List)) {
+          totalDecoded++;
+          final mapped = QuestionCmsMerger.mapQuestionEntry(
+            Map<String, dynamic>.from(rawQ as Map),
+            categoryId: 'mega_sahaba',
+            levelNumber: lv,
+            optionRandom: null,
+          );
+          seenCorrectIndices.add(mapped.correctAnswerIndex);
+        }
       }
 
       // ignore: avoid_print
@@ -120,6 +135,8 @@ void main() {
 
       expect(levels.length, equals(40));
       expect(totalDecoded, equals(1000));
+      // Explicit contract check: `correct` produces real 0, 1, 2, 3 values (never stuck at 0)
+      expect(seenCorrectIndices, equals({0, 1, 2, 3}));
       expect(sw.elapsedMilliseconds, lessThan(3000));
     });
 
@@ -137,8 +154,9 @@ void main() {
       expect((decoded['levels'] as Map).length, equals(2));
     });
 
-    test('QuestionPackCacheService caches by packVersion and falls back cleanly when offline', () async {
+    test('QuestionPackCacheService caches by packVersion, uses exact storagePath & falls back cleanly on offline/502 HTML/corrupt bytes', () async {
       var fetchCount = 0;
+      String? requestedPath;
       final packV1 = _buildSyntheticPack(
         categoryId: 'offline_test',
         totalLevels: 3,
@@ -148,6 +166,7 @@ void main() {
 
       QuestionPackCacheService.instance.packBytesFetcherOverride = (path) async {
         fetchCount++;
+        requestedPath = path;
         return gzV1;
       };
 
@@ -156,12 +175,13 @@ void main() {
         name: 'اختبار الكاش',
         totalLevels: 3,
         packVersion: 1,
-        packStoragePath: 'packs/offline_test_v1.json.gz',
+        packStoragePath: 'offline_test_v1.json.gz',
       );
 
       final first = await QuestionPackCacheService.instance.ensurePackLoaded(catV1);
       expect(first, isNotNull);
       expect(fetchCount, equals(1));
+      expect(requestedPath, equals('offline_test_v1.json.gz'));
       expect(SharedPrefsService.getCategoryPackVersion('offline_test'), equals(1));
 
       // Same version -> served from memory without network fetch
@@ -169,7 +189,7 @@ void main() {
       expect(second, isNotNull);
       expect(fetchCount, equals(1));
 
-      // Newer version fails due to offline error -> falls back cleanly to cached memory pack
+      // Newer version fails due to SocketException -> falls back cleanly to cached v1 pack
       QuestionPackCacheService.instance.packBytesFetcherOverride = (path) async {
         fetchCount++;
         throw const SocketException('No internet');
@@ -179,13 +199,95 @@ void main() {
         name: 'اختبار الكاش',
         totalLevels: 3,
         packVersion: 2,
-        packStoragePath: 'packs/offline_test_v2.json.gz',
+        packStoragePath: 'offline_test_v2.json.gz',
       );
       final offlineFallback =
           await QuestionPackCacheService.instance.ensurePackLoaded(catV2);
       expect(fetchCount, equals(2));
       expect(offlineFallback, isNotNull);
       expect((offlineFallback!['levels'] as Map).length, equals(3));
+
+      // HTML 502 Bad Gateway response -> safe fallback without crash
+      QuestionPackCacheService.instance.resetForTesting();
+      QuestionPackCacheService.instance.disableDiskCacheForTesting = true;
+      QuestionPackCacheService.instance.packBytesFetcherOverride = (_) async =>
+          Uint8List.fromList(utf8.encode('<html><body>502 Bad Gateway</body></html>'));
+      const htmlCat = DynamicQuizCategoryData(
+        id: 'bad_502_cat',
+        name: 'اختبار 502',
+        totalLevels: 2,
+        packVersion: 1,
+        packStoragePath: 'bad_502_cat_v1.json.gz',
+      );
+      final htmlResult =
+          await QuestionPackCacheService.instance.ensurePackLoaded(htmlCat);
+      expect(htmlResult, isNull);
+
+      // Corrupted Gzip bytes (valid magic bytes 0x1f 0x8b followed by garbage) -> safe fallback
+      QuestionPackCacheService.instance.packBytesFetcherOverride = (_) async =>
+          Uint8List.fromList([0x1f, 0x8b, 0x08, 0xff, 0x00, 0xde, 0xad, 0xbe, 0xef]);
+      final corruptResult =
+          await QuestionPackCacheService.instance.ensurePackLoaded(htmlCat);
+      expect(corruptResult, isNull);
+    });
+
+    test('Gzip pack merges cleanly over legacy assets/questions/quran.json (levels 1-10 intact + levels 11-20 added)', () async {
+      // Pack contains ONLY cloud-added levels 11..20 for built-in `quran` category
+      final extraPack = _buildSyntheticPack(
+        categoryId: 'quran',
+        startLevel: 11,
+        totalLevels: 10,
+        questionsPerLevelInBank: 10,
+      );
+      final gzBytes =
+          Uint8List.fromList(gzip.encode(utf8.encode(jsonEncode(extraPack))));
+      QuestionPackCacheService.instance.packBytesFetcherOverride =
+          (_) async => gzBytes;
+
+      CmsCacheService.instance.setSnapshotForTesting(
+        const CmsCacheSnapshot(
+          cmsVersion: 20,
+          quizCategories: {
+            'quran': DynamicQuizCategoryData(
+              id: 'quran',
+              name: 'القرآن الكريم',
+              totalLevels: 20,
+              questionsPerLevel: 10,
+              levelDrawMode: 'fixed',
+              packVersion: 1,
+              packStoragePath: 'quran_v1.json.gz',
+            ),
+          },
+        ),
+      );
+
+      final qs = QuestionService();
+      // Legacy built-in levels 1 and 10 from assets/questions/quran.json MUST remain intact!
+      final level1 = await qs.loadQuestions(categoryId: 'quran', levelNumber: 1);
+      final level10 = await qs.loadQuestions(categoryId: 'quran', levelNumber: 10);
+      expect(level1.length, equals(10));
+      expect(level10.length, equals(10));
+
+      // New levels 11 and 20 MUST load seamlessly from the Gzip pack!
+      final level11 = await qs.loadQuestions(categoryId: 'quran', levelNumber: 11);
+      final level20 = await qs.loadQuestions(categoryId: 'quran', levelNumber: 20);
+      expect(level11.length, equals(10));
+      expect(level20.length, equals(10));
+      expect(level11.first.id, startsWith('quran_l11_'));
+      expect(level20.first.id, startsWith('quran_l20_'));
+
+      // Verify `correct` contract preserved across loadAllQuestionsForCategory (without option shuffle)
+      final allUnshuffled = await qs.loadAllQuestionsForCategory(
+        'quran',
+        shuffleQuestions: false,
+        shuffleOptions: false,
+      );
+      final level11Unshuffled =
+          allUnshuffled.where((q) => q.levelNumber == 11).toList();
+      expect(
+        level11Unshuffled.map((q) => q.correctAnswerIndex).toSet(),
+        equals({0, 1, 2, 3}),
+      );
     });
 
     test('Backward compatibility: legacy 10-level categories & JSON payloads default safely', () {
@@ -273,12 +375,12 @@ void main() {
       expect(profile.getCategoryUnlockedLevels('cat_40'), equals(40));
     });
 
-    test('RotatingPoolSelector Auto-Reset Seen Pool guarantees ZERO duplicates per round on rollover', () {
+    test('RotatingPoolSelector Auto-Reset Seen Pool guarantees ZERO duplicates, prevents immediate repeat of remaining5, & preserves state on empty pool', () async {
       final pool = _buildPool(25);
       final rng = Random(42);
-      var seen = <String>{};
+      var seen = <String>{'stale_deleted_id_999'};
 
-      // Round 1: 10 unseen
+      // Round 1: 10 unseen (stale_deleted_id_999 pruned automatically)
       final r1 = RotatingPoolSelector.selectForLevel(
         pool: pool,
         questionsPerLevel: 10,
@@ -290,6 +392,7 @@ void main() {
       expect(r1.didResetPool, isFalse);
       seen = r1.updatedSeenIds;
       expect(seen.length, equals(10));
+      expect(seen.contains('stale_deleted_id_999'), isFalse);
 
       // Round 2: 10 unseen (completely disjoint from Round 1)
       final r2 = RotatingPoolSelector.selectForLevel(
@@ -327,20 +430,56 @@ void main() {
       expect(r3Ids.toSet().containsAll(remaining5), isTrue);
       expect(r3.didResetPool, isTrue);
       seen = r3.updatedSeenIds;
-      expect(seen.length, equals(5));
+      // ALL 10 questions played in r3 are now marked seen (NOT just refill 5)
+      expect(seen.length, equals(10));
+      expect(seen.containsAll(remaining5), isTrue);
 
-      // Round 4 & Round 5 continue cleanly with zero duplicates
-      for (var round = 4; round <= 5; round++) {
-        final next = RotatingPoolSelector.selectForLevel(
-          pool: pool,
-          questionsPerLevel: 10,
-          seenIds: seen,
-          random: rng,
-        );
-        expect(next.selected.length, equals(10));
-        expect(next.selected.map((q) => q.id).toSet().length, equals(10));
-        seen = next.updatedSeenIds;
-      }
+      // Round 4 MUST NOT immediately repeat ANY of remaining5 (or any r3 question!)
+      final r4 = RotatingPoolSelector.selectForLevel(
+        pool: pool,
+        questionsPerLevel: 10,
+        seenIds: seen,
+        random: rng,
+      );
+      final r4Ids = r4.selected.map((q) => q.id).toSet();
+      expect(r4Ids.length, equals(10));
+      expect(r4Ids.intersection(remaining5), isEmpty);
+      expect(r4Ids.intersection(r3Ids.toSet()), isEmpty);
+      expect(r4.didResetPool, isFalse);
+
+      // Empty pool MUST preserve existing seenIds in both pure & SharedPrefs wrappers
+      final emptyRes = RotatingPoolSelector.selectForLevel(
+        pool: const [],
+        questionsPerLevel: 10,
+        seenIds: seen,
+        random: rng,
+      );
+      expect(emptyRes.selected, isEmpty);
+      expect(emptyRes.updatedSeenIds, equals(seen));
+
+      await SharedPrefsService.setRotatingPoolSeenIds('preserve_cat', 1, {'a', 'b'});
+      final persistedEmpty = await RotatingPoolSelector.selectAndPersist(
+        categoryId: 'preserve_cat',
+        levelNumber: 1,
+        pool: const [],
+        questionsPerLevel: 10,
+      );
+      expect(persistedEmpty, isEmpty);
+      expect(
+        SharedPrefsService.getRotatingPoolSeenIds('preserve_cat', 1),
+        equals({'a', 'b'}),
+      );
+
+      // Duplicate IDs inside pool are deduplicated defensively
+      final dupPool = [pool[0], pool[0], pool[1], pool[1], pool[2]];
+      final dedupRes = RotatingPoolSelector.selectForLevel(
+        pool: dupPool,
+        questionsPerLevel: 5,
+        seenIds: const {},
+        random: rng,
+      );
+      expect(dedupRes.selected.length, equals(3));
+      expect(dedupRes.selected.map((q) => q.id).toSet().length, equals(3));
     });
 
     test('QuestionService integrates Gzip pack + rotating_pool persistence end-to-end', () async {
@@ -364,7 +503,7 @@ void main() {
               questionsPerLevel: 10,
               levelDrawMode: 'rotating_pool',
               packVersion: 1,
-              packStoragePath: 'packs/rotating_pack_v1.json.gz',
+              packStoragePath: 'rotating_pack_v1.json.gz',
             ),
           },
         ),
