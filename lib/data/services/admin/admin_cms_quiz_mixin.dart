@@ -213,7 +213,10 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
     String? levelDrawMode,
   }) async {
     final cleanCat = categoryId.trim().toLowerCase();
-    final cleanMode = levelDrawMode?.trim();
+    if (cleanCat.isEmpty) {
+      throw ArgumentError('معرّف القسم مطلوب لتحديث الإعدادات');
+    }
+    final cleanMode = levelDrawMode?.trim().toLowerCase();
     if (cleanMode != null &&
         cleanMode.isNotEmpty &&
         cleanMode != 'fixed' &&
@@ -253,36 +256,42 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
     void Function(int uploaded, int total)? onProgress,
   }) async {
     final cleanCat = categoryId.trim().toLowerCase();
+    if (cleanCat.isEmpty) {
+      throw ArgumentError('معرّف القسم مطلوب للاستيراد الجماعي');
+    }
     if (questions.isEmpty) return 0;
 
     final total = questions.length;
     var uploaded = 0;
 
-    for (var i = 0; i < total; i += bulkUpsertChunkSize) {
-      final end = (i + bulkUpsertChunkSize).clamp(0, total);
-      final chunk = questions.sublist(i, end);
+    try {
+      for (var i = 0; i < total; i += bulkUpsertChunkSize) {
+        final end = (i + bulkUpsertChunkSize).clamp(0, total);
+        final chunk = questions.sublist(i, end);
 
-      if (bulkQuizQuestionsUpserterOverride != null) {
-        uploaded += await bulkQuizQuestionsUpserterOverride!(cleanCat, chunk);
-      } else {
-        final client = supabaseClient;
-        if (client == null) {
-          throw StateError('عميل Supabase غير متصل');
+        if (bulkQuizQuestionsUpserterOverride != null) {
+          uploaded += await bulkQuizQuestionsUpserterOverride!(cleanCat, chunk);
+        } else {
+          final client = supabaseClient;
+          if (client == null) {
+            throw StateError('عميل Supabase غير متصل');
+          }
+          await client.rpc(
+            'admin_bulk_upsert_quiz_questions',
+            params: {
+              'p_category_id': cleanCat,
+              'p_questions': chunk,
+            },
+          ).timeout(const Duration(seconds: 15));
+          uploaded += chunk.length;
         }
-        await client.rpc(
-          'admin_bulk_upsert_quiz_questions',
-          params: {
-            'p_category_id': cleanCat,
-            'p_questions': chunk,
-          },
-        ).timeout(const Duration(seconds: 15));
-        uploaded += chunk.length;
+        onProgress?.call(uploaded, total);
       }
-      onProgress?.call(uploaded, total);
-    }
-
-    if (bulkQuizQuestionsUpserterOverride == null) {
-      syncAndBroadcastAll();
+    } finally {
+      // Ensure partial batch uploads still sync CMS & notify clients cleanly
+      if (uploaded > 0 && bulkQuizQuestionsUpserterOverride == null) {
+        syncAndBroadcastAll();
+      }
     }
     return uploaded;
   }
@@ -296,6 +305,9 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
     void Function(String stage)? onStage,
   }) async {
     final cleanCat = categoryId.trim().toLowerCase();
+    if (cleanCat.isEmpty) {
+      throw ArgumentError('معرّف القسم مطلوب لنشر حزمة Gzip');
+    }
     if (gzipPackPublisherOverride != null) {
       return gzipPackPublisherOverride!(cleanCat);
     }
@@ -322,13 +334,15 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
 
     onStage?.call('جارٍ ضغط $qCount سؤالاً عبر Gzip Isolate...');
     final compressed = await compute(encodeJsonToGzipBytes, payload);
-    final packVer = (payload['packVersion'] as num?)?.toInt() ?? 1;
-    final storagePath = '${cleanCat}_v$packVer.json.gz';
+    final expectedPackVer = (payload['packVersion'] as num?)?.toInt() ?? 1;
+    final storagePath = '${cleanCat}_v$expectedPackVer.json.gz';
 
     onStage?.call(
       'جارٍ رفع الحزمة $storagePath (${(compressed.gzBytes.length / 1024).toStringAsFixed(1)} KB)...',
     );
-    await client.storage.from(questionPacksBucket).uploadBinary(
+    await client.storage
+        .from(questionPacksBucket)
+        .uploadBinary(
           storagePath,
           compressed.gzBytes,
           fileOptions: const FileOptions(
@@ -336,10 +350,11 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
             cacheControl: '31536000',
             upsert: true,
           ),
-        );
+        )
+        .timeout(const Duration(seconds: 30));
 
     onStage?.call('جارٍ اعتماد رقم الحزمة وبث التحديث للاعبين...');
-    await client.rpc(
+    final pubRes = await client.rpc(
       'admin_publish_category_pack',
       params: {
         'p_category_id': cleanCat,
@@ -348,12 +363,16 @@ mixin AdminCmsQuizMixin on AdminServiceBase {
       },
     ).timeout(const Duration(seconds: 10));
 
+    final actualPackVer = pubRes is Map
+        ? ((pubRes['pack_version'] as num?)?.toInt() ?? expectedPackVer)
+        : expectedPackVer;
+
     syncAndBroadcastAll();
 
     return AdminGzipPackPublishResult(
       categoryId: cleanCat,
       storagePath: storagePath,
-      packVersion: packVer,
+      packVersion: actualPackVer,
       questionsCount: qCount,
       rawBytesLength: compressed.rawBytes.length,
       gzipBytesLength: compressed.gzBytes.length,

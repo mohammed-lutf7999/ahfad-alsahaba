@@ -14,6 +14,14 @@ import '../../models/control/admin_player_dossier_models.dart';
   return (rawBytes: rawBytes, gzBytes: gzBytes);
 }
 
+/// Top-level Isolate function parsing & validating large bulk JSON strings
+/// off the UI thread via `compute`.
+BulkQuestionValidationResult parseAndValidateBulkJsonIsolate(
+  String rawJsonText,
+) {
+  return BulkQuestionJsonValidator.parseAndValidateJsonString(rawJsonText);
+}
+
 /// Optional category metadata extracted from a bulk JSON pack file.
 class BulkQuestionPackMeta {
   final String categoryId;
@@ -22,8 +30,8 @@ class BulkQuestionPackMeta {
   final String colorHex;
   final String iconName;
   final int? totalLevels;
-  final int questionsPerLevel;
-  final String levelDrawMode;
+  final int? questionsPerLevel;
+  final String? levelDrawMode;
 
   const BulkQuestionPackMeta({
     this.categoryId = '',
@@ -32,8 +40,8 @@ class BulkQuestionPackMeta {
     this.colorHex = '#1B5E20',
     this.iconName = 'quiz_rounded',
     this.totalLevels,
-    this.questionsPerLevel = 10,
-    this.levelDrawMode = 'fixed',
+    this.questionsPerLevel,
+    this.levelDrawMode,
   });
 }
 
@@ -78,11 +86,15 @@ class BulkQuestionJsonValidator {
   }
 
   /// Parses and validates raw JSON text (either `{ levels: {...} }` or `[...]`).
+  /// Strips leading UTF-8 BOM (`\uFEFF`) commonly emitted by Windows editors.
   static BulkQuestionValidationResult parseAndValidateJsonString(
     String rawJsonText,
   ) {
     try {
-      final decoded = jsonDecode(rawJsonText);
+      final sanitized = rawJsonText.startsWith('\uFEFF')
+          ? rawJsonText.substring(1)
+          : rawJsonText;
+      final decoded = jsonDecode(sanitized);
       return validateDecoded(decoded);
     } catch (e) {
       return BulkQuestionValidationResult(
@@ -189,11 +201,15 @@ class BulkQuestionJsonValidator {
     } else if (rawData is Map && rawData['levels'] is Map) {
       final map = Map<String, dynamic>.from(rawData);
       final rawDrawMode =
-          (map['levelDrawMode'] ?? map['level_draw_mode'] ?? 'fixed')
-              .toString()
-              .trim();
+          (map['levelDrawMode'] ?? map['level_draw_mode'])?.toString().trim().toLowerCase();
+      final String? parsedDrawMode =
+          (rawDrawMode == 'fixed' || rawDrawMode == 'rotating_pool')
+              ? rawDrawMode
+              : null;
       final parsedTotal =
           _toInt(map['totalLevels'] ?? map['total_levels']);
+      final parsedQPerLevel =
+          _toInt(map['questionsPerLevel'] ?? map['questions_per_level']);
       meta = BulkQuestionPackMeta(
         categoryId: (map['categoryId'] ?? map['category_id'] ?? '')
             .toString()
@@ -213,12 +229,10 @@ class BulkQuestionJsonValidator {
         totalLevels: (parsedTotal != null && parsedTotal > 0)
             ? parsedTotal.clamp(1, 100)
             : null,
-        questionsPerLevel:
-            (_toInt(map['questionsPerLevel'] ?? map['questions_per_level']) ??
-                    10)
-                .clamp(1, 100),
-        levelDrawMode:
-            rawDrawMode == 'rotating_pool' ? 'rotating_pool' : 'fixed',
+        questionsPerLevel: (parsedQPerLevel != null && parsedQPerLevel > 0)
+            ? parsedQPerLevel.clamp(1, 100)
+            : null,
+        levelDrawMode: parsedDrawMode,
       );
 
       final levelsMap = Map<String, dynamic>.from(map['levels'] as Map);
@@ -281,17 +295,25 @@ class BulkQuestionJsonValidator {
 
   static int? _toInt(dynamic raw) {
     if (raw is int) return raw;
-    if (raw is num) return raw.toInt();
+    if (raw is num) {
+      // Strictly reject non-integer decimals like 1.5 instead of truncating silently
+      return raw.isFinite && raw == raw.truncateToDouble() ? raw.toInt() : null;
+    }
     if (raw is String) return int.tryParse(raw.trim());
     return null;
   }
 
   /// Escapes a CSV cell safely and neutralizes spreadsheet formula injection
-  /// (`=`, `+`, `-`, `@`, `\t`, `\r`).
+  /// (`=`, `+`, `-`, `@`, `\t`, `\r`) even when preceded by leading whitespace.
   static String escapeCsvCell(Object? value) {
-    var str = (value ?? '').toString().replaceAll('\r\n', ' ').replaceAll('\n', ' ');
-    if (str.isNotEmpty) {
-      final first = str[0];
+    var str = (value ?? '')
+        .toString()
+        .replaceAll('\r\n', ' ')
+        .replaceAll('\r', ' ')
+        .replaceAll('\n', ' ');
+    final trimmedLeft = str.trimLeft();
+    if (trimmedLeft.isNotEmpty) {
+      final first = trimmedLeft[0];
       if (first == '=' ||
           first == '+' ||
           first == '-' ||

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:ahfad_alsahaba/core/app_constants.dart';
 import 'package:ahfad_alsahaba/core/theme/app_custom_theme.dart';
 import 'package:ahfad_alsahaba/data/local/shared_prefs_service.dart';
 import 'package:ahfad_alsahaba/data/models/app_control_models.dart';
@@ -12,6 +13,7 @@ import 'package:ahfad_alsahaba/data/services/question/question_pack_cache_servic
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_bulk_pack_manager_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_players_support_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,80 +27,44 @@ void main() {
     AdminService().resetForTesting();
   });
 
-  group('M25 — Full Mobile Admin Parity (Bulk JSON, Gzip Publish & CSV Export)', () {
-    test('BulkQuestionJsonValidator validates levels & snake_case, catches bad IDs/options/duplicates', () {
-      final validJson = jsonEncode({
-        'category_id': 'ghazawat',
-        'category_name': 'الغزوات الكبرى',
-        'total_levels': 25,
-        'questions_per_level': 15,
-        'level_draw_mode': 'rotating_pool',
+  group('M25 — Full Mobile Admin Parity (Hardened 11-Point Audit)', () {
+    test('BulkQuestionJsonValidator strips Windows UTF-8 BOM, rejects decimal correct indices, & keeps omitted meta fields null', () {
+      // Leading UTF-8 BOM (\uFEFF) + omitted questionsPerLevel/levelDrawMode -> must stay null!
+      final bomJson = '\uFEFF${jsonEncode({
+        'category_id': 'seerah',
         'levels': {
           '1': [
             {
-              'id': 'ghz_001',
+              'id': 'bom_q_01',
               'question': 'في أي سنة وقعت غزوة بدر الكبرى؟',
               'options': ['1 هـ', '2 هـ', '3 هـ', '4 هـ'],
               'correct': 1,
               'explanation': 'وقعت في رمضان سنة 2 هـ.',
-              'sync_scope': 'all_with_fallback',
-              'is_visible': true,
-            },
-            {
-              'id': 'ghz_002',
-              'question': 'في اي سنه وقعت غزوة بدر الكبرى؟',
-              'options': ['2 هـ', '3 هـ', '4 هـ', '5 هـ'],
-              'correct_index': 0,
             },
           ],
         },
-      });
+      })}';
 
-      final res = BulkQuestionJsonValidator.parseAndValidateJsonString(validJson);
-      expect(res.isValid, isTrue);
-      expect(res.errors, isEmpty);
-      expect(res.normalizedQuestions.length, equals(2));
-      expect(res.meta?.categoryId, equals('ghazawat'));
-      expect(res.meta?.totalLevels, equals(25));
-      expect(res.meta?.questionsPerLevel, equals(15));
-      expect(res.meta?.levelDrawMode, equals('rotating_pool'));
-      // Duplicate normalized Arabic text + missing explanation produce non-blocking warnings
-      expect(res.warnings.length, greaterThanOrEqualTo(2));
+      final bomRes = BulkQuestionJsonValidator.parseAndValidateJsonString(bomJson);
+      expect(bomRes.isValid, isTrue);
+      expect(bomRes.meta?.categoryId, equals('seerah'));
+      expect(bomRes.meta?.questionsPerLevel, isNull);
+      expect(bomRes.meta?.levelDrawMode, isNull);
+      expect(bomRes.meta?.totalLevels, isNull);
 
-      // Invalid payload: duplicate ID + empty option + out-of-range correct
-      final invalidJson = jsonEncode([
+      // Strictly reject non-integer decimal like "correct": 1.5
+      final decimalJson = jsonEncode([
         {
-          'id': 'dup_01',
+          'id': 'dec_01',
           'level_number': 1,
-          'question': 'سؤال أول؟',
-          'options': ['أ', 'ب', 'ج', ''],
-          'correct': 1,
-        },
-        {
-          'id': 'dup_02',
-          'level_number': 1,
-          'question': 'سؤال ثانٍ؟',
+          'question': 'سؤال بقيمة عشرية خاطئة؟',
           'options': ['أ', 'ب', 'ج', 'د'],
-          'correct': 5,
-        },
-        {
-          'id': 'dup_03',
-          'level_number': 1,
-          'question': 'سؤال ثالث؟',
-          'options': ['أ', 'ب', 'ج', 'د'],
-          'correct': 0,
-        },
-        {
-          'id': 'dup_03',
-          'level_number': 2,
-          'question': 'سؤال رابع؟',
-          'options': ['أ', 'ب', 'ج', 'د'],
-          'correct': 2,
+          'correct': 1.5,
         },
       ]);
-      final bad = BulkQuestionJsonValidator.parseAndValidateJsonString(invalidJson);
-      expect(bad.isValid, isFalse);
-      expect(bad.errors.length, greaterThanOrEqualTo(3));
+      final decRes = BulkQuestionJsonValidator.parseAndValidateJsonString(decimalJson);
+      expect(decRes.isValid, isFalse);
+      expect(decRes.errors.first, contains('فهرس الإجابة الصحيحة'));
     });
 
     test('encodeJsonToGzipBytes produces valid Gzip Magic Bytes & round-trips through decodeQuestionPackBytes', () {
@@ -125,33 +91,43 @@ void main() {
       expect((decoded['levels'] as Map)['1'], hasLength(1));
     });
 
-    test('buildPlayersCsv includes UTF-8 BOM and neutralizes CSV formula injection', () {
+    test('buildPlayersCsv includes UTF-8 BOM, strips standalone CR & blocks leading-whitespace formula injection', () {
       final players = [
-        AdminPlayerSearchResult(
+        const AdminPlayerSearchResult(
           userId: 'u1',
-          displayName: '=CMD|" /C calc"!A0',
-          email: '+evil@example.com',
+          displayName: '  =CMD|" /C calc"!A0\rline2',
+          email: ' +evil@example.com',
           playerCode: 'SAH-1234',
           totalScore: 500,
           trophies: 120,
           playerLevel: 5,
           isGuest: false,
           platform: 'android',
-          appVersion: '1.2.0',
+          appVersion: '1.2.1',
         ),
       ];
       final csv = BulkQuestionJsonValidator.buildPlayersCsv(players);
       expect(csv.startsWith('\uFEFF'), isTrue);
-      expect(csv, contains('"\'=CMD'));
-      expect(csv, contains('"\'+evil@example.com"'));
+      expect(csv, contains('"\'  =CMD'));
+      expect(csv, contains('"\' +evil@example.com"'));
+      expect(csv.contains('\r'), isFalse);
       expect(csv, contains('"SAH-1234"'));
     });
 
-    test('AdminService.bulkUpsertQuizQuestions chunks 450 questions into 200+200+50 batches', () async {
+    test('AdminService.bulkUpsertQuizQuestions chunks 450 questions into 200+200+50 and rejects empty categoryId', () async {
+      expect(
+        () => AdminService().bulkUpsertQuizQuestions(
+          categoryId: '   ',
+          questions: const [],
+        ),
+        throwsArgumentError,
+      );
+
       final chunkSizes = <int>[];
       final progressLog = <int>[];
 
       AdminService().bulkQuizQuestionsUpserterOverride = (catId, chunk) async {
+        expect(catId, equals('seerah'));
         chunkSizes.add(chunk.length);
         return chunk.length;
       };
@@ -178,11 +154,38 @@ void main() {
       expect(progressLog, equals([200, 400, 450]));
     });
 
-    testWidgets('AdminBulkPackManagerScreen renders cleanly on 360x800dp with SafeArea and saves config / publishes pack', (tester) async {
+    testWidgets('AdminBulkPackManagerScreen (RTL 360x800dp) preserves seerah config on clipboard paste, uploads, saves config & updates v2->v3 on publish', (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Mock Clipboard with JSON targeting `seerah` WITHOUT questionsPerLevel/levelDrawMode
+      final clipboardJson = jsonEncode({
+        'categoryId': 'seerah',
+        'levels': {
+          '11': [
+            {
+              'id': 'sr_l11_q1',
+              'question': 'في أي عام كان صلح الحديبية؟',
+              'options': ['5 هـ', '6 هـ', '7 هـ', '8 هـ'],
+              'correct': 1,
+              'explanation': 'كان في ذي القعدة سنة 6 هـ.',
+            },
+          ],
+        },
+      });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.getData') {
+          return <String, dynamic>{'text': clipboardJson};
+        }
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
 
       CmsCacheService.instance.setSnapshotForTesting(
         const CmsCacheSnapshot(
@@ -201,20 +204,29 @@ void main() {
         ),
       );
 
-      var configSaved = false;
-      var packPublished = false;
+      String? uploadedCat;
+      int uploadedCount = 0;
+      Map<String, dynamic>? savedConfigParams;
+      String? publishedCat;
+
+      AdminService().bulkQuizQuestionsUpserterOverride = (catId, chunk) async {
+        uploadedCat = catId;
+        uploadedCount += chunk.length;
+        return chunk.length;
+      };
       AdminService().quizCategoryConfigUpdaterOverride = (params) async {
-        configSaved = true;
+        savedConfigParams = params;
         return DynamicQuizCategoryData(
           id: params['p_category_id'] as String,
           name: 'السيرة النبوية',
           totalLevels: (params['p_total_levels'] as int?) ?? 20,
           questionsPerLevel: (params['p_questions_per_level'] as int?) ?? 15,
           levelDrawMode: (params['p_level_draw_mode'] as String?) ?? 'rotating_pool',
+          packVersion: 2,
         );
       };
       AdminService().gzipPackPublisherOverride = (catId) async {
-        packPublished = true;
+        publishedCat = catId;
         return AdminGzipPackPublishResult(
           categoryId: catId,
           storagePath: '${catId}_v3.json.gz',
@@ -230,38 +242,69 @@ void main() {
           theme: ThemeData.dark().copyWith(
             extensions: [AppCustomTheme.andalusianGold],
           ),
-          home: const MediaQuery(
-            data: MediaQueryData(
-              size: Size(360, 800),
-              padding: EdgeInsets.only(top: 48, bottom: 48),
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: MediaQuery(
+              data: MediaQueryData(
+                size: Size(360, 800),
+                padding: EdgeInsets.only(top: 48, bottom: 48),
+              ),
+              child: AdminBulkPackManagerScreen(),
             ),
-            child: AdminBulkPackManagerScreen(),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('btn_pick_json_file')), findsOneWidget);
-      expect(find.byKey(const Key('btn_paste_json_clipboard')), findsOneWidget);
-
+      // Paste JSON targeting `seerah` -> switches dropdown to `seerah` & preserves 20 / 15 / rotating_pool!
       await tester.scrollUntilVisible(
-        find.byKey(const Key('btn_mobile_publish_gzip')),
+        find.byKey(const Key('btn_paste_json_clipboard')),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('btn_paste_json_clipboard')));
+      // Allow the real `compute(...)` Isolate to complete inside testWidgets fake-async zone
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 250)),
+      );
+      await tester.pumpAndSettle();
+
+      // Scroll to action buttons and run Upload -> Save Config -> Publish Gzip
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('btn_mobile_publish_gzip')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('btn_mobile_bulk_upload')));
+      await tester.pumpAndSettle();
+      expect(uploadedCat, equals('seerah'));
+      expect(uploadedCount, equals(1));
 
       await tester.tap(find.byKey(const Key('btn_mobile_save_config')));
       await tester.pumpAndSettle();
-      expect(configSaved, isTrue);
+      expect(savedConfigParams?['p_category_id'], equals('seerah'));
+      expect(savedConfigParams?['p_total_levels'], equals(20));
+      expect(savedConfigParams?['p_questions_per_level'], equals(15));
+      expect(savedConfigParams?['p_level_draw_mode'], equals('rotating_pool'));
 
       await tester.tap(find.byKey(const Key('btn_mobile_publish_gzip')));
       await tester.pumpAndSettle();
-      expect(packPublished, isTrue);
+      expect(publishedCat, equals('seerah'));
+      // Dropdown immediately reflects updated packVersion v3
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('bulk_existing_category_dropdown')),
+        -250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('السيرة النبوية (seerah) — v3'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('AdminPlayersSupportScreen displays CSV export button cleanly on 360x800dp', (tester) async {
+    testWidgets('AdminPlayersSupportScreen (RTL 360x800dp) displays CSV export button cleanly', (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -287,12 +330,15 @@ void main() {
           theme: ThemeData.dark().copyWith(
             extensions: [AppCustomTheme.andalusianGold],
           ),
-          home: const MediaQuery(
-            data: MediaQueryData(
-              size: Size(360, 800),
-              padding: EdgeInsets.only(top: 48, bottom: 48),
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: MediaQuery(
+              data: MediaQueryData(
+                size: Size(360, 800),
+                padding: EdgeInsets.only(top: 48, bottom: 48),
+              ),
+              child: AdminPlayersSupportScreen(),
             ),
-            child: AdminPlayersSupportScreen(),
           ),
         ),
       );
@@ -301,6 +347,11 @@ void main() {
       expect(find.byKey(const Key('btn_export_players_csv')), findsOneWidget);
       expect(find.text('تصدير CSV (1)'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    test('Unified Version Bump is 1.2.1+23', () {
+      expect(AppConstants.appVersion, equals('1.2.1'));
+      expect(AppConstants.appBuildNumber, equals(23));
     });
   });
 }

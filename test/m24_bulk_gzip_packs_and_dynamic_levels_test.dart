@@ -707,9 +707,9 @@ void main() {
       );
     });
 
-    test('Unified Version Bump is 1.2.0+22', () {
-      expect(AppConstants.appVersion, equals('1.2.0'));
-      expect(AppConstants.appBuildNumber, equals(22));
+    test('Unified Version Bump is at least 1.2.0+22', () {
+      expect(AppConstants.appVersion.startsWith('1.2.'), isTrue);
+      expect(AppConstants.appBuildNumber, greaterThanOrEqualTo(22));
     });
   });
 }
