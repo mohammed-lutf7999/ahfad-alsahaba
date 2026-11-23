@@ -6,6 +6,7 @@ import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
 import '../../data/services/admin_service.dart';
 import 'admin/admin_announcements_screen.dart';
+import 'admin/admin_bulk_pack_manager_screen.dart';
 import 'admin/admin_cms_manager_screen.dart';
 import 'admin/admin_events_screen.dart';
 import 'admin/admin_players_support_screen.dart';
@@ -541,6 +542,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           icon: Icons.store_mall_directory_rounded,
           color: customTheme.sovereignAccent,
           onTap: () => _openAndRefresh(const AdminCmsManagerScreen()),
+        ),
+        const SizedBox(height: 12),
+        _buildActionCard(
+          key: const Key('admin_nav_bulk_packs'),
+          title: 'استيراد JSON وحزم Gzip CDN 📦',
+          subtitle: 'رفع آلاف الأسئلة، المستويات المرنة (1–100)، ونمط السحب المتجدد',
+          icon: Icons.archive_rounded,
+          color: const Color(0xFF10B981),
+          onTap: () => _openAndRefresh(const AdminBulkPackManagerScreen()),
         ),
         const SizedBox(height: 12),
         _buildActionCard(

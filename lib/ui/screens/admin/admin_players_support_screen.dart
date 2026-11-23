@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/app_control_models.dart';
+import '../../../data/services/admin/bulk_question_json_validator.dart';
 import '../../../data/services/admin_service.dart';
 import 'widgets/admin_ui_kit.dart';
 
@@ -302,6 +307,30 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
     }
   }
 
+  Future<void> _exportPlayersCsv() async {
+    if (_players.isEmpty) {
+      showAdminFeedback(context, 'لا يوجد لاعبون لتصديرهم حالياً.', isError: true);
+      return;
+    }
+    try {
+      final csv = BulkQuestionJsonValidator.buildPlayersCsv(_players);
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}ahfad_players_${DateTime.now().millisecondsSinceEpoch}.csv',
+      );
+      await file.writeAsString(csv, flush: true);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/csv')],
+          text: 'تصدير بيانات اللاعبين — معركة أحفاد الصحابة (${_players.length} سجل)',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAdminFeedback(context, 'تعذر تصدير ملف CSV: $e', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent = AppCustomTheme.of(context).sovereignAccent;
@@ -326,6 +355,25 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
                   suffixIcon: IconButton(
                     icon: Icon(Icons.search_rounded, color: accent),
                     onPressed: _runSearch,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const Key('btn_export_players_csv'),
+                    onPressed: _players.isEmpty ? null : _exportPlayersCsv,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 17),
+                    label: Text(
+                      'تصدير CSV (${_players.length})',
+                      style: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
