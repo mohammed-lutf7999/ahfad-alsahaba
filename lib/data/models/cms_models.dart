@@ -116,6 +116,10 @@ class DynamicQuizCategoryData {
   final String iconName;
   final String colorHex;
   final int totalLevels;
+  final int questionsPerLevel;
+  final String levelDrawMode;
+  final int packVersion;
+  final String packStoragePath;
   final int sortOrder;
   final bool isVisible;
   final bool isLocked;
@@ -128,6 +132,10 @@ class DynamicQuizCategoryData {
     this.iconName = 'quiz_rounded',
     this.colorHex = '#1B5E20',
     this.totalLevels = 10,
+    this.questionsPerLevel = 10,
+    this.levelDrawMode = 'fixed',
+    this.packVersion = 0,
+    this.packStoragePath = '',
     this.sortOrder = 100,
     this.isVisible = true,
     this.isLocked = false,
@@ -135,6 +143,12 @@ class DynamicQuizCategoryData {
   });
 
   factory DynamicQuizCategoryData.fromJson(Map<String, dynamic> json) {
+    final rawMode =
+        (json['level_draw_mode'] ?? json['levelDrawMode'] ?? 'fixed')
+            .toString()
+            .trim();
+    final safeMode =
+        rawMode == 'rotating_pool' ? 'rotating_pool' : 'fixed';
     return DynamicQuizCategoryData(
       id: (json['id'] ?? '').toString().trim(),
       name: (json['name'] ?? '').toString(),
@@ -146,6 +160,19 @@ class DynamicQuizCategoryData {
               (json['totalLevels'] as num?)?.toInt() ??
               10)
           .clamp(1, 100),
+      questionsPerLevel: ((json['questions_per_level'] as num?)?.toInt() ??
+              (json['questionsPerLevel'] as num?)?.toInt() ??
+              10)
+          .clamp(1, 100),
+      levelDrawMode: safeMode,
+      packVersion: ((json['pack_version'] as num?)?.toInt() ??
+              (json['packVersion'] as num?)?.toInt() ??
+              0)
+          .clamp(0, 1000000000),
+      packStoragePath:
+          (json['pack_storage_path'] ?? json['packStoragePath'] ?? '')
+              .toString()
+              .trim(),
       sortOrder: (json['sort_order'] as num?)?.toInt() ??
           (json['sortOrder'] as num?)?.toInt() ??
           100,
@@ -168,6 +195,10 @@ class DynamicQuizCategoryData {
         'icon_name': iconName,
         'color_hex': colorHex,
         'total_levels': totalLevels,
+        'questions_per_level': questionsPerLevel,
+        'level_draw_mode': levelDrawMode,
+        'pack_version': packVersion,
+        'pack_storage_path': packStoragePath,
         'sort_order': sortOrder,
         'is_visible': isVisible,
         'is_locked': isLocked,

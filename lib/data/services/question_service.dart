@@ -1,10 +1,13 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import '../../core/cms_icon_registry.dart';
 import '../models/cms_models.dart';
 import '../models/question_model.dart';
 import 'cms_cache_service.dart';
 import 'question/question_asset_loader.dart';
 import 'question/question_cms_merger.dart';
+import 'question/question_pack_cache_service.dart';
+import 'question/rotating_pool_selector.dart';
 
 /// Service for loading questions from local JSON assets merged with dynamic
 /// solo Quiz additions/edits/visibility rules cached in [CmsCacheService].
@@ -23,6 +26,30 @@ class QuestionService {
 
   Future<void> _ensureBaseCategoryLoaded(String categoryId) =>
       _assetLoader.ensureLoaded(categoryId);
+
+  /// Resolves the primary solo question dataset for [categoryId]:
+  /// 1. Published Gzip CDN pack (if `packVersion > 0 && packStoragePath` is set)
+  ///    hydrated via [QuestionPackCacheService] with offline disk cache fallback.
+  /// 2. Bundled `assets/questions/<categoryId>.json` fallback if offline or no pack.
+  Future<Map<String, dynamic>?> _resolveCategorySourceData(
+    String categoryId, {
+    bool allowPack = true,
+  }) async {
+    if (allowPack) {
+      final dynCat = CmsCacheService.instance.snapshot.quizCategories[categoryId];
+      if (dynCat != null &&
+          dynCat.packVersion > 0 &&
+          dynCat.packStoragePath.isNotEmpty) {
+        final pack =
+            await QuestionPackCacheService.instance.ensurePackLoaded(dynCat);
+        if (pack != null && pack['levels'] is Map) {
+          return pack;
+        }
+      }
+    }
+    await _ensureBaseCategoryLoaded(categoryId);
+    return _assetLoader.getCached(categoryId);
+  }
 
   Question _withOptionRandom(Question question, Random? optionRandom) =>
       QuestionCmsMerger.withOptionRandom(question, optionRandom);
@@ -199,14 +226,14 @@ class QuestionService {
   }
 
   /// Builds visible solo questions for `(categoryId, levelNumber)` merging
-  /// local asset JSON with dynamic overrides & additions from [CmsCacheService].
+  /// Gzip CDN pack (or local asset JSON) with dynamic overrides & additions
+  /// from [CmsCacheService], applying `questions_per_level` and `rotating_pool`
+  /// rules when configured.
   Future<List<Question>> loadQuestions({
     required String categoryId,
     required int levelNumber,
   }) async {
-    await _ensureBaseCategoryLoaded(categoryId);
-
-    final baseData = _assetLoader.getCached(categoryId);
+    final baseData = await _resolveCategorySourceData(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final levelKey = levelNumber.toString();
     final rawBaseList = levels?[levelKey] as List?;
@@ -267,7 +294,26 @@ class QuestionService {
 
     merged.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final questions = merged.map((e) => e.question).toList();
+
+    final qPerLevel = CmsCategoryBounds.questionsPerLevelFor(categoryId);
+    final drawMode = CmsCategoryBounds.drawModeFor(categoryId);
+
+    if (drawMode == 'rotating_pool' && questions.length > qPerLevel) {
+      return RotatingPoolSelector.selectAndPersist(
+        categoryId: categoryId,
+        levelNumber: levelNumber,
+        pool: questions,
+        questionsPerLevel: qPerLevel,
+        random: _random,
+      );
+    }
+
     questions.shuffle(_random);
+    final hasDynamicCategory =
+        CmsCacheService.instance.snapshot.quizCategories.containsKey(categoryId);
+    if (hasDynamicCategory && questions.length > qPerLevel) {
+      return questions.take(qPerLevel).toList();
+    }
     return questions;
   }
 
@@ -279,9 +325,10 @@ class QuestionService {
     Random? optionRandom,
     bool includeCloudSoloQuestions = true,
   }) async {
-    await _ensureBaseCategoryLoaded(categoryId);
-
-    final baseData = _assetLoader.getCached(categoryId);
+    final baseData = await _resolveCategorySourceData(
+      categoryId,
+      allowPack: includeCloudSoloQuestions,
+    );
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final effectiveOptionRng = shuffleOptions ? (optionRandom ?? _random) : null;
 
@@ -352,7 +399,6 @@ class QuestionService {
 
   /// Check if a specific level has visible questions in [categoryId].
   Future<bool> levelExists(String categoryId, int levelNumber) async {
-    await _ensureBaseCategoryLoaded(categoryId);
     final hasCloudForLevel = CmsCacheService.instance.snapshot.quizQuestions.values
         .any((q) =>
             q.categoryId == categoryId &&
@@ -361,19 +407,25 @@ class QuestionService {
             q.options.length == 4);
     if (hasCloudForLevel) return true;
 
-    final baseData = _assetLoader.getCached(categoryId);
+    final baseData = await _resolveCategorySourceData(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final list = levels?[levelNumber.toString()] as List?;
     return list != null && list.isNotEmpty;
   }
 
-  /// Clears cached JSON asset data (only needed explicitly in memory cleanup/tests).
-  void clearCache([String? categoryId]) => _assetLoader.clear(categoryId);
+  /// Clears cached JSON asset & Gzip pack memory data.
+  void clearCache([String? categoryId]) {
+    _assetLoader.clear(categoryId);
+    QuestionPackCacheService.instance.clearMemoryCache(categoryId);
+  }
 
-  bool isCached(String categoryId) => _assetLoader.isCached(categoryId);
+  bool isCached(String categoryId) =>
+      _assetLoader.isCached(categoryId) ||
+      QuestionPackCacheService.instance.getCachedPackInMemory(categoryId) !=
+          null;
 
   Future<void> preloadCategory(String categoryId) async {
-    await _ensureBaseCategoryLoaded(categoryId);
+    await _resolveCategorySourceData(categoryId);
   }
 
   /// Get 5 deterministic questions for multiplayer based on a seed.

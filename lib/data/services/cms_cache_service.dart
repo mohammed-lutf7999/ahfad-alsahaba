@@ -27,6 +27,9 @@ class CmsCacheService extends ChangeNotifier {
   static final CmsCacheService instance = CmsCacheService._internal();
   CmsCacheService._internal() {
     CmsCategoryBounds.totalLevelsResolver = getTotalLevelsForCategory;
+    CmsCategoryBounds.questionsPerLevelResolver =
+        getQuestionsPerLevelForCategory;
+    CmsCategoryBounds.drawModeResolver = getDrawModeForCategory;
   }
 
   CmsCacheSnapshot _snapshot = CmsCacheSnapshot.empty();
@@ -238,6 +241,24 @@ class CmsCacheService extends ChangeNotifier {
       return cat.totalLevels.clamp(1, 100);
     }
     return AppConstants.levelsPerCategory;
+  }
+
+  /// Resolves dynamic `questionsPerLevel` for [categoryId] (defaulting to 10).
+  int getQuestionsPerLevelForCategory(String categoryId) {
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat != null && cat.questionsPerLevel > 0) {
+      return cat.questionsPerLevel.clamp(1, 100);
+    }
+    return AppConstants.questionsPerLevel;
+  }
+
+  /// Resolves dynamic `levelDrawMode` (`fixed` or `rotating_pool`) for [categoryId].
+  String getDrawModeForCategory(String categoryId) {
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat != null && cat.levelDrawMode == 'rotating_pool') {
+      return 'rotating_pool';
+    }
+    return 'fixed';
   }
 
   /// Resolves category display title from dynamic CMS first, falling back to AppConstants.

@@ -114,11 +114,14 @@ class CmsIconRegistry {
 }
 
 /// Lightweight indirection avoiding circular imports between `PlayerProfile`
-/// and `CmsCacheService` when resolving per-category dynamic max levels.
+/// and `CmsCacheService` when resolving per-category dynamic max levels,
+/// questions per level, and draw mode.
 class CmsCategoryBounds {
   CmsCategoryBounds._();
 
   static int Function(String categoryId)? totalLevelsResolver;
+  static int Function(String categoryId)? questionsPerLevelResolver;
+  static String Function(String categoryId)? drawModeResolver;
 
   /// Resolves dynamic max levels for [categoryId], defaulting safely to 10.
   static int maxLevelsFor(String categoryId, {int defaultMax = 10}) {
@@ -126,5 +129,21 @@ class CmsCategoryBounds {
     if (resolver == null) return defaultMax;
     final resolved = resolver(categoryId);
     return resolved > 0 ? resolved.clamp(1, 100) : defaultMax;
+  }
+
+  /// Resolves dynamic questions-per-level for [categoryId], defaulting to 10.
+  static int questionsPerLevelFor(String categoryId, {int defaultCount = 10}) {
+    final resolver = questionsPerLevelResolver;
+    if (resolver == null) return defaultCount;
+    final resolved = resolver(categoryId);
+    return resolved > 0 ? resolved.clamp(1, 100) : defaultCount;
+  }
+
+  /// Resolves dynamic level draw mode (`fixed` or `rotating_pool`).
+  static String drawModeFor(String categoryId) {
+    final resolver = drawModeResolver;
+    if (resolver == null) return 'fixed';
+    final resolved = resolver(categoryId);
+    return resolved == 'rotating_pool' ? 'rotating_pool' : 'fixed';
   }
 }

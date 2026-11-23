@@ -83,7 +83,11 @@ class GameController extends ChangeNotifier {
         name: 'القرآن الكريم',
         description: 'أسئلة عن القرآن الكريم وعلومه',
         icon: Icons.menu_book,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.quranCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.quranCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.quranCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.quranCategory),
         color: const Color(0xFF1B5E20),
         sortOrder: 10,
@@ -93,7 +97,11 @@ class GameController extends ChangeNotifier {
         name: 'الحديث الشريف',
         description: 'أسئلة عن الأحاديث النبوية',
         icon: Icons.format_quote,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.hadithCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.hadithCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.hadithCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.hadithCategory),
         color: const Color(0xFF0D47A1),
         sortOrder: 20,
@@ -103,7 +111,11 @@ class GameController extends ChangeNotifier {
         name: 'الفقه',
         description: 'أسئلة عن أحكام الفقه الإسلامي',
         icon: Icons.balance,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.fiqhCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.fiqhCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.fiqhCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.fiqhCategory),
         color: const Color(0xFF4A148C),
         sortOrder: 30,
@@ -113,7 +125,11 @@ class GameController extends ChangeNotifier {
         name: 'السيرة النبوية',
         description: 'أسئلة عن سيرة النبي ﷺ',
         icon: Icons.history_edu,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.seerahCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.seerahCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.seerahCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.seerahCategory),
         color: const Color(0xFFBF360C),
         sortOrder: 40,
@@ -123,7 +139,11 @@ class GameController extends ChangeNotifier {
         name: 'التاريخ الإسلامي',
         description: 'أسئلة عن تاريخ الحضارة الإسلامية',
         icon: Icons.castle,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.historyCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.historyCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.historyCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.historyCategory),
         color: const Color(0xFF006064),
         sortOrder: 50,
@@ -133,7 +153,11 @@ class GameController extends ChangeNotifier {
         name: 'العقيدة',
         description: 'أسئلة عن أصول العقيدة الإسلامية',
         icon: Icons.auto_awesome,
-        totalLevels: AppConstants.levelsPerCategory,
+        totalLevels: CmsCategoryBounds.maxLevelsFor(AppConstants.aqeedahCategory),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(
+          AppConstants.aqeedahCategory,
+        ),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(AppConstants.aqeedahCategory),
         unlockedLevels: _getCategoryUnlockedLevels(AppConstants.aqeedahCategory),
         color: const Color(0xFF311B92),
         sortOrder: 60,
@@ -160,6 +184,8 @@ class GameController extends ChangeNotifier {
           fallback: base?.icon ?? Icons.quiz_rounded,
         ),
         totalLevels: resolvedLevels,
+        questionsPerLevel: cloudCat.questionsPerLevel,
+        levelDrawMode: cloudCat.levelDrawMode,
         unlockedLevels: _getCategoryUnlockedLevels(cloudCat.id),
         isLocked: cloudCat.isLocked,
         color: CmsIconRegistry.parseHexColor(
@@ -189,10 +215,13 @@ class GameController extends ChangeNotifier {
         description: '',
         icon: Icons.quiz_rounded,
         totalLevels: CmsCategoryBounds.maxLevelsFor(categoryId),
+        questionsPerLevel: CmsCategoryBounds.questionsPerLevelFor(categoryId),
+        levelDrawMode: CmsCategoryBounds.drawModeFor(categoryId),
         unlockedLevels: _getCategoryUnlockedLevels(categoryId),
       ),
     );
     final profile = ProfileService.instance.activeProfile;
+    final questionsCount = category.questionsPerLevel;
     
     return List.generate(category.totalLevels, (index) {
       final levelNumber = index + 1;
@@ -206,7 +235,7 @@ class GameController extends ChangeNotifier {
         categoryId: categoryId,
         levelNumber: levelNumber,
         title: 'المستوى $levelNumber',
-        totalQuestions: AppConstants.questionsPerLevel,
+        totalQuestions: questionsCount,
         isLocked: !isLevelUnlocked,
         isCompleted: isCompleted,
         highScore: levelScore,
