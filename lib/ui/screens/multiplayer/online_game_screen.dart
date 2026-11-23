@@ -731,7 +731,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         AppDialogs.showExitConfirmationDialog(
           context,
@@ -804,7 +804,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                                Container(
                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                                  decoration: BoxDecoration(
-                                   color: _timeLeft <= 5 ? Colors.red.withOpacity(0.3) : Colors.white.withOpacity(0.12),
+                                   color: _timeLeft <= 5 ? Colors.red.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.12),
                                    borderRadius: BorderRadius.circular(16),
                                    border: Border.all(
                                      color: _timeLeft <= 5 ? Colors.red : Colors.white30,
@@ -1024,7 +1024,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                         decoration: BoxDecoration(
                           color: Colors.black87,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
+                          border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
                         ),
                         child: Text(
                           _incomingReactionEmoji!,
@@ -1047,9 +1047,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
@@ -1063,19 +1063,19 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
     final isSelected = _selectedAnswer == index;
     final isCorrect = index == correctIndex;
     
-    Color color = Colors.white.withOpacity(0.05);
-    Color borderColor = Colors.white.withOpacity(0.1);
+    Color color = Colors.white.withValues(alpha: 0.05);
+    Color borderColor = Colors.white.withValues(alpha: 0.1);
     
     if (_isAnswered) {
       if (isCorrect) {
-        color = Colors.green.withOpacity(0.3);
+        color = Colors.green.withValues(alpha: 0.3);
         borderColor = Colors.green;
       } else if (isSelected) {
-        color = Colors.red.withOpacity(0.3);
+        color = Colors.red.withValues(alpha: 0.3);
         borderColor = Colors.red;
       }
     } else if (isSelected) {
-      color = AppTheme.accentColor.withOpacity(0.3);
+      color = AppTheme.accentColor.withValues(alpha: 0.3);
     }
 
     return GestureDetector(
@@ -1096,7 +1096,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> with TickerProvider
                height: 30,
                decoration: BoxDecoration(
                  shape: BoxShape.circle,
-                 color: borderColor.withOpacity(0.3),
+                 color: borderColor.withValues(alpha: 0.3),
                ),
                child: Center(
                  child: Text(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/date_formatters.dart';
 import '../../core/sound_service.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
@@ -510,13 +511,5 @@ class _RoyalInboxScreenState extends State<RoyalInboxScreen>
     }
   }
 
-  String _formatDate(DateTime? dt) {
-    if (dt == null) return '';
-    final local = dt.toLocal();
-    final m = local.month.toString().padLeft(2, '0');
-    final d = local.day.toString().padLeft(2, '0');
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    return '$d/$m • $hh:$mm';
-  }
+  String _formatDate(DateTime? dt) => DateFormatters.formatDayMonthTime(dt);
 }

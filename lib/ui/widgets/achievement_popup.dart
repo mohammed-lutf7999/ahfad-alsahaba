@@ -25,7 +25,7 @@ class AchievementPopup extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Achievement',
-      barrierColor: Colors.black.withOpacity(0.85),
+      barrierColor: Colors.black.withValues(alpha: 0.85),
       transitionDuration: const Duration(milliseconds: 600),
       pageBuilder: (ctx, anim1, anim2) {
         return AchievementPopup(
@@ -269,7 +269,7 @@ class _AchievementPopupState extends State<AchievementPopup>
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                AppTheme.primaryLight.withOpacity(0.95),
+                                AppTheme.primaryLight.withValues(alpha: 0.95),
                                 AppTheme.primaryColor,
                                 AppTheme.primaryDark,
                               ],
@@ -282,13 +282,13 @@ class _AchievementPopupState extends State<AchievementPopup>
                             boxShadow: [
                               // Outer glow
                               BoxShadow(
-                                color: _rarityColor.withOpacity(0.4 * _glowAnimation.value),
+                                color: _rarityColor.withValues(alpha: 0.4 * _glowAnimation.value),
                                 blurRadius: 40 * _glowAnimation.value,
                                 spreadRadius: 15 * _glowAnimation.value,
                               ),
                               // Inner shadow
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withValues(alpha: 0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -335,18 +335,18 @@ class _AchievementPopupState extends State<AchievementPopup>
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      _rarityColor.withOpacity(0.3),
-                                      _raritySecondaryColor.withOpacity(0.2),
+                                      _rarityColor.withValues(alpha: 0.3),
+                                      _raritySecondaryColor.withValues(alpha: 0.2),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(25),
                                   border: Border.all(
-                                    color: _rarityColor.withOpacity(0.6),
+                                    color: _rarityColor.withValues(alpha: 0.6),
                                     width: 2,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: _rarityColor.withOpacity(0.3),
+                                      color: _rarityColor.withValues(alpha: 0.3),
                                       blurRadius: 10,
                                     ),
                                   ],
@@ -409,7 +409,7 @@ class _AchievementPopupState extends State<AchievementPopup>
                                 widget.achievement.description,
                                 style: TextStyle(
                                   fontSize: 15,
-                                  color: Colors.white.withOpacity(0.85),
+                                  color: Colors.white.withValues(alpha: 0.85),
                                   height: 1.4,
                                 ),
                                 textAlign: TextAlign.center,
@@ -434,22 +434,22 @@ class _AchievementPopupState extends State<AchievementPopup>
                                         colors: [
                                           _raritySecondaryColor,
                                           _rarityColor,
-                                          _rarityColor.withOpacity(0.8),
+                                          _rarityColor.withValues(alpha: 0.8),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(30),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Colors.white.withValues(alpha: 0.3),
                                         width: 2,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: _rarityColor.withOpacity(0.5),
+                                          color: _rarityColor.withValues(alpha: 0.5),
                                           blurRadius: 15,
                                           offset: const Offset(0, 6),
                                         ),
                                         BoxShadow(
-                                          color: Colors.white.withOpacity(0.1),
+                                          color: Colors.white.withValues(alpha: 0.1),
                                           blurRadius: 5,
                                           spreadRadius: -2,
                                           offset: const Offset(0, -2),
@@ -498,22 +498,22 @@ class _AchievementPopupState extends State<AchievementPopup>
                                   colors: [
                                     _raritySecondaryColor,
                                     _rarityColor,
-                                    _rarityColor.withOpacity(0.8),
+                                    _rarityColor.withValues(alpha: 0.8),
                                   ],
                                   stops: const [0.0, 0.6, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   width: 4,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: _rarityColor.withOpacity(0.6 * _glowAnimation.value),
+                                    color: _rarityColor.withValues(alpha: 0.6 * _glowAnimation.value),
                                     blurRadius: 25,
                                     spreadRadius: 8,
                                   ),
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     blurRadius: 10,
                                     offset: const Offset(0, 5),
                                   ),
@@ -570,7 +570,7 @@ class _ConfettiPainter extends CustomPainter {
       canvas.translate(x, y);
       canvas.rotate(rotation);
 
-      _paint.color = p.color.withOpacity(opacity.clamp(0.0, 1.0));
+      _paint.color = p.color.withValues(alpha: opacity.clamp(0.0, 1.0));
 
       switch (p.shape) {
         case 0: // Circle
@@ -629,8 +629,8 @@ class _RaysPainter extends CustomPainter {
       
       paint.shader = RadialGradient(
         colors: [
-          color.withOpacity(0.8),
-          color.withOpacity(0.0),
+          color.withValues(alpha: 0.8),
+          color.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: outerRadius));
 

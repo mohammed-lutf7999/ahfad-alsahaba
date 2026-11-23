@@ -11,6 +11,7 @@ import '../../data/services/admin_service.dart'; // Add AdminService import
 import '../../data/services/app_control_service.dart';
 import '../../data/models/app_control_models.dart';
 import '../../data/models/player_profile_model.dart'; // Add PlayerProfile import
+import '../widgets/app_snackbar.dart';
 import '../widgets/avatar_selector.dart';
 import 'admin_dashboard_screen.dart'; // Import AdminDashboardScreen
 
@@ -239,10 +240,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppTheme.accentColor.withOpacity(0.15), AppTheme.accentColor.withOpacity(0.05)],
+          colors: [AppTheme.accentColor.withValues(alpha: 0.15), AppTheme.accentColor.withValues(alpha: 0.05)],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(0.4)),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
@@ -269,14 +270,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           '${profile.totalScore}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
                         ),
                         const SizedBox(width: 4),
                         const Icon(Icons.stars_rounded, color: AppTheme.accentColor, size: 18),
                         const SizedBox(width: 12),
                         Text(
                           '${profile.highScore}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
                         ),
                         const SizedBox(width: 4),
                         const Icon(Icons.emoji_events_rounded, color: AppTheme.accentLight, size: 18),
@@ -302,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryDark.withOpacity(0.3),
+                      color: AppTheme.primaryDark.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const FittedBox(
@@ -643,7 +644,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showResetDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
@@ -652,17 +653,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         content: Text('سيتم حذف جميع بيانات التقدم والنقاط. هل أنت متأكد؟', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء', style: TextStyle(color: AppTheme.accentDark))),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('إلغاء', style: TextStyle(color: AppTheme.accentDark))),
           ElevatedButton(
             onPressed: () async {
               await SharedPrefsService.resetAllProgress();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('تم إعادة تعيين جميع البيانات بنجاح', textAlign: TextAlign.center),
-                backgroundColor: AppTheme.successColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ));
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              if (!mounted) return;
+              AppSnackBar.success(context, 'تم إعادة تعيين جميع البيانات بنجاح');
               _loadSettings();
               setState(() {});
             },
@@ -731,7 +728,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showDeleteAccountDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
@@ -755,26 +752,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('إلغاء', style: TextStyle(color: AppTheme.accentDark)),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('جارٍ حذف الحساب والبيانات...', textAlign: TextAlign.center),
-                duration: Duration(seconds: 2),
-              ));
-              
+              Navigator.pop(dialogContext);
+              AppSnackBar.info(context, 'جارٍ حذف الحساب والبيانات...');
+
               await AuthService().deleteAccountAndData();
-              
+
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: const Text('تم حذف الحساب وجميع البيانات بنجاح', textAlign: TextAlign.center),
-                  backgroundColor: AppTheme.successColor,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ));
+                AppSnackBar.success(context, 'تم حذف الحساب وجميع البيانات بنجاح');
                 _loadSettings();
                 setState(() {});
               }

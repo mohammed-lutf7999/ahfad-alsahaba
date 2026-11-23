@@ -124,7 +124,7 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> with SingleTickerPr
                            borderRadius: _currentStep.shape == BoxShape.rectangle 
                                ? BorderRadius.circular(20) : null,
                            border: Border.all(
-                             color: AppTheme.accentColor.withOpacity(0.5),
+                             color: AppTheme.accentColor.withValues(alpha: 0.5),
                              width: 2,
                            ),
                          ),
@@ -222,7 +222,7 @@ class _CoachMarkOverlayState extends State<CoachMarkOverlay> with SingleTickerPr
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.accentColor.withOpacity(0.2),
+                color: AppTheme.accentColor.withValues(alpha: 0.2),
                 blurRadius: 20,
                 spreadRadius: 2,
               )
@@ -283,7 +283,7 @@ class _OverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF001e1d).withOpacity(opacity);
+    final paint = Paint()..color = const Color(0xFF001e1d).withValues(alpha: opacity);
 
     // Create a path that covers the whole screen
     final backgroundPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));

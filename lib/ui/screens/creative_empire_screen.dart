@@ -106,7 +106,7 @@ class _CreativeEmpireScreenState extends State<CreativeEmpireScreen> with Ticker
                               color: _goldColor,
                               shadows: [
                                 BoxShadow(
-                                    color: _goldColor.withOpacity(0.5),
+                                    color: _goldColor.withValues(alpha: 0.5),
                                     blurRadius: 20,
                                     spreadRadius: 5)
                               ],
@@ -118,7 +118,7 @@ class _CreativeEmpireScreenState extends State<CreativeEmpireScreen> with Ticker
                               fontFamily: 'Cairo',
                               fontSize: 14,
                               letterSpacing: 3,
-                              color: _textColor.withOpacity(0.6),
+                              color: _textColor.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -200,7 +200,7 @@ class _CreativeEmpireScreenState extends State<CreativeEmpireScreen> with Ticker
             decoration: BoxDecoration(
               border: Border(right: BorderSide(color: _goldColor, width: 4)), // Right Border
               // borderRadius: BorderRadius.circular(8),
-              // color: _isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05),
+              // color: _isDarkMode ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
             ),
             child: Text(
               title,
@@ -237,9 +237,9 @@ class _ImperialBackButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
           shape: BoxShape.circle,
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Icon(Icons.arrow_forward_ios_rounded, color: color), // RTL Arrow
       ),
@@ -263,17 +263,17 @@ class _DesignerIdentityImperial extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark ? [
-            Colors.white.withOpacity(0.05),
-            Colors.white.withOpacity(0.02),
+            Colors.white.withValues(alpha: 0.05),
+            Colors.white.withValues(alpha: 0.02),
           ] : [
              Colors.white,
              const Color(0xFFFAFAFA),
           ],
         ),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFD700).withOpacity(isDark ? 0.05 : 0.2),
+            color: const Color(0xFFFFD700).withValues(alpha: isDark ? 0.05 : 0.2),
             blurRadius: 30,
             spreadRadius: 0,
           )
@@ -289,7 +289,7 @@ class _DesignerIdentityImperial extends StatelessWidget {
               border: Border.all(color: const Color(0xFFFFD700), width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFD700).withOpacity(0.5),
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.5),
                   blurRadius: 30,
                   spreadRadius: 5,
                 )
@@ -315,7 +315,7 @@ class _DesignerIdentityImperial extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD700).withOpacity(0.1),
+              color: const Color(0xFFFFD700).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
@@ -331,7 +331,7 @@ class _DesignerIdentityImperial extends StatelessWidget {
            Text(
              "متخصص في بناء إمبراطوريات رقمية تجمع بين القيم، الجمال، والتقنية.",
              textAlign: TextAlign.center,
-             style: TextStyle(color: textColor.withOpacity(0.7), height: 1.5, fontFamily: 'Cairo'),
+             style: TextStyle(color: textColor.withValues(alpha: 0.7), height: 1.5, fontFamily: 'Cairo'),
            ),
            const SizedBox(height: 24),
            // Actions
@@ -381,7 +381,7 @@ class _ImperialSocialBtn extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(color: isDark ? Colors.white.withOpacity(0.7) : Colors.black54, fontSize: 10),
+              style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54, fontSize: 10),
             )
           ],
         ),
@@ -414,7 +414,7 @@ class _ImperialPavilion extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: section.color.withOpacity(0.2),
+                    color: section.color.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                     border: Border.all(color: section.color),
                   ),
@@ -436,7 +436,7 @@ class _ImperialPavilion extends StatelessWidget {
                       ),
                       Text(
                         section.subtitle,
-                        style: TextStyle(color: section.color.withOpacity(0.8), fontSize: 12),
+                        style: TextStyle(color: section.color.withValues(alpha: 0.8), fontSize: 12),
                       ),
                     ],
                   ),
@@ -532,7 +532,7 @@ class _AnimatedProjectCardState extends State<_AnimatedProjectCard> with SingleT
             border: Border.all(color: widget.isDark ? Colors.white10 : Colors.grey.shade300),
             boxShadow: [
                BoxShadow(
-                 color: widget.color.withOpacity(widget.isDark ? 0.2 : 0.1),
+                 color: widget.color.withValues(alpha: widget.isDark ? 0.2 : 0.1),
                  blurRadius: 15,
                  spreadRadius: 2,
                  offset: const Offset(0, 4),
@@ -551,7 +551,7 @@ class _AnimatedProjectCardState extends State<_AnimatedProjectCard> with SingleT
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: widget.color.withOpacity(widget.isDark ? 0.3 : 0.1),
+                      color: widget.color.withValues(alpha: widget.isDark ? 0.3 : 0.1),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -618,7 +618,7 @@ class _ProjectPopup extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: color, width: 2),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 40, spreadRadius: 5),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 40, spreadRadius: 5),
             ],
           ),
           child: SingleChildScrollView(
@@ -628,7 +628,7 @@ class _ProjectPopup extends StatelessWidget {
                 Container(
                    padding: const EdgeInsets.all(20),
                    decoration: BoxDecoration(
-                     color: color.withOpacity(0.1),
+                     color: color.withValues(alpha: 0.1),
                      shape: BoxShape.circle,
                    ),
                    child: Icon(project.icon, size: 60, color: color),
@@ -662,7 +662,7 @@ class _ProjectPopup extends StatelessWidget {
                   project.fullDesc,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isDark ? Colors.white.withOpacity(0.8) : Colors.black87,
+                    color: isDark ? Colors.white.withValues(alpha: 0.8) : Colors.black87,
                     height: 1.6,
                     fontSize: 16,
                     fontFamily: 'Cairo',
@@ -753,7 +753,7 @@ class _TeamMemberTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
           boxShadow: [if(!isDark) BoxShadow(color: Colors.black12, blurRadius: 10)],
@@ -894,7 +894,7 @@ class _ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color.withOpacity(0.3);
+    final paint = Paint()..color = color.withValues(alpha: 0.3);
     
     for (int i = 0; i < _stars.length; i++) {
         var offset = _stars[i];
@@ -904,7 +904,7 @@ class _ParticlePainter extends CustomPainter {
         
         // Blink effect
         double opacity = (math.sin(animation.value * 20 + i) + 1) / 2 * 0.5;
-        paint.color = color.withOpacity(opacity);
+        paint.color = color.withValues(alpha: opacity);
         
         canvas.drawCircle(Offset(dx * size.width, dy * size.height), 1.5, paint);
     }
