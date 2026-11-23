@@ -16,7 +16,7 @@
      * الترقية إلى رتبة جديدة من رتب الفرسان (مثل «فارس الميدان» أو «نخبة الأحفاد»).
      * الفوز بمعركة الجمعة مع الكتيبة أو تصدر لوحة المتصدرين.
    - يتاح زر ملكي أنيق: **«شارك انتصارك وتحدَّ أصدقاءك ⚔️»**.
-   - يلتقط المحرك المشهد عبر `RepaintBoundary` بدقة بصرية فائقة ($3.0\times$ Pixel Ratio):
+   - يلتقط المحرك المشهد عبر `RepaintBoundary` بدقة بصرية عالية ومتوازنة للذاكرة ($2.0\times$ إلى $2.5\times$ Pixel Ratio ديناميكياً حسب `devicePixelRatio` لحماية هواتف `2–3GB RAM` من `OutOfMemory`):
      * تصميم أندلسي ملكي فاخر، خلفية مخطوطة عتيقة، إطار ذهبي مزخرف.
      * اسم اللاعب، رتبته الحالية، شارته، نتيجته، وسؤال السيرة الذكي الذي تفوق فيه.
      * رمز QR ديناميكي ورابط إحالة ذكي ينقل الصديق مباشرة لتحميل اللعبة من Google Play أو قبول التحدي مباشرة (`Deep Link`).
@@ -81,8 +81,9 @@ Future<void> captureAndShareVictoryCard({
         boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return;
 
-    // التقاط الصورة بدقة 3x لضمان وضوح فائق عند النشر
-    final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    // التقاط الصورة بدقة ديناميكية متوازنة (2.0x–2.5x) لتجنب استهلاك الذاكرة المفرط على هواتف 2-3GB RAM
+    final double safePixelRatio = MediaQuery.of(context).devicePixelRatio.clamp(2.0, 2.5);
+    final ui.Image image = await boundary.toImage(pixelRatio: safePixelRatio);
     final ByteData? byteData =
         await image.toByteData(format: ui.ImageByteFormat.png);
     if (byteData == null) return;
@@ -180,7 +181,7 @@ WITH CHECK (auth.uid() = user_id);
 
 ## ✅ 6. معايير القبول والتحقق (Definition of Done)
 
-1. **دقة ونقاء البطاقات:** توليد بطاقة المشاركة بدقة $3.0\times$ بدون أي تشويش أو تشوه في خط Cairo أو النصوص العربية.
+1. **دقة ونقاء البطاقات وسلامة الذاكرة:** توليد بطاقة المشاركة بدقة متوازنة ديناميكياً ($2.0\times$–$2.5\times$) بدون أي تشويش في خط Cairo وبدون تجاوز حدود الذاكرة (`OOM`) على الأجهزة الاقتصادية (`2–3GB RAM`).
 2. **عدم هدر الذاكرة أو التخزين:** استخدام المجلد المؤقت (`getTemporaryDirectory`) وتنظيف الملفات القديمة تلقائياً دون استنزاف ذاكرة الهاتف.
 3. **أداء الودجت:** استهلاك شبه منعدم للبطارية ($< 0.1\%$ يومياً) عبر تحديث الودجت بجدولة ذكية واستخدام التخزين المحلي المشترك.
 4. **التوافق التام:** عمل الودجت والبطاقات بسلاسة على كافة المقاسات من الشاشات المدمجة ($360\text{dp}$) وحتى الحواسيب اللوحية.

@@ -76,7 +76,7 @@
 بناءً على مراجعة [`AppFeatureFlags`](../../lib/data/models/app_control_models.dart#L5-L49) و[`PlayerPermissions`](../../lib/data/models/app_control_models.dart#L103-L135) الموجودة حالياً (`13` مفتاحاً عاماً + `4` صلاحيات فردية)، نضيف في هذه الخطة المفاتيح الدقيقة التي سأل عنها القائد لتتحكم بكل ميزة **على الجميع أو على أفراد بعينهم** من التطبيق و`admin_web/`:
 
 ### أ) مفاتيح عامة جديدة في `app_release_config.feature_flags`:
-* `guild_creation_vip_only`: قصر **تأسيس الكتائب** على المشتركين والمفوّضين فقط (`true`/`false`).
+* `guild_creation_vip_only`: قصر **تأسيس الكتائب** على المشتركين والمفوّضين فقط (`true`/`false` — **القيمة الافتراضية عند الإطلاق: `false`** حتى لا تُقفل ميزة الكتائب فجأةً على المستخدمين الأوائل، وتُفعّل عن بُعد من لوحة الإدارة لاحقاً متى ما قرّر القائد).
 * `private_room_creation_vip_only`: قصر **إنشاء الغرف الخاصة المتقدمة** على المشتركين (`true`/`false`).
 * `private_chat_enabled`: تفعيل/إيقاف **الدردشة الخاصة** على مستوى التطبيق.
 * `private_chat_vip_only`: قصر الدردشة الخاصة الحرة على المشتركين (`true`/`false`).
@@ -142,8 +142,11 @@ CREATE TABLE IF NOT EXISTS public.redemption_code_claims (
 );
 ```
 
-### التحقق السيرفري من المشتريات (أمان ضد التزوير):
-* إضافة دالة `supabase/functions/verify-play-purchase/index.ts` تتحقق من `purchaseToken` مباشرةً عبر **Google Play Developer API** قبل منح الاشتراك أو الشارة، ثم تسجله في `purchase_transactions` وتحدّث `player_permissions` وترسل رسالة ترحيبية إلى `/inbox`.
+### التحقق السيرفري من المشتريات ودورة حياة الاشتراكات (`RTDN` وإعادة التحقق الصامتة):
+* **التحقق الفوري عند الشراء (`supabase/functions/verify-play-purchase/index.ts`):** تتحقق الدالة من `purchaseToken` مباشرةً عبر **Google Play Developer API** قبل منح الاشتراك أو الشارة، ثم تسجله في `purchase_transactions` وتحدّث `player_permissions` وترسل رسالة ترحيبية إلى `/inbox`.
+* **إدارة التجديدات، الإلغاء، والاستردادات الفورية (`RTDN` + `Silent Re-verification`):**
+  1. **إشعارات جوجل الفورية (`Google Play RTDN` عبر Cloud Pub/Sub ← Edge Function `play-rtdn-webhook`):** تستقبل أحداث `SUBSCRIPTION_RENEWED` (لتمديد `subscription_expires_at` تلقائياً)، و`SUBSCRIPTION_CANCELED` / `SUBSCRIPTION_ON_HOLD`، و`SUBSCRIPTION_REVOKED` أو استرداد المبلغ `REFUND` (**لإسقاط الصلاحية وتحديث `status = 'refunded'/'revoked'` فوراً** ومنع استغلال الاستردادات).
+  2. **إعادة التحقق الصامتة (`Silent Re-verification`):** عند فتح التطبيق واقتراب أو انتهاء `subscription_expires_at`، يتحقق السيرفر صمتياً من آخر `purchase_token` لدى Google Play Developer API لضمان مزامنة التجديد حتى لو تأخر إشعار Pub/Sub.
 
 ---
 

@@ -108,8 +108,12 @@ CREATE TABLE IF NOT EXISTS public.guild_join_requests (
     note TEXT NOT NULL DEFAULT '' CHECK (char_length(note) <= 120),
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
     reviewed_by UUID REFERENCES auth.users(id),
+    reviewed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (guild_id, user_id)
+    -- ملاحظة تنفيذية إلزامية: عند إعادة التقديم بعد الرفض، تُستخدم
+    -- INSERT ... ON CONFLICT (guild_id, user_id) DO UPDATE SET status = 'pending', note = EXCLUDED.note, created_at = NOW()
+    -- بشرط انقضاء فترة تهدئة 48 ساعة منذ reviewed_at لمنع السبام مع السماح بإعادة التقديم!
 );
 
 -- 4. سجل نشاط الكتيبة الخفيف (آخر 50 حدثاً لكل كتيبة)
@@ -133,10 +137,11 @@ ALTER TABLE public.live_quiz_sessions
 ### الدوال السحابية الذرية المطلوبة (`SECURITY DEFINER` + `#variable_conflict use_column`):
 1. `guild_manage_member(p_target_user_id, p_action)` — الإجراءات: `'promote'`, `'demote'`, `'kick'`, `'transfer_leadership'`.
 2. `guild_update_settings(p_description, p_banner_icon, p_join_policy, p_pinned_notice, p_regenerate_code)`.
-3. `guild_request_or_join_by_code(p_guild_id, p_invite_code, p_note)` — يدعم الدخول المباشر، أو تقديم طلب، أو الدخول بكود الدعوة.
-4. `guild_review_join_request(p_request_id, p_approve)` — للقائد والنائب فقط.
+3. `guild_request_or_join_by_code(p_guild_id, p_invite_code, p_note)` — يدعم الدخول المباشر، أو تقديم طلب (عبر `ON CONFLICT (guild_id, user_id) DO UPDATE` مع فترة تهدئة **`48` ساعة** بعد الرفض)، أو الدخول بكود الدعوة.
+4. `guild_review_join_request(p_request_id, p_approve)` — للقائد والنائب فقط؛ **يجب إلزامياً قفل صف الكتيبة بـ `SELECT id, max_members FROM public.guilds WHERE id = v_guild_id FOR UPDATE` قبل عدّ الأعضاء وقبول الطلب** لمنع سباق التزامن (`Race Condition`) وتجاوز حد `max_members`.
 5. `guild_send_recruit_card_to_diwan()` — مع حارس التهدئة `60 دقيقة`.
-6. `guild_claim_inactive_leadership(p_guild_id)` — يفعّل التوريث التلقائي بعد `30 يوماً` من غياب القائد.
+6. `guild_claim_inactive_leadership(p_guild_id)` — يفعّل التوريث التلقائي بعد `30 يوماً` من غياب القائد؛ **ويختار الخليفة حتمياً من السيرفر (وليس `auth.uid()` أول مستدعٍ للدالة!) عبر:**
+   `SELECT user_id FROM public.guild_members WHERE guild_id = p_guild_id AND user_id <> v_old_leader_id ORDER BY (role = 'نائب') DESC, total_contribution DESC, joined_at ASC LIMIT 1` (مع قفل صف الكتيبة بـ `FOR UPDATE`).
 
 ---
 
