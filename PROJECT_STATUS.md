@@ -1,10 +1,10 @@
 # 📊 توثيق الحالة الهندسية وسجل التحديثات الشامل — «معركة أحفاد الصحابة»
 > **تاريخ آخر تحديث:** 23 نوفمبر 2026  
-> **إصدار التطبيق الحالي:** `1.2.0` (رقم البناء `versionCode`: `22` على فرع `feat/v1.2.0-build22` — الترحيل `023` مطبّق ومختبر حياً على Supabase، بانتظار اختبار الـ APK قبل الدمج في `main`، بينما نسخة الإنتاج الحية على المتجر هي `1.1.0+21`)  
+> **إصدار التطبيق الحالي:** `1.2.0` (رقم البناء `versionCode`: `22` — مدمج ومعتمد على `main` مع تطبيق الترحيل `023` حياً على Supabase، وجاهز للرفع على متجر Google Play)  
 > **حزمة التطبيق (Package ID):** `com.ahfad.alsahaba.battle`  
 > **كبير المهندسين والمسؤول:** م. محمد لطف  
-> **ملف المتجر السابق المرفوع للإنتاج (AAB):** `build/app/outputs/bundle/release/app-release.aab` (`1.1.0+21` — `47.6 MB`)  
-> **ملف التجربة السابق (APK arm64):** `build/app/outputs/flutter-apk/app-release.apk` (`1.1.0+21` — `23.0 MB`)  
+> **ملف المتجر الجاهز للرفع (AAB):** `build/app/outputs/bundle/release/app-release.aab` (`1.2.0+22` — `47.6 MB` / `49,958,703` بايت)  
+> **ملف التجربة المباشر (APK arm64):** `build/app/outputs/flutter-apk/app-release.apk` (`1.2.0+22` — `23.1 MB` / `24,237,626` بايت)  
 > **لوحة الويب المستقلة:** `admin_web/` (جاهزة محلياً عبر `python admin_web/serve.py` مع `Cache-Control: no-cache, no-store, must-revalidate` ووحدة `bulk_questions_importer.js` المستقلة)  
 > **التقرير الهندسي المعتمد (PDF):** `PROJECT_STATUS_REPORT.pdf` و `التقرير_الهندسي_الشامل_لمعركة_أحفاد_الصحابة.pdf` (`761 KB` — في جذر المشروع)
 
