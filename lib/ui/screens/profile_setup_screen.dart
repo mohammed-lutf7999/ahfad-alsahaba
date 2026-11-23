@@ -164,7 +164,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
                               gradient: AppTheme.cardGradient,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: AppTheme.accentColor.withOpacity(0.3),
+                                color: AppTheme.accentColor.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Column(
@@ -404,7 +404,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
             Expanded(
               child: Container(
                 height: 1,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
             ),
             Padding(
@@ -412,7 +412,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
               child: Text(
                 'أو',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                   fontFamily: 'Cairo',
                 ),
@@ -421,7 +421,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
             Expanded(
               child: Container(
                 height: 1,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
             ),
           ],
@@ -456,7 +456,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
             ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              side: BorderSide(color: Colors.white.withOpacity(0.5)),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),

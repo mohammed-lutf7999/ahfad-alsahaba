@@ -28,7 +28,7 @@ Widget getAvatarWidget(int index, {double size = 50}) {
       shape: BoxShape.circle,
       boxShadow: [
         BoxShadow(
-          color: (preset['color'] as Color).withOpacity(0.4),
+          color: (preset['color'] as Color).withValues(alpha: 0.4),
           blurRadius: 8,
           offset: const Offset(0, 3),
         ),
@@ -106,7 +106,7 @@ class _AvatarSelectorState extends State<AvatarSelector> {
                   ),
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: AppTheme.accentColor.withOpacity(0.5),
+                      color: AppTheme.accentColor.withValues(alpha: 0.5),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),

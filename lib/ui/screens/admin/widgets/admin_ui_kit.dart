@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/sound_service.dart';
 import '../../../../core/theme/app_custom_theme.dart';
 
+export 'admin_shared_components.dart';
+
 /// Shared scaffold shell providing royal custom theme gradient, SafeArea,
 /// 360dp-safe responsive header, and consistent RTL layout for Admin screens.
 class AdminScaffoldShell extends StatelessWidget {

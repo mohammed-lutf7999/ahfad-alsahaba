@@ -1,14 +1,13 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import '../../core/cms_icon_registry.dart';
 import '../models/cms_models.dart';
 import '../models/question_model.dart';
 import 'cms_cache_service.dart';
-
-Map<String, dynamic> _decodeQuestionJson(String jsonString) {
-  return jsonDecode(jsonString) as Map<String, dynamic>;
-}
+import 'question/question_asset_loader.dart';
+import 'question/question_cms_merger.dart';
+import 'question/question_pack_cache_service.dart';
+import 'question/rotating_pool_selector.dart';
 
 /// Service for loading questions from local JSON assets merged with dynamic
 /// solo Quiz additions/edits/visibility rules cached in [CmsCacheService].
@@ -22,126 +21,123 @@ class QuestionService {
     CmsCacheService.instance.registerOnBundleApplied(() => clearCache());
   }
 
-  /// Raw decoded asset data per built-in category (immutable once loaded).
-  final Map<String, Map<String, dynamic>?> _baseAssetCache = {};
-
-  /// Coalesces concurrent asset loads per category.
-  final Map<String, Future<void>> _inFlightLoads = {};
-
+  final QuestionAssetLoader _assetLoader = QuestionAssetLoader();
   final Random _random = Random();
 
-  Future<void> _ensureBaseCategoryLoaded(String categoryId) async {
-    if (_baseAssetCache.containsKey(categoryId)) return;
+  Future<void> _ensureBaseCategoryLoaded(String categoryId) =>
+      _assetLoader.ensureLoaded(categoryId);
 
-    final existingFuture = _inFlightLoads[categoryId];
-    if (existingFuture != null) {
-      await existingFuture;
-      return;
+  /// Resolves the primary solo question dataset for [categoryId]:
+  /// 1. Loads bundled `assets/questions/<categoryId>.json` if it exists.
+  /// 2. If a published Gzip CDN pack exists (`packVersion > 0 && packStoragePath`),
+  ///    hydrates it via [QuestionPackCacheService] (with offline disk fallback)
+  ///    and MERGES it over the bundled asset levels so built-in levels 1..10
+  ///    remain intact when levels 11..20+ are added via a Gzip pack.
+  Future<Map<String, dynamic>?> _resolveCategorySourceData(
+    String categoryId, {
+    bool allowPack = true,
+  }) async {
+    await _ensureBaseCategoryLoaded(categoryId);
+    final assetData = _assetLoader.getCached(categoryId);
+
+    if (!allowPack) {
+      return assetData;
     }
 
-    final loadFuture = () async {
-      try {
-        final jsonString = await rootBundle.loadString(
-          'assets/questions/$categoryId.json',
-        );
-        _baseAssetCache[categoryId] =
-            await compute(_decodeQuestionJson, jsonString);
-      } catch (_) {
-        // Cloud-only categories have no bundled asset file; record null cleanly
-        // so level lookups proceed smoothly from CmsCacheService.
-        _baseAssetCache[categoryId] = null;
+    final dynCat = CmsCacheService.instance.snapshot.quizCategories[categoryId];
+    if (dynCat == null ||
+        dynCat.packVersion <= 0 ||
+        dynCat.packStoragePath.isEmpty) {
+      return assetData;
+    }
+
+    final pack =
+        await QuestionPackCacheService.instance.ensurePackLoaded(dynCat);
+    if (pack == null || pack['levels'] is! Map) {
+      return assetData;
+    }
+
+    if (assetData == null || assetData['levels'] is! Map) {
+      return pack;
+    }
+
+    return _mergePackOverAsset(assetData, pack);
+  }
+
+  Map<String, dynamic> _mergePackOverAsset(
+    Map<String, dynamic> assetData,
+    Map<String, dynamic> packData,
+  ) {
+    final mergedLevels = <String, dynamic>{};
+    final assetLevels = assetData['levels'] as Map<String, dynamic>;
+    for (final entry in assetLevels.entries) {
+      if (entry.value is List) {
+        mergedLevels[entry.key] = List<dynamic>.from(entry.value as List);
       }
-    }();
-
-    _inFlightLoads[categoryId] = loadFuture;
-    try {
-      await loadFuture;
-    } finally {
-      _inFlightLoads.remove(categoryId);
-    }
-  }
-
-  Question _withOptionRandom(Question question, Random? optionRandom) {
-    final originalOptions = question.options;
-    final originalCorrectIndex = question.correctAnswerIndex;
-    if (optionRandom == null || originalOptions.isEmpty) {
-      return Question(
-        id: question.id,
-        categoryId: question.categoryId,
-        levelNumber: question.levelNumber,
-        questionText: question.questionText,
-        options: List<String>.from(originalOptions),
-        correctAnswerIndex: originalCorrectIndex.clamp(
-          0,
-          originalOptions.isEmpty ? 0 : originalOptions.length - 1,
-        ),
-        explanation: question.explanation,
-        syncScope: question.syncScope,
-        isVisible: question.isVisible,
-      );
     }
 
-    final safeCorrect =
-        originalCorrectIndex.clamp(0, originalOptions.length - 1);
-    final correctAnswer = originalOptions[safeCorrect];
-    final indices = List<int>.generate(originalOptions.length, (i) => i);
-    indices.shuffle(optionRandom);
+    final packLevels = packData['levels'] as Map<String, dynamic>;
+    for (final entry in packLevels.entries) {
+      final rawPackList = entry.value;
+      if (rawPackList is! List) continue;
+      final existing = mergedLevels[entry.key];
+      if (existing is! List) {
+        mergedLevels[entry.key] = List<dynamic>.from(rawPackList);
+        continue;
+      }
 
-    final shuffledOptions = indices.map((i) => originalOptions[i]).toList();
-    final newCorrectIndex = shuffledOptions.indexOf(correctAnswer);
+      // Merge by question id: pack overrides matching id, appends new questions
+      final combined = List<dynamic>.from(existing);
+      final indexById = <String, int>{};
+      for (var i = 0; i < combined.length; i++) {
+        final item = combined[i];
+        if (item is Map) {
+          final id = (item['id'] ?? '').toString().trim();
+          if (id.isNotEmpty) indexById[id] = i;
+        }
+      }
+      for (final rawItem in rawPackList) {
+        if (rawItem is! Map) continue;
+        final id = (rawItem['id'] ?? '').toString().trim();
+        final existingIdx = id.isNotEmpty ? indexById[id] : null;
+        if (existingIdx != null) {
+          combined[existingIdx] = rawItem;
+        } else {
+          if (id.isNotEmpty) indexById[id] = combined.length;
+          combined.add(rawItem);
+        }
+      }
+      mergedLevels[entry.key] = combined;
+    }
 
-    return Question(
-      id: question.id,
-      categoryId: question.categoryId,
-      levelNumber: question.levelNumber,
-      questionText: question.questionText,
-      options: shuffledOptions,
-      correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
-      explanation: question.explanation,
-      syncScope: question.syncScope,
-      isVisible: question.isVisible,
-    );
+    return <String, dynamic>{
+      ...assetData,
+      ...packData,
+      'levels': mergedLevels,
+    };
   }
+
+  Question _withOptionRandom(Question question, Random? optionRandom) =>
+      QuestionCmsMerger.withOptionRandom(question, optionRandom);
 
   Question _mapQuestionEntry(
     Map<String, dynamic> q, {
     required String categoryId,
     required int levelNumber,
     Random? optionRandom,
-  }) {
-    final originalOptions = List<String>.from(q['options'] ?? []);
-    final originalCorrectIndex = (q['correct'] as num?)?.toInt() ?? 0;
-    final baseQuestion = Question(
-      id: (q['id'] ?? '').toString(),
-      categoryId: categoryId,
-      levelNumber: levelNumber,
-      questionText: (q['question'] ?? '').toString(),
-      options: originalOptions,
-      correctAnswerIndex: originalCorrectIndex,
-      explanation: q['explanation']?.toString(),
-      syncScope: 'all_with_fallback',
-      isVisible: true,
-    );
-    return _withOptionRandom(baseQuestion, optionRandom);
-  }
+  }) =>
+      QuestionCmsMerger.mapQuestionEntry(
+        q,
+        categoryId: categoryId,
+        levelNumber: levelNumber,
+        optionRandom: optionRandom,
+      );
 
   Question _mapDynamicQuestion(
     DynamicQuizQuestionData q, {
     Random? optionRandom,
-  }) {
-    final base = Question(
-      id: q.id,
-      categoryId: q.categoryId,
-      levelNumber: q.levelNumber,
-      questionText: q.questionText,
-      options: List<String>.from(q.options),
-      correctAnswerIndex: q.correctIndex,
-      explanation: q.explanation,
-      syncScope: q.syncScope,
-      isVisible: q.isVisible,
-    );
-    return _withOptionRandom(base, optionRandom);
-  }
+  }) =>
+      QuestionCmsMerger.mapDynamicQuestion(q, optionRandom: optionRandom);
 
   /// Loads a single deterministic question by `category:level:index` specification
   /// WITHOUT shifting base list ordering, guaranteeing Device A, Device B, and
@@ -154,7 +150,7 @@ class QuestionService {
     int slotOffset = 0,
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
-    final data = _baseAssetCache[categoryId];
+    final data = _assetLoader.getCached(categoryId);
     if (data == null) return null;
 
     final levels = data['levels'] as Map<String, dynamic>?;
@@ -249,7 +245,7 @@ class QuestionService {
   }) async {
     await _ensureBaseCategoryLoaded(categoryId);
     final specs = <String>[];
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
 
     final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
@@ -296,14 +292,14 @@ class QuestionService {
   }
 
   /// Builds visible solo questions for `(categoryId, levelNumber)` merging
-  /// local asset JSON with dynamic overrides & additions from [CmsCacheService].
+  /// Gzip CDN pack (or local asset JSON) with dynamic overrides & additions
+  /// from [CmsCacheService], applying `questions_per_level` and `rotating_pool`
+  /// rules when configured.
   Future<List<Question>> loadQuestions({
     required String categoryId,
     required int levelNumber,
   }) async {
-    await _ensureBaseCategoryLoaded(categoryId);
-
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = await _resolveCategorySourceData(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final levelKey = levelNumber.toString();
     final rawBaseList = levels?[levelKey] as List?;
@@ -364,7 +360,26 @@ class QuestionService {
 
     merged.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final questions = merged.map((e) => e.question).toList();
+
+    final qPerLevel = CmsCategoryBounds.questionsPerLevelFor(categoryId);
+    final drawMode = CmsCategoryBounds.drawModeFor(categoryId);
+
+    if (drawMode == 'rotating_pool' && questions.length > qPerLevel) {
+      return RotatingPoolSelector.selectAndPersist(
+        categoryId: categoryId,
+        levelNumber: levelNumber,
+        pool: questions,
+        questionsPerLevel: qPerLevel,
+        random: _random,
+      );
+    }
+
     questions.shuffle(_random);
+    final hasDynamicCategory =
+        CmsCacheService.instance.snapshot.quizCategories.containsKey(categoryId);
+    if (hasDynamicCategory && questions.length > qPerLevel) {
+      return questions.take(qPerLevel).toList();
+    }
     return questions;
   }
 
@@ -376,9 +391,10 @@ class QuestionService {
     Random? optionRandom,
     bool includeCloudSoloQuestions = true,
   }) async {
-    await _ensureBaseCategoryLoaded(categoryId);
-
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = await _resolveCategorySourceData(
+      categoryId,
+      allowPack: includeCloudSoloQuestions,
+    );
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final effectiveOptionRng = shuffleOptions ? (optionRandom ?? _random) : null;
 
@@ -449,7 +465,6 @@ class QuestionService {
 
   /// Check if a specific level has visible questions in [categoryId].
   Future<bool> levelExists(String categoryId, int levelNumber) async {
-    await _ensureBaseCategoryLoaded(categoryId);
     final hasCloudForLevel = CmsCacheService.instance.snapshot.quizQuestions.values
         .any((q) =>
             q.categoryId == categoryId &&
@@ -458,25 +473,25 @@ class QuestionService {
             q.options.length == 4);
     if (hasCloudForLevel) return true;
 
-    final baseData = _baseAssetCache[categoryId];
+    final baseData = await _resolveCategorySourceData(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final list = levels?[levelNumber.toString()] as List?;
     return list != null && list.isNotEmpty;
   }
 
-  /// Clears cached JSON asset data (only needed explicitly in memory cleanup/tests).
+  /// Clears cached JSON asset & Gzip pack memory data.
   void clearCache([String? categoryId]) {
-    if (categoryId != null) {
-      _baseAssetCache.remove(categoryId);
-    } else {
-      _baseAssetCache.clear();
-    }
+    _assetLoader.clear(categoryId);
+    QuestionPackCacheService.instance.clearMemoryCache(categoryId);
   }
 
-  bool isCached(String categoryId) => _baseAssetCache.containsKey(categoryId);
+  bool isCached(String categoryId) =>
+      _assetLoader.isCached(categoryId) ||
+      QuestionPackCacheService.instance.getCachedPackInMemory(categoryId) !=
+          null;
 
   Future<void> preloadCategory(String categoryId) async {
-    await _ensureBaseCategoryLoaded(categoryId);
+    await _resolveCategorySourceData(categoryId);
   }
 
   /// Get 5 deterministic questions for multiplayer based on a seed.

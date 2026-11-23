@@ -31,7 +31,7 @@ class AdminWebHandler(http.server.SimpleHTTPRequestHandler):
     extensions_map = _configure_mimetypes()
 
     def end_headers(self) -> None:
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         super().end_headers()
 
 

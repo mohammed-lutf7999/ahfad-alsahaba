@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/app_theme.dart';
+import '../../../../core/date_formatters.dart';
 import '../../../../core/theme/app_custom_theme.dart';
 import '../../../../data/models/chat_message_model.dart';
 import '../../../widgets/avatar_selector.dart';
@@ -25,12 +26,7 @@ class ChatBubbleWidget extends StatelessWidget {
     this.onAdminMute,
   });
 
-  String _formatTime(DateTime dt) {
-    final local = dt.toLocal();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
-  }
+  String _formatTime(DateTime dt) => DateFormatters.formatHourMinute(dt);
 
   @override
   Widget build(BuildContext context) {

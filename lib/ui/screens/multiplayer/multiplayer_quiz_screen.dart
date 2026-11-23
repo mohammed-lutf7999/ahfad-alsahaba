@@ -224,9 +224,9 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
                        padding: const EdgeInsets.all(20),
                        margin: const EdgeInsets.symmetric(horizontal: 40),
                        decoration: BoxDecoration(
-                         color: Colors.white.withOpacity(0.1),
+                         color: Colors.white.withValues(alpha: 0.1),
                          borderRadius: BorderRadius.circular(20),
-                         border: Border.all(color: AppTheme.accentColor.withOpacity(0.5)),
+                         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5)),
                        ),
                        child: Column(
                          children: [
@@ -262,8 +262,8 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
       );
     }
     
-    return WillPopScope(
-      onWillPop: () async => false, // منع الخروج أثناء اللعب
+    return PopScope(
+      canPop: false, // منع الخروج أثناء اللعب
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(gradient: AppTheme.imperialGradient),
@@ -355,10 +355,10 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
                   margin: const EdgeInsets.symmetric(horizontal: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: (isLocal ? AppTheme.accentColor : Colors.white).withOpacity(0.1),
+                    color: (isLocal ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: (isLocal ? AppTheme.accentColor : Colors.white).withOpacity(0.3),
+                      color: (isLocal ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -412,7 +412,7 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
             builder: (context, _) {
               return LinearProgressIndicator(
                 value: 1 - _timerController.value,
-                backgroundColor: Colors.white.withOpacity(0.1),
+                backgroundColor: Colors.white.withValues(alpha: 0.1),
                 valueColor: AlwaysStoppedAnimation(color),
                 minHeight: 6,
                 borderRadius: BorderRadius.circular(3),
@@ -431,12 +431,12 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryLight.withOpacity(0.3),
-            AppTheme.primaryColor.withOpacity(0.5),
+            AppTheme.primaryLight.withValues(alpha: 0.3),
+            AppTheme.primaryColor.withValues(alpha: 0.5),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
@@ -462,24 +462,24 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
     
     if (showResult) {
       if (isCorrect) {
-        bgColor = Colors.green.withOpacity(0.2);
+        bgColor = Colors.green.withValues(alpha: 0.2);
         borderColor = Colors.green;
         icon = Icons.check_circle_rounded;
       } else if (isSelected && !isCorrect) {
-        bgColor = Colors.red.withOpacity(0.2);
+        bgColor = Colors.red.withValues(alpha: 0.2);
         borderColor = Colors.red;
         icon = Icons.cancel_rounded;
       } else {
-        bgColor = Colors.white.withOpacity(0.05);
-        borderColor = Colors.white.withOpacity(0.1);
+        bgColor = Colors.white.withValues(alpha: 0.05);
+        borderColor = Colors.white.withValues(alpha: 0.1);
       }
     } else {
       bgColor = isSelected 
-          ? AppTheme.accentColor.withOpacity(0.2)
-          : Colors.white.withOpacity(0.05);
+          ? AppTheme.accentColor.withValues(alpha: 0.2)
+          : Colors.white.withValues(alpha: 0.05);
       borderColor = isSelected 
           ? AppTheme.accentColor 
-          : Colors.white.withOpacity(0.1);
+          : Colors.white.withValues(alpha: 0.1);
     }
     
     return GestureDetector(
@@ -499,7 +499,7 @@ class _MultiplayerQuizScreenState extends State<MultiplayerQuizScreen>
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: borderColor.withOpacity(0.2),
+                color: borderColor.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Center(

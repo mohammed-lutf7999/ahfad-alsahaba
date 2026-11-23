@@ -331,7 +331,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _showExitDialog();
       },
@@ -474,7 +474,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               child: LayoutBuilder(builder: (ctx, constraints) {
                                 return Transform.translate(
                                   offset: Offset(constraints.maxWidth * (_successController.value - 1), 0),
-                                  child: Container(width: constraints.maxWidth / 3, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, Colors.white.withOpacity(0.5), Colors.transparent]))),
+                                  child: Container(width: constraints.maxWidth / 3, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, Colors.white.withValues(alpha: 0.5), Colors.transparent]))),
                                 );
                               }),
                             ),
@@ -597,7 +597,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         content: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
-            color: AppTheme.errorColor.withOpacity(0.9),
+            color: AppTheme.errorColor.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
           ),
@@ -620,7 +620,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.9),
+      barrierColor: Colors.black.withValues(alpha: 0.9),
       transitionDuration: const Duration(milliseconds: 500),
       pageBuilder: (ctx, anim1, anim2) {
         return SafeArea(
@@ -648,7 +648,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: const Color(0xFF9575CD), width: 2),
-                      boxShadow: [BoxShadow(color: const Color(0xFF311B92).withOpacity(0.6), blurRadius: 40, spreadRadius: 5)],
+                      boxShadow: [BoxShadow(color: const Color(0xFF311B92).withValues(alpha: 0.6), blurRadius: 40, spreadRadius: 5)],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -703,7 +703,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                     elevation: 8,
-                                    shadowColor: const Color(0xFFFFD700).withOpacity(0.4), // Gold Shadow
+                                    shadowColor: const Color(0xFFFFD700).withValues(alpha: 0.4), // Gold Shadow
                                 ),
                                 child: const FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -791,7 +791,7 @@ class _ShatteringHeartState extends State<_ShatteringHeart> with SingleTickerPro
       animation: _controller,
       builder: (context, child) {
         if (_controller.value == 0 && !widget.isActive) {
-          return Icon(Icons.favorite_border_rounded, color: Colors.grey.withOpacity(0.5), size: 24);
+          return Icon(Icons.favorite_border_rounded, color: Colors.grey.withValues(alpha: 0.5), size: 24);
         }
 
         // Deterministic Shake Effect

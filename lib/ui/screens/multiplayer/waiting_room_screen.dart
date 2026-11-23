@@ -72,10 +72,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
     final config = gameService.config;
     final players = gameService.players;
     
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
         await _showExitDialog();
-        return false;
       },
       child: Scaffold(
         body: Container(
@@ -170,9 +171,9 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -218,7 +219,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -255,13 +256,13 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            (isHost ? AppTheme.accentColor : Colors.white).withOpacity(0.15),
-            (isHost ? AppTheme.accentColor : Colors.white).withOpacity(0.05),
+            (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.15),
+            (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: (isHost ? AppTheme.accentColor : Colors.white).withOpacity(0.3),
+          color: (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.3),
           width: isHost ? 2 : 1,
         ),
       ),
@@ -296,7 +297,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: player.isReady ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+              color: player.isReady ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -318,10 +319,10 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       builder: (context, child) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03 * _pulseAnimation.value),
+            color: Colors.white.withValues(alpha: 0.03 * _pulseAnimation.value),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               style: BorderStyle.solid,
             ),
           ),
@@ -331,14 +332,14 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
               Icon(
                 Icons.person_add_rounded,
                 size: 40,
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
               ),
               const SizedBox(height: 8),
               Text(
                 'في انتظار لاعب...',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                 ),
               ),
             ],
@@ -366,7 +367,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.4),
+                color: Colors.green.withValues(alpha: 0.4),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -423,6 +424,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
 
     if (result == true && mounted) {
       await ChallengeGameService.instance.reset();
+      if (!mounted) return;
       Navigator.pop(context);
     }
   }

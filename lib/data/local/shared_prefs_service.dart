@@ -338,5 +338,48 @@ class SharedPrefsService {
     await prefs.setBool(_keyWiseTeacherEnabled, value);
   }
 
+  // ============ GZIP QUESTION PACKS & ROTATING POOL (PLAN 20) ============
+
+  static int getCategoryPackVersion(String categoryId) {
+    final clean = categoryId.trim();
+    if (clean.isEmpty) return 0;
+    return _prefs?.getInt('category_pack_version_$clean') ?? 0;
+  }
+
+  static Future<void> setCategoryPackVersion(
+    String categoryId,
+    int version,
+  ) async {
+    final clean = categoryId.trim();
+    if (clean.isEmpty) return;
+    final prefs = await _instance;
+    await prefs.setInt('category_pack_version_$clean', version);
+  }
+
+  static Set<String> getRotatingPoolSeenIds(
+    String categoryId,
+    int levelNumber,
+  ) {
+    final clean = categoryId.trim();
+    if (clean.isEmpty) return <String>{};
+    return (_prefs?.getStringList('rotating_pool_seen_${clean}_$levelNumber') ??
+            const <String>[])
+        .toSet();
+  }
+
+  static Future<void> setRotatingPoolSeenIds(
+    String categoryId,
+    int levelNumber,
+    Set<String> ids,
+  ) async {
+    final clean = categoryId.trim();
+    if (clean.isEmpty) return;
+    final prefs = await _instance;
+    await prefs.setStringList(
+      'rotating_pool_seen_${clean}_$levelNumber',
+      ids.where((e) => e.trim().isNotEmpty).toList(),
+    );
+  }
+
   static Future<SharedPreferences?> getRawPrefs() async => _instance;
 }

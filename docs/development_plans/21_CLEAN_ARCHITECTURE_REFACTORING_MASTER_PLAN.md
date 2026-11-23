@@ -156,12 +156,15 @@ admin_web/js/
     └── tab_resources_audit.js        # صحة موارد Supabase + التنظيف + الأشباح + التدقيق + المشرفون
 ```
 
-### 🔹 الخطوة 2.4: تفكيك [`admin_web/index.html`](../../admin_web/index.html) (`1,296` سطراً ← `~160` سطراً)
+### 🔹 الخطوة 2.4: تفكيك [`admin_web/index.html`](../../admin_web/index.html) (`1,296` سطراً ← `~160` سطراً) + إزالة `onclick` المضمّن + `no-cache`
 - إبقاء `index.html` كغلاف نظيف يحتوي على: الرأس + شاشة الدخول + الشريط الجانبي للـ `8` تبويبات + حاوية `<main id="tab-mount"></main>`.
 - كل وحدة في `js/modules/tab_*.js` تمتلك دالة `renderTemplate()` و`mount(container)` وتُحمّل عند الطلب (`Lazy Loading`) لأول مرة فقط ثم تُحفظ في الذاكرة!
+- **إلزام استبدال معالجات `onclick="..."` المضمّنة في HTML بـ `addEventListener` / Event Delegation:** لأن دوال `Native ES Modules` معزولة النطاق (`Module-Scoped`) ولا تُكشف تلقائياً على `window`، مما يمنع أخطاء `ReferenceError` ويرفع الأمان (`CSP-Ready`).
+- **ترويسة منع التخزين المؤقت في [`admin_web/serve.py`](../../admin_web/serve.py):** إضافة ترويسة `Cache-Control: no-cache, no-store, must-revalidate` لردود الخادم المحلي لضمان تحميل أحدث نسخ ملفات `.js`/`.css` المقسّمة فوراً دون بقاء نسخ قديمة في كاش المتصفح!
 
 ### ✅ بوابة التحقق للموجة 2 (`Gate 2`):
-- [ ] تشغيل `python admin_web/serve.py` وفتح اللوحة عبر **Edge CDP Headless**.
+- [ ] تشغيل `python admin_web/serve.py` والتأكد من وجود ترويسة `Cache-Control: no-cache`، وفتح اللوحة عبر **Edge CDP Headless**.
+- [ ] التحقق من خلو قوالب HTML من أي معالجات `onclick="..."` مضمّنة (Event Delegation / `addEventListener` فقط).
 - [ ] المرور على كافة الـ **`8/8` تبويبات** والتأكد من **`0` أخطاء JavaScript / Console / 404**.
 - [ ] اختبار عملية قراءة حية + بث REST + تصدير CSV بدون أي خلل.
 - [ ] عدم تجاوز أي ملف JS حاجز `350` سطراً.
@@ -240,11 +243,11 @@ admin_web/js/
 ### 🔹 الخطوة 4.1: تثبيت قدسية الترحيلات التاريخية (`Immutable Migrations Policy`)
 * **قاعدة إلزامية:** تبقى ملفات `supabase/migrations/001` حتى `021` كما هي **دون حذف أو تعديل** لأنها تمثل السجل التاريخي المطبق حياً على قاعدة الإنتاج `khatzzpqxaiwuoodgcst`.
 
-### 🔹 الخطوة 4.2: إنشاء المجلد المرجعي الموحّد للحالة الحية (`supabase/schema/`)
-بدلاً من البحث في `21` ترحيلاً لمعرفة أي نسخة من `find_or_create_match` (المكررة 6 مرات!) هي الحية الآن، يُنشأ مجلد مرجعي مقسم إلى **8 ملفات صغيرة (`150–300` سطر لكل ملف)** مسحوبة ومطابقة 100% للنسخة الحية في Supabase عبر `pg_get_functiondef`:
+### 🔹 الخطوة 4.2: توليد المجلد المرجعي الموحّد للحالة الحية آلياً (`supabase/schema/`)
+بدلاً من البحث اليدوي في `21+` ترحيلاً لمعرفة أي نسخة من `find_or_create_match` (المكررة 6 مرات!) هي الحية الآن، يُنشأ **سكربت توليد آلي** (مثل `tools/export_supabase_schema.py`) يسحب التعريفات الحية مباشرةً من `pg_get_functiondef` و`information_schema` على قاعدة Supabase الحية ويولّد تلقائياً `FUNCTIONS_INDEX.md` و**8 ملفات صغيرة (`150–300` سطر لكل ملف)** لضمان تطابق 100% ومنع الانحراف اليدوي (`Schema Drift`):
 ```text
 supabase/schema/
-├── FUNCTIONS_INDEX.md                      # فهرس كل دالة RPC: الاسم + آخر ترحيل + الصلاحيات + التوقيع
+├── FUNCTIONS_INDEX.md                      # فهرس مولّد آلياً لكل دالة RPC: الاسم + آخر ترحيل + الصلاحيات + التوقيع
 ├── 01_profiles_and_leaderboard.sql         # user_progress, leaderboard, player_directory
 ├── 02_glory_and_knights_store.sql          # store_items, user_inventory, purchase_store_item, triggers
 ├── 03_multiplayer_rooms_and_ghosts.sql     # matchmaking_queue, matches, private rooms, ghost_recordings
@@ -255,16 +258,17 @@ supabase/schema/
 └── 08_push_tokens_and_maintenance.sql      # player_push_tokens, admin_cleanup_stale_resources, resource health
 ```
 
-### 🔹 الخطوة 4.3: توحيد طبقة Edge Functions (`supabase/functions/_shared/`)
+### 🔹 الخطوة 4.3: توحيد طبقة Edge Functions (`supabase/functions/_shared/`) — *مع استثناء `privacy-policy` نهائياً!*
 - إنشاء **`supabase/functions/_shared/cors_and_auth.ts`** لتوحيد:
   * رؤوس `CORS` الآمنة والرد على طلبات `OPTIONS`.
   * دالة `requireVerifiedAdmin(req)` للتحقق من JWT وصلاحية الأدمن.
   * دالة `jsonResponse(data, status)` الموحّدة.
-- تحديث الدوال الخمس (`push-dispatch`, `welcome-email`, `admin-broadcast`, `privacy-policy`, `admin-stats`) لاستيرادها دون تكرار.
+- تحديث الدوال الأربع الإدارية فقط (**`push-dispatch`, `welcome-email`, `admin-broadcast`, `admin-stats`**) لاستيرادها دون تكرار.
+- **⛔ استثناء إلزامي (`DO NOT TOUCH`):** تُستثنى دالة **`privacy-policy`** نهائياً من أي تعديل أو إعادة نشر في الموجة 4 لحماية رابط سياسة الخصوصية العام المسجّل لدى Google Play Console من أي توقف أو تغيير أثناء المراجعة وبعد الإطلاق!
 
 ### 🔹 الخطوة 4.4: ميثاق الترحيلات المستقبلية (`022+` فما فوق)
-1. **حد أقصى `400` سطر للملف الواحد:** تقسيم الميزات الكبيرة إلى ترحيلات متسلسلة صغيرة (`022a_ethics_dictionary.sql`، `022b_diwan_v2_and_friends.sql`).
-2. **تحديث مزدوج إلزامي:** أي ترحيل جديد يغيّر دالة أو جدولاً يجب أن يُحدّث الملف المقابل له في `supabase/schema/` و`FUNCTIONS_INDEX.md` في نفس الكوميت!
+1. **حد أقصى `400` سطر للملف الواحد:** تقسيم الميزات الكبيرة إلى ترحيلات متسلسلة صغيرة (`022_hotfix_diwan_profanity_filter.sql`، `022b_ethics_dictionary_friends_and_social_chat_v2.sql`).
+2. **مزامنة آلية إلزامية:** بعد تطبيق أي ترحيل جديد يغيّر دالة أو جدولاً، يُعاد تشغيل سكربت التوليد الآلي لتحديث `supabase/schema/` و`FUNCTIONS_INDEX.md` في نفس الكوميت دون تعديل يدوي!
 
 ---
 

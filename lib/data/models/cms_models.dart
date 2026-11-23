@@ -116,6 +116,10 @@ class DynamicQuizCategoryData {
   final String iconName;
   final String colorHex;
   final int totalLevels;
+  final int questionsPerLevel;
+  final String levelDrawMode;
+  final int packVersion;
+  final String packStoragePath;
   final int sortOrder;
   final bool isVisible;
   final bool isLocked;
@@ -128,6 +132,10 @@ class DynamicQuizCategoryData {
     this.iconName = 'quiz_rounded',
     this.colorHex = '#1B5E20',
     this.totalLevels = 10,
+    this.questionsPerLevel = 10,
+    this.levelDrawMode = 'fixed',
+    this.packVersion = 0,
+    this.packStoragePath = '',
     this.sortOrder = 100,
     this.isVisible = true,
     this.isLocked = false,
@@ -135,6 +143,12 @@ class DynamicQuizCategoryData {
   });
 
   factory DynamicQuizCategoryData.fromJson(Map<String, dynamic> json) {
+    final rawMode =
+        (json['level_draw_mode'] ?? json['levelDrawMode'] ?? 'fixed')
+            .toString()
+            .trim();
+    final safeMode =
+        rawMode == 'rotating_pool' ? 'rotating_pool' : 'fixed';
     return DynamicQuizCategoryData(
       id: (json['id'] ?? '').toString().trim(),
       name: (json['name'] ?? '').toString(),
@@ -146,6 +160,19 @@ class DynamicQuizCategoryData {
               (json['totalLevels'] as num?)?.toInt() ??
               10)
           .clamp(1, 100),
+      questionsPerLevel: ((json['questions_per_level'] as num?)?.toInt() ??
+              (json['questionsPerLevel'] as num?)?.toInt() ??
+              10)
+          .clamp(1, 100),
+      levelDrawMode: safeMode,
+      packVersion: ((json['pack_version'] as num?)?.toInt() ??
+              (json['packVersion'] as num?)?.toInt() ??
+              0)
+          .clamp(0, 1000000000),
+      packStoragePath:
+          (json['pack_storage_path'] ?? json['packStoragePath'] ?? '')
+              .toString()
+              .trim(),
       sortOrder: (json['sort_order'] as num?)?.toInt() ??
           (json['sortOrder'] as num?)?.toInt() ??
           100,
@@ -168,6 +195,10 @@ class DynamicQuizCategoryData {
         'icon_name': iconName,
         'color_hex': colorHex,
         'total_levels': totalLevels,
+        'questions_per_level': questionsPerLevel,
+        'level_draw_mode': levelDrawMode,
+        'pack_version': packVersion,
+        'pack_storage_path': packStoragePath,
         'sort_order': sortOrder,
         'is_visible': isVisible,
         'is_locked': isLocked,
@@ -260,9 +291,16 @@ class DynamicQuizQuestionData {
       };
 }
 
-/// Persisted snapshot of all CMS overrides & additions returned by `get_cms_bundle`.
+/// Persisted snapshot of all CMS overrides & additions returned by `get_cms_bundle_v2`.
 class CmsCacheSnapshot {
+  /// Schema version stored in SharedPreferences cache:
+  /// - `1` (or absent): legacy 1.1.0+21 cache before Plan 20 pack metadata.
+  /// - `2`: 1.2.0+22 cache with `questions_per_level`, `level_draw_mode`,
+  ///        `pack_version`, `pack_storage_path`, and pack-pruned `quizQuestions`.
+  static const int currentCacheSchemaVersion = 2;
+
   final int cmsVersion;
+  final int cacheSchemaVersion;
   final Map<String, StoreItemModel> storeItems;
   final Map<String, DynamicLibrarySectionData> librarySections;
   final Map<String, DynamicLibraryItemData> libraryItems;
@@ -272,6 +310,7 @@ class CmsCacheSnapshot {
 
   const CmsCacheSnapshot({
     this.cmsVersion = 0,
+    this.cacheSchemaVersion = currentCacheSchemaVersion,
     this.storeItems = const {},
     this.librarySections = const {},
     this.libraryItems = const {},
@@ -352,6 +391,7 @@ class CmsCacheSnapshot {
 
     return CmsCacheSnapshot(
       cmsVersion: (json['cms_version'] as num?)?.toInt() ?? 0,
+      cacheSchemaVersion: (json['cache_schema_version'] as num?)?.toInt() ?? 1,
       storeItems: storeMap,
       librarySections: secMap,
       libraryItems: libItemMap,
@@ -365,6 +405,7 @@ class CmsCacheSnapshot {
 
   Map<String, dynamic> toJson() => {
         'cms_version': cmsVersion,
+        'cache_schema_version': cacheSchemaVersion,
         'store_items': storeItems.values.map((e) => e.toCloudJson()).toList(),
         'library_sections':
             librarySections.values.map((e) => e.toJson()).toList(),
@@ -375,7 +416,22 @@ class CmsCacheSnapshot {
         if (syncedAt != null) 'synced_at': syncedAt!.toUtc().toIso8601String(),
       };
 
-  /// Merges either a full snapshot (`incremental == false`) or delta rows (`incremental == true`).
+  static Map<String, DynamicQuizQuestionData> _prunePackedCategoryQuestions(
+    Map<String, DynamicQuizQuestionData> questions,
+    Map<String, DynamicQuizCategoryData> categories,
+  ) {
+    final packedCatIds = <String>{
+      for (final entry in categories.entries)
+        if (entry.value.packVersion > 0) entry.key,
+    };
+    if (packedCatIds.isEmpty) return questions;
+    return Map<String, DynamicQuizQuestionData>.from(questions)
+      ..removeWhere((_, q) => packedCatIds.contains(q.categoryId));
+  }
+
+  /// Merges either a full snapshot (`incremental == false`) or delta rows (`incremental == true`),
+  /// upgrading `cacheSchemaVersion` to [currentCacheSchemaVersion] and pruning raw
+  /// `quizQuestions` for categories that now have a published Gzip CDN pack (`packVersion > 0`).
   CmsCacheSnapshot mergeBundle(Map<String, dynamic> rpcResult, DateTime nowUtc) {
     final nextVersion = (rpcResult['cms_version'] as num?)?.toInt() ?? cmsVersion;
     final incremental = rpcResult['incremental'] as bool? ?? false;
@@ -387,19 +443,36 @@ class CmsCacheSnapshot {
       // hidden from non-auth callers.
       final mergedStore = Map<String, StoreItemModel>.from(storeItems)
         ..addAll(incoming.storeItems);
+      final prunedQuestions = _prunePackedCategoryQuestions(
+        incoming.quizQuestions,
+        incoming.quizCategories,
+      );
       return CmsCacheSnapshot(
         cmsVersion: nextVersion,
+        cacheSchemaVersion: currentCacheSchemaVersion,
         storeItems: mergedStore,
         librarySections: incoming.librarySections,
         libraryItems: incoming.libraryItems,
         quizCategories: incoming.quizCategories,
-        quizQuestions: incoming.quizQuestions,
+        quizQuestions: prunedQuestions,
         syncedAt: nowUtc,
       );
     }
 
+    final mergedCats =
+        Map<String, DynamicQuizCategoryData>.from(quizCategories)
+          ..addAll(incoming.quizCategories);
+    final mergedQuestions =
+        Map<String, DynamicQuizQuestionData>.from(quizQuestions)
+          ..addAll(incoming.quizQuestions);
+    final prunedQuestions = _prunePackedCategoryQuestions(
+      mergedQuestions,
+      mergedCats,
+    );
+
     return CmsCacheSnapshot(
       cmsVersion: nextVersion,
+      cacheSchemaVersion: currentCacheSchemaVersion,
       storeItems: Map<String, StoreItemModel>.from(storeItems)
         ..addAll(incoming.storeItems),
       librarySections:
@@ -407,11 +480,8 @@ class CmsCacheSnapshot {
             ..addAll(incoming.librarySections),
       libraryItems: Map<String, DynamicLibraryItemData>.from(libraryItems)
         ..addAll(incoming.libraryItems),
-      quizCategories:
-          Map<String, DynamicQuizCategoryData>.from(quizCategories)
-            ..addAll(incoming.quizCategories),
-      quizQuestions: Map<String, DynamicQuizQuestionData>.from(quizQuestions)
-        ..addAll(incoming.quizQuestions),
+      quizCategories: mergedCats,
+      quizQuestions: prunedQuestions,
       syncedAt: nowUtc,
     );
   }

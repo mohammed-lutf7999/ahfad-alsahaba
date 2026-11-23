@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/date_formatters.dart';
 import '../../core/sound_service.dart';
 import '../../core/theme/app_custom_theme.dart';
 import '../../data/models/app_control_models.dart';
@@ -659,9 +660,5 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  String _formatTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
+  String _formatTime(DateTime time) => DateFormatters.formatHourMinute(time);
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/date_formatters.dart';
 import '../../core/sound_service.dart';
 import '../../data/models/achievement_model.dart';
 import '../../data/services/achievement_service.dart';
@@ -168,7 +169,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           Container(
             height: 12,
             decoration: BoxDecoration(
-              color: AppTheme.primaryLight.withOpacity(0.3),
+              color: AppTheme.primaryLight.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Stack(
@@ -181,7 +182,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.accentColor.withOpacity(0.5),
+                          color: AppTheme.accentColor.withValues(alpha: 0.5),
                           blurRadius: 8,
                         ),
                       ],
@@ -198,7 +199,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
             '${(progress * 100).toInt()}% مكتمل',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -214,7 +215,7 @@ class _AchievementsScreenState extends State<AchievementsScreen>
         controller: _tabController,
         isScrollable: true,
         labelColor: AppTheme.primaryDark,
-        unselectedLabelColor: Colors.white.withOpacity(0.6),
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           gradient: AppTheme.goldGradient,
@@ -317,25 +318,25 @@ class _AchievementCard extends StatelessWidget {
           end: Alignment.bottomLeft,
           colors: isUnlocked
               ? [
-                  _rarityColor.withOpacity(0.2),
-                  _rarityColor.withOpacity(0.05),
+                  _rarityColor.withValues(alpha: 0.2),
+                  _rarityColor.withValues(alpha: 0.05),
                 ]
               : [
-                  Colors.white.withOpacity(0.05),
-                  Colors.white.withOpacity(0.02),
+                  Colors.white.withValues(alpha: 0.05),
+                  Colors.white.withValues(alpha: 0.02),
                 ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isUnlocked
-              ? _rarityColor.withOpacity(0.5)
-              : Colors.white.withOpacity(0.1),
+              ? _rarityColor.withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.1),
           width: isUnlocked ? 2 : 1,
         ),
         boxShadow: isUnlocked
             ? [
                 BoxShadow(
-                  color: _rarityColor.withOpacity(0.2),
+                  color: _rarityColor.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -361,7 +362,7 @@ class _AchievementCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isUnlocked ? Colors.white : Colors.white.withOpacity(0.5),
+                          color: isUnlocked ? Colors.white : Colors.white.withValues(alpha: 0.5),
                         ),
                         textAlign: TextAlign.right,
                       ),
@@ -371,7 +372,7 @@ class _AchievementCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: _rarityColor.withOpacity(0.2),
+                          color: _rarityColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -396,7 +397,7 @@ class _AchievementCard extends StatelessWidget {
                       : achievement.description,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(isUnlocked ? 0.7 : 0.4),
+                    color: Colors.white.withValues(alpha: isUnlocked ? 0.7 : 0.4),
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -411,7 +412,7 @@ class _AchievementCard extends StatelessWidget {
                       '${achievement.targetValue}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -419,7 +420,7 @@ class _AchievementCard extends StatelessWidget {
                       child: Container(
                         height: 6,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(3),
                         ),
                         child: FractionallySizedBox(
@@ -429,7 +430,7 @@ class _AchievementCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  _rarityColor.withOpacity(0.5),
+                                  _rarityColor.withValues(alpha: 0.5),
                                   _rarityColor,
                                 ],
                               ),
@@ -444,7 +445,7 @@ class _AchievementCard extends StatelessWidget {
                       '$currentValue',
                       style: TextStyle(
                         fontSize: 11,
-                        color: isUnlocked ? _rarityColor : Colors.white.withOpacity(0.5),
+                        color: isUnlocked ? _rarityColor : Colors.white.withValues(alpha: 0.5),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -459,7 +460,7 @@ class _AchievementCard extends StatelessWidget {
                       'تم الفتح: ${_formatDate(achievementWithProgress.progress.unlockedAt!)}',
                       style: TextStyle(
                         fontSize: 10,
-                        color: _rarityColor.withOpacity(0.7),
+                        color: _rarityColor.withValues(alpha: 0.7),
                       ),
                       textAlign: TextAlign.right,
                     ),
@@ -477,17 +478,17 @@ class _AchievementCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isUnlocked
-                  ? _rarityColor.withOpacity(0.2)
-                  : Colors.white.withOpacity(0.05),
+                  ? _rarityColor.withValues(alpha: 0.2)
+                  : Colors.white.withValues(alpha: 0.05),
               border: Border.all(
                 color: isUnlocked
-                    ? _rarityColor.withOpacity(0.5)
-                    : Colors.white.withOpacity(0.1),
+                    ? _rarityColor.withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.1),
               ),
               boxShadow: isUnlocked
                   ? [
                       BoxShadow(
-                        color: _rarityColor.withOpacity(0.3),
+                        color: _rarityColor.withValues(alpha: 0.3),
                         blurRadius: 10,
                       ),
                     ]
@@ -504,7 +505,7 @@ class _AchievementCard extends StatelessWidget {
                     )
                   : Icon(
                       Icons.lock_rounded,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       size: 24,
                     ),
             ),
@@ -514,9 +515,7 @@ class _AchievementCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) => DateFormatters.formatShortDate(date);
 }
 
 class _CategoryTab {

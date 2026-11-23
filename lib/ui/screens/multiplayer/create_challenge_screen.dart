@@ -198,15 +198,15 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
           gradient: isSelected
               ? LinearGradient(
                   colors: [
-                    AppTheme.accentColor.withOpacity(0.3),
-                    AppTheme.accentColor.withOpacity(0.1),
+                    AppTheme.accentColor.withValues(alpha: 0.3),
+                    AppTheme.accentColor.withValues(alpha: 0.1),
                   ],
                 )
               : null,
-          color: isSelected ? null : Colors.white.withOpacity(0.05),
+          color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.accentColor : Colors.white.withOpacity(0.1),
+            color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -225,7 +225,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
               subtitle,
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -259,10 +259,10 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
               gradient: isSelected
                   ? const LinearGradient(colors: [AppTheme.accentLight, AppTheme.accentColor])
                   : null,
-              color: isSelected ? null : Colors.white.withOpacity(0.05),
+              color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected ? AppTheme.accentColor : Colors.white.withOpacity(0.1),
+                color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -308,10 +308,10 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                 gradient: isSelected
                     ? const LinearGradient(colors: [AppTheme.accentLight, AppTheme.accentColor])
                     : null,
-                color: isSelected ? null : Colors.white.withOpacity(0.05),
+                color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected ? AppTheme.accentColor : Colors.white.withOpacity(0.1),
+                  color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
               child: Text(
@@ -334,7 +334,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -359,7 +359,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                       'من يجيب أسرع يحصل على نقاط أكثر',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -395,7 +395,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                       '$_maxPlayers لاعبين',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -438,7 +438,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: AppTheme.accentColor.withOpacity(0.2),
+          color: AppTheme.accentColor.withValues(alpha: 0.2),
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: AppTheme.accentColor, size: 18),
@@ -465,7 +465,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.accentColor.withOpacity(0.4),
+                color: AppTheme.accentColor.withValues(alpha: 0.4),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),

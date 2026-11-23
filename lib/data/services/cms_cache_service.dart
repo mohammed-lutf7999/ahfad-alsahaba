@@ -27,6 +27,9 @@ class CmsCacheService extends ChangeNotifier {
   static final CmsCacheService instance = CmsCacheService._internal();
   CmsCacheService._internal() {
     CmsCategoryBounds.totalLevelsResolver = getTotalLevelsForCategory;
+    CmsCategoryBounds.questionsPerLevelResolver =
+        getQuestionsPerLevelForCategory;
+    CmsCategoryBounds.drawModeResolver = getDrawModeForCategory;
   }
 
   CmsCacheSnapshot _snapshot = CmsCacheSnapshot.empty();
@@ -67,6 +70,17 @@ class CmsCacheService extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Returns `true` ONLY when Supabase reports that `get_cms_bundle_v2` is not
+  /// yet deployed (`PGRST202` or PostgreSQL `42883`), preventing redundant
+  /// fallback retries on network / timeout failures.
+  @visibleForTesting
+  static bool isCmsV2MissingError(Object error) {
+    if (error is PostgrestException) {
+      return error.code == 'PGRST202' || error.code == '42883';
+    }
+    return false;
   }
 
   /// Hydrates cached CMS deltas from SharedPreferences in ~0ms.
@@ -113,7 +127,13 @@ class CmsCacheService extends ChangeNotifier {
       await initFromCache();
     }
 
-    if (!force && serverCmsVersion <= _snapshot.cmsVersion && _snapshot.cmsVersion > 0) {
+    final needsSchemaUpgrade = _snapshot.cacheSchemaVersion <
+        CmsCacheSnapshot.currentCacheSchemaVersion;
+
+    if (!force &&
+        !needsSchemaUpgrade &&
+        serverCmsVersion <= _snapshot.cmsVersion &&
+        _snapshot.cmsVersion > 0) {
       return false;
     }
 
@@ -123,7 +143,7 @@ class CmsCacheService extends ChangeNotifier {
 
     final future = _performSync(
       ownedIds: collectLocalOwnedItemIds(ownedItemIds),
-      force: force,
+      force: force || needsSchemaUpgrade,
     );
     _inFlightSync = future;
     try {
@@ -150,13 +170,29 @@ class CmsCacheService extends ChangeNotifier {
       } else {
         final client = _safeSupabase();
         if (client == null) return false;
-        final raw = await client.rpc(
-          'get_cms_bundle',
-          params: {
-            'p_client_cms_version': clientVer,
-            'p_owned_item_ids': ownedIds,
-          },
-        ).timeout(const Duration(seconds: 5));
+        dynamic raw;
+        try {
+          raw = await client.rpc(
+            'get_cms_bundle_v2',
+            params: {
+              'p_client_cms_version': clientVer,
+              'p_owned_item_ids': ownedIds,
+            },
+          ).timeout(const Duration(seconds: 5));
+        } on PostgrestException catch (v2Err) {
+          if (isCmsV2MissingError(v2Err)) {
+            debugPrint('CmsCacheService get_cms_bundle_v2 missing (${v2Err.code}), falling back to v1');
+            raw = await client.rpc(
+              'get_cms_bundle',
+              params: {
+                'p_client_cms_version': clientVer,
+                'p_owned_item_ids': ownedIds,
+              },
+            ).timeout(const Duration(seconds: 5));
+          } else {
+            rethrow;
+          }
+        }
         if (raw is Map) {
           rpcResult = Map<String, dynamic>.from(raw);
         }
@@ -238,6 +274,24 @@ class CmsCacheService extends ChangeNotifier {
       return cat.totalLevels.clamp(1, 100);
     }
     return AppConstants.levelsPerCategory;
+  }
+
+  /// Resolves dynamic `questionsPerLevel` for [categoryId] (defaulting to 10).
+  int getQuestionsPerLevelForCategory(String categoryId) {
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat != null && cat.questionsPerLevel > 0) {
+      return cat.questionsPerLevel.clamp(1, 100);
+    }
+    return AppConstants.questionsPerLevel;
+  }
+
+  /// Resolves dynamic `levelDrawMode` (`fixed` or `rotating_pool`) for [categoryId].
+  String getDrawModeForCategory(String categoryId) {
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat != null && cat.levelDrawMode == 'rotating_pool') {
+      return 'rotating_pool';
+    }
+    return 'fixed';
   }
 
   /// Resolves category display title from dynamic CMS first, falling back to AppConstants.

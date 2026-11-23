@@ -1,7 +1,7 @@
 # 🛡️ الخطة التطويرية 17: موسوعة فلتر الأخلاق الديناميكي، تطوير الديوان (`v2`)، الصداقة، والدردشة الخاصة ودردشة الكتيبة
 > **الوثيقة:** `17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md`  
 > **المحطة المستهدفة:** Milestone 25 (الإصدار المستقبلي `1.2.x` / `1.3.x`)  
-> **الترحيل السحابي المقترح:** `supabase/migrations/022_ethics_dictionary_friends_and_social_chat_v2.sql` *(إضافي متوافق عكسياً `Additive-Only`)*  
+> **الترحيل السحابي المقترح:** `supabase/migrations/022b_ethics_dictionary_friends_and_social_chat_v2.sql` *(إضافي متوافق عكسياً `Additive-Only` — يبني فوق الإصلاح الجراحي العاجل `022_hotfix_diwan_profanity_filter.sql`)*  
 > **الحالة:** 📝 وثيقة معمارية معتمدة ومفصلة للتنفيذ  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
 > **الهدف الاستراتيجي:** معالجة الثغرة المرصودة في فلتر الأخلاق الحالي، وتحويله إلى موسوعة عربية ديناميكية تُدار من لوحة الإدارة دون تحديث التطبيق، مع ترقية «ديوان الأحفاد» وبناء نظام صداقة ودردشة كتيبة ودردشة خاصة آمنة ومتوافقة تماماً مع سياسة Google Play للمحتوى (`UGC Policy`).
@@ -30,7 +30,7 @@
    - ثلاثة أنماط مطابقة دقيقة:
      * `exact_word`: لا يُحجب إلا إذا جاءت الكلمة مستقلة (مثالي للكلمات القصيرة من 2–3 حروف منعاً للـ `False Positives`).
      * `root_substring`: يُحجب داخل النص المضغوط للشتائم الصريحة الطويلة (≥ 4 حروف).
-     * `regex_guard`: لمنع الروابط الخارجية (`http`, `www`, `t.me`, `wa.me`, `discord.gg`) وأرقام الهواتف والاحتيال المالي.
+     * `regex_guard`: لمنع الروابط الخارجية (`http`, `www`, `t.me`, `wa.me`, `discord.gg`) وأرقام الهواتف والاحتيال المالي — **مع إلزام التحقق من صحة التعبير النمطي قبل الحفظ الإداري (عبر اختبار `'' ~ p_word`) وتغليف تقييمه وقت التشغيل بكتلة `BEGIN ... EXCEPTION WHEN invalid_regular_expression THEN CONTINUE; END;`** حتى لا يتعطل إرسال الرسائل بسبب خطأ إدخال إداري.
 2. **أداة اختبار وإدارة الموسوعة في لوحة الويب `admin_web/`:**
    - واجهة لإضافة/تعديل/حذف الكلمات المحظورة والمستثناة بضغطة زر.
    - **صندوق «اختبر جملة الآن» (`Live Filter Tester`):** يكتب المشرف أي جملة فيخبره النظام فوراً هل تُقبل أم تُرفض وأي كلمة تحديداً أطلقت الحجب!
@@ -70,7 +70,7 @@
 
 ---
 
-## 🗄️ 3. البنية السحابية في Supabase (`022_ethics_dictionary_friends_and_social_chat_v2.sql`)
+## 🗄️ 3. البنية السحابية في Supabase (`022b_ethics_dictionary_friends_and_social_chat_v2.sql`)
 
 ```sql
 -- 1. جدول موسوعة فلتر الأخلاق الديناميكي + الاستثناءات
@@ -115,6 +115,10 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 CREATE INDEX IF NOT EXISTS idx_friendships_users
     ON public.friendships (requester_id, addressee_id, status);
 
+-- فهرس فريد متماثل يمنع تكرار الزوج (A->B) و (B->A) معاً
+CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_pair_unique
+    ON public.friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
+
 -- 4. جدول الرسائل الخاصة بين الأصدقاء (TTL 14 يوماً)
 CREATE TABLE IF NOT EXISTS public.private_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -142,12 +146,20 @@ AS $$
 DECLARE
     v TEXT := LOWER(BTRIM(COALESCE(p_text, '')));
 BEGIN
-    v := regexp_replace(v, '[ـ\u064B-\u065F]', '', 'g');        -- إزالة التشكيل والتطويل
-    v := translate(v, 'أإآىة', 'ااايه');                         -- توحيد الهمزات والألف والهاء
-    v := regexp_replace(v, '(.)\1{2,}', '\1', 'g');              -- ضغط تكرار الحروف (كككلب -> كلب)
+    v := regexp_replace(v, E'[\u0640\u064B-\u065F\u0670]', '', 'g'); -- إزالة التطويل والتشكيل والألف الخنجرية ببادئة PostgreSQL E''
+    v := translate(v, 'أإآىة', 'ااايه');                            -- توحيد الهمزات والألف والهاء
+    v := regexp_replace(v, '(.)\1{2,}', '\1', 'g');                 -- ضغط تكرار الحروف (كككلب -> كلب)
     RETURN v;
 END;
 $$;
+
+-- تقييم آمن لتعبيرات regex_guard (مع التحقق المسبق عند الإضافة الإدارية + حماية وقت التشغيل):
+-- BEGIN
+--     IF v_norm ~ v_rule.word THEN RETURN TRUE; END IF;
+-- EXCEPTION WHEN invalid_regular_expression THEN
+--     -- تجاهل التعبير المعطوب دون إسقاط الديوان وتسجيل تنبيه إداري
+--     NULL;
+-- END;
 ```
 
 > 🛡️ **ضمان RLS:** يُحظر تماماً `INSERT` المباشر من العميل على `private_messages` و`chat_messages`؛ وتمر كل رسالة عبر دوال `SECURITY DEFINER` (`send_diwan_message_v2`, `send_private_message`) التي تتحقق من: `auth.uid()`، عدم الحظر/الكتم، الصداقة المتبادلة، عضوية الكتيبة، حد التكرار (`Rate Limit: 3s`)، وموسوعة فلتر الأخلاق الديناميكي.
@@ -158,7 +170,7 @@ $$;
 
 ```
 supabase/migrations/
-└── 022_ethics_dictionary_friends_and_social_chat_v2.sql
+└── 022b_ethics_dictionary_friends_and_social_chat_v2.sql  # يبني فوق 022_hotfix_diwan_profanity_filter.sql
 
 lib/
 ├── core/
@@ -187,7 +199,7 @@ admin_web/
 
 ## 📋 5. خطوات التنفيذ المتسلسلة (Sequential Milestones)
 
-- [ ] **المرحلة M25.1 (إصلاح الخلل وبناء الموسوعة):** تطبيق الترحيل `022` حياً على Supabase، وتعبئة جدول `ethics_banned_words` (بأنماط `exact_word` للقصيرة و`root_substring` للطويلة) وجدول `ethics_whitelist_words`، واختباره حياً على كلمات بريئة مثل *«اكسب»* و*«مكسرات»* وكلمات مخالفة بأساليب تحايل مختلفة.
+- [ ] **المرحلة M25.1 (بناء الموسوعة الديناميكية فوق الإصلاح الجراحي `022`):** تطبيق الترحيل `022b` حياً على Supabase، وتعبئة جدول `ethics_banned_words` (بأنماط `exact_word` للقصيرة و`root_substring` للطويلة و`regex_guard` المحقق منه قبل الحفظ والمحمي بـ `invalid_regular_expression`) وجدول `ethics_whitelist_words`، واختباره حياً على كلمات بريئة مثل *«اكسب»* و*«مكسرات»* وكلمات مخالفة بأساليب تحايل مختلفة.
 - [ ] **المرحلة M25.2 (إدارة الموسوعة في `admin_web/` والتطبيق):** بناء واجهة إضافة/حذف/تعطيل الكلمات مع «مختبر الجمل الحي»، وربط `ethics_version` بـ `Delta Cache`.
 - [ ] **المرحلة M25.3 (ترقية ديوان الأحفاد `v2`):** إضافة الردود، التفاعلات الشهمة، الرسالة المثبّتة، صلاحية بطاقة التحدي (`3 دقائق`)، والحظر الشخصي الصامت.
 - [ ] **المرحلة M25.4 (دردشة الكتيبة الخاصة):** بناء `GuildChatScreen` وربطها بشاشة الكتيبة مع فتح/إغلاق قناة Realtime منضبط في `dispose()`.
