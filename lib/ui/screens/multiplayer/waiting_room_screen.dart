@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
-import '../../../data/services/challenge_game_service.dart';
 import '../../../data/models/challenge_config.dart';
-import '../../widgets/avatar_selector.dart';
+import '../../../data/services/challenge_game_service.dart';
 import 'multiplayer_quiz_screen.dart';
+import 'widgets/waiting_room_grid.dart';
 
 /// شاشة انتظار اللاعبين (للمضيف)
 class WaitingRoomScreen extends StatefulWidget {
@@ -18,22 +18,22 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   @override
   void initState() {
     super.initState();
-    
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
+
     ChallengeGameService.instance.addListener(_onGameStateChanged);
-    debugPrint('🏠 WaitingRoom: initialized, isHost=${ChallengeGameService.instance.isHost}');
+    debugPrint(
+      '🏠 WaitingRoom: initialized, isHost=${ChallengeGameService.instance.isHost}',
+    );
   }
 
   @override
@@ -44,17 +44,16 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
   }
 
   void _onGameStateChanged() {
-    if (mounted) {
-      final gameService = ChallengeGameService.instance;
-      debugPrint('🔄 WaitingRoom: state changed to ${gameService.state}, players: ${gameService.players.length}');
-      
-      setState(() {});
-      
-      // التحقق من بدء اللعبة - يعمل للمضيف والمنضمين
-      if (gameService.state == ChallengeState.inProgress) {
-        debugPrint('🎮 WaitingRoom: Game is inProgress! Navigating to quiz...');
-        _navigateToQuiz();
-      }
+    if (!mounted) return;
+    final gameService = ChallengeGameService.instance;
+    debugPrint(
+      '🔄 WaitingRoom: state changed to ${gameService.state}, players: ${gameService.players.length}',
+    );
+    setState(() {});
+
+    if (gameService.state == ChallengeState.inProgress) {
+      debugPrint('🎮 WaitingRoom: Game is inProgress! Navigating to quiz...');
+      _navigateToQuiz();
     }
   }
 
@@ -66,12 +65,51 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
     );
   }
 
+  Future<void> _showExitDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.primaryColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'مغادرة الغرفة؟',
+          style: TextStyle(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'سيتم إلغاء التحدي وإخراج جميع اللاعبين',
+          style: TextStyle(color: Colors.white70),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'البقاء',
+              style: TextStyle(color: AppTheme.accentColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('مغادرة', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && mounted) {
+      await ChallengeGameService.instance.reset();
+      if (!mounted) return;
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final gameService = ChallengeGameService.instance;
     final config = gameService.config;
     final players = gameService.players;
-    
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -85,21 +123,17 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             child: Column(
               children: [
                 _buildHeader(),
-                
-                // Challenge Info
-                if (config != null) _buildChallengeInfo(config),
-                
+                if (config != null) WaitingRoomChallengeInfo(config: config),
                 const SizedBox(height: 20),
-                
-                // Players Grid
                 Expanded(
-                  child: _buildPlayersGrid(players, config?.maxPlayers ?? 4),
+                  child: WaitingRoomPlayersGrid(
+                    players: players,
+                    maxPlayers: config?.maxPlayers ?? 4,
+                    pulseAnimation: _pulseAnimation,
+                  ),
                 ),
-                
-                // Start Button (only for host with 2+ players)
                 if (gameService.isHost && players.length >= 2)
                   _buildStartButton(),
-                
                 const SizedBox(height: 20),
               ],
             ),
@@ -115,7 +149,6 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Title and Icon
           Expanded(
             child: Row(
               children: [
@@ -124,9 +157,18 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                   decoration: BoxDecoration(
                     gradient: AppTheme.goldGradient,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accentColor.withAlpha(80),
+                        blurRadius: 10,
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.people_rounded, color: AppTheme.primaryDark, size: 22),
+                  child: const Icon(
+                    Icons.people_rounded,
+                    color: AppTheme.primaryDark,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Flexible(
@@ -139,7 +181,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                       ).createShader(bounds),
                       child: const Text(
                         'غرفة الانتظار',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -148,9 +194,8 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // Exit button
           GestureDetector(
-            onTap: () => _showExitDialog(),
+            onTap: _showExitDialog,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -158,194 +203,12 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.red.withAlpha(80)),
               ),
-              child: const Icon(Icons.close_rounded, color: Colors.red, size: 20),
+              child:
+                  const Icon(Icons.close_rounded, color: Colors.red, size: 20),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChallengeInfo(ChallengeConfig config) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          Expanded(
-            child: _buildInfoItem(
-              icon: config.type == ChallengeType.bruteForce ? '🎲' : '📚',
-              label: config.type == ChallengeType.bruteForce
-                  ? 'القوة الغاشمة'
-                  : 'قسم محدد',
-            ),
-          ),
-          Container(width: 1, height: 40, color: Colors.white24),
-          Expanded(
-            child: _buildInfoItem(
-              icon: '❓',
-              label: '${config.questionCount} سؤال',
-            ),
-          ),
-          Container(width: 1, height: 40, color: Colors.white24),
-          Expanded(
-            child: _buildInfoItem(
-              icon: '⚡',
-              label: config.speedMode ? 'سرعة' : 'عادي',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoItem({required String icon, required String label}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlayersGrid(List players, int maxPlayers) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        mainAxisExtent: 206,
-      ),
-      itemCount: maxPlayers,
-      itemBuilder: (context, index) {
-        if (index < players.length) {
-          return _buildPlayerCard(players[index], index == 0);
-        } else {
-          return _buildEmptySlot(index);
-        }
-      },
-    );
-  }
-
-  Widget _buildPlayerCard(dynamic player, bool isHost) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.15),
-            (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: (isHost ? AppTheme.accentColor : Colors.white).withValues(alpha: 0.3),
-          width: isHost ? 2 : 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Crown for host
-          if (isHost)
-            const Text('👑', style: TextStyle(fontSize: 24)),
-          
-          // Avatar
-          ProfileAvatar(avatarIndex: player.avatarIndex, size: 60),
-          
-          const SizedBox(height: 8),
-          
-          // Name
-          Text(
-            player.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          
-          const SizedBox(height: 4),
-          
-          // Status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: player.isReady ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              player.isReady ? 'جاهز ✓' : 'ينتظر...',
-              style: TextStyle(
-                fontSize: 10,
-                color: player.isReady ? Colors.green : Colors.orange,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptySlot(int index) {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03 * _pulseAnimation.value),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              style: BorderStyle.solid,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.person_add_rounded,
-                size: 40,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'في انتظار لاعب...',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.3),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -391,41 +254,5 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         ),
       ),
     );
-  }
-
-  Future<void> _showExitDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.primaryColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'مغادرة الغرفة؟',
-          style: TextStyle(color: Colors.white),
-          textAlign: TextAlign.center,
-        ),
-        content: const Text(
-          'سيتم إلغاء التحدي وإخراج جميع اللاعبين',
-          style: TextStyle(color: Colors.white70),
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('البقاء', style: TextStyle(color: AppTheme.accentColor)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('مغادرة', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true && mounted) {
-      await ChallengeGameService.instance.reset();
-      if (!mounted) return;
-      Navigator.pop(context);
-    }
   }
 }
