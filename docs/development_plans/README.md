@@ -1,6 +1,6 @@
 # 🗺️ الدليل الشامل وخرائط الطريق التطويرية — مشروع «معركة أحفاد الصحابة»
 > **المسار الأساسي:** `docs/development_plans/`  
-> **تاريخ التحديث:** 23 نوفمبر 2026  
+> **تاريخ التحديث:** 24 نوفمبر 2026  
 > **الإصدار الحالي المستقر والمدمج على `main`:** `1.2.1+23` *(نسخة الإنتاج المنشورة سابقاً على Google Play: `1.1.0+21`، وحزمة `1.2.1+23` جاهزة للرفع)*  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
 > **معيار الجودة والهندسة:** معايير التطوير العالمية لبيئات الإنتاج (Clean Architecture + Zero-Lag Realtime + RLS Enterprise Security + `179/179` Tests + `0` Analyzer Issues).
@@ -35,6 +35,7 @@
 | **🩹 022** | **الإصلاح الجراحي الحي لفلتر أخلاق الديوان (`E'...'` + فصل الجذور القصيرة)** | [`022_hotfix_diwan_profanity_filter.sql`](../../supabase/migrations/022_hotfix_diwan_profanity_filter.sql) | **✅ مطبّق ومختبر حياً (16/16)** | الترحيل `022` |
 | **🏗️ 21 (W1)** | **الموجة الأولى من الكود النظيف: تفكيك `app_control_models` و`AdminService` وتصفير `203` تحذير** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 1 مكتملة 100%** | `M23` (`1.2.0+22`) — *الموجات 2–4 لاحقة* |
 | **📦 20** | **المستويات المرنة (`1–100`)، الاستيراد الجماعي لـ `JSON`، حزم `Gzip CDN`، `rotating_pool`، والتطابق الإداري الكامل من الجوال + تصدير CSV** | [`20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md`](./20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md) | **✅ مكتمل 100% ومطبّق حياً** | الترحيل `023` (`1.2.0+22` + `1.2.1+23` / `179` اختباراً) |
+| **🌐 21 (W2)** | **الموجة الثانية من الكود النظيف: تفكيك `admin_web/` إلى `27` وحدة `Native ES Modules` وتحميل كسول لـ `8` تبويبات + `3` ملفات CSS** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 2 مكتملة 100%** | فرع `refactor/wave-2-admin-web-modularization` (`Gate 2`: Edge CDP `8/8`، `0` أخطاء) |
 
 *(ملاحظة معمارية: تم استيعاب وتطوير المسودات السابقة للخطة 03 «ديوان الأحفاد» والخطة 07 «الكتائب والبطولات» بالكامل وتطبيقهما حياً ضمن الخطتين المكتملتين 10 و 11).*
 
@@ -45,7 +46,7 @@
 | # | اسم الخطة التطويرية المستهدفة | الملف التوثيقي | المحطة المقترحة | الترحيل القادم | الأولوية |
 | :-: | :--- | :--- | :--- | :---: | :---: |
 | **🚀 12** | **محرّك النمو الفيروسي وبطاقات النصر التفاعلية وودجت أندرويد 14/15 («مخطوطة اليوم»)** | [`12_VIRAL_CARDS_AND_ANDROID_WIDGETS.md`](./12_VIRAL_CARDS_AND_ANDROID_WIDGETS.md) | **`1.3.0+24`** *(التالي المقترح)* | — | 🔥 قصوى |
-| **🏗️ 21 (W2–4)** | **استكمال موجات إعادة الهيكلة (الموجة 2: `admin_web` ES Modules، الموجة 3: `Multiplayer`/الشاشات، الموجة 4: `supabase/schema/`)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | بالتوازي بين الإصدارات | — | 🔴 عالية |
+| **🏗️ 21 (W3–4)** | **استكمال موجات إعادة الهيكلة (الموجة 3: `Multiplayer`/الشاشات، الموجة 4: `supabase/schema/` ومشاركة Edge)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | بالتوازي بين الإصدارات | — | 🔴 عالية |
 | **🛡️ 17** | **موسوعة فلتر الأخلاق الديناميكي، تطوير الديوان (`v2`)، طلبات الصداقة، ودردشة الكتيبة والخاص** | [`17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md`](./17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md) | Milestone 25 | `024` | 🔥 قصوى |
 | **⚔️ 18** | **حوكمة الكتائب المتقدمة، صلاحيات القائد والنائب، محرك الاستقطاب والدعوات، والبطولات الداخلية** | [`18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md`](./18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md) | Milestone 26 | `025` | 🔴 عالية |
 | **💰 19** | **منظومة الدخل الحلال المستدام، اشتراكات «الفارس الملكي VIP»، زر الدعم، وتوافق Google Play** | [`19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md`](./19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md) | Milestone 27 | `026` | 🔥 سيادية |

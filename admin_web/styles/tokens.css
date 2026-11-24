@@ -1,0 +1,54 @@
+:root {
+  --bg-deep: #0d061a;
+  --bg-mid: #1a0f2e;
+  --surface-card: rgba(36, 20, 61, 0.88);
+  --surface-dark: rgba(0, 0, 0, 0.28);
+  --gold: #f3c644;
+  --gold-dim: #d4af37;
+  --emerald: #10b981;
+  --sky: #38bdf8;
+  --rose: #fb7185;
+  --purple: #a78bfa;
+  --danger: #e11d48;
+  --text-light: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.72);
+  --border-gold: rgba(243, 198, 68, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at top right, #2d1b4e, var(--bg-deep) 60%);
+  background-attachment: fixed;
+  color: var(--text-light);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.gold-text { color: var(--gold); }
+.emerald-text { color: var(--emerald); }
+.sky-text { color: var(--sky); }
+.rose-text { color: var(--rose); }
+.purple-text { color: var(--purple); }
+.muted-text,
+.muted { color: var(--text-muted); font-size: 0.8rem; }
+
+.code-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gold);
+  font-size: 0.74rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  direction: ltr;
+}
