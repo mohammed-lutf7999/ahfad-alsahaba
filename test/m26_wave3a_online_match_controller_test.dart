@@ -149,7 +149,8 @@ void main() {
       await controller.initialize();
       expect(controller.opponentScore, 0);
 
-      await tester.pump(const Duration(milliseconds: 1200));
+      // GhostPlaybackService applies ±150..±300ms human jitter (max 1300ms for 1000ms base).
+      await tester.pump(const Duration(milliseconds: 1500));
       expect(controller.opponentScore, greaterThan(0));
       expect(controller.opponentQuestionIndex, 1);
 
