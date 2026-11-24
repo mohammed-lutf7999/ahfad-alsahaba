@@ -1,222 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../core/cms_icon_registry.dart';
-import '../../data/models/player_level_model.dart';
-import '../../data/models/store_item_model.dart';
-import '../../data/services/cms_cache_service.dart';
+import 'avatar_frame/royal_avatar_frame_painter.dart';
+import 'avatar_frame/royal_frame_style.dart';
 
-/// Visual specification for each of the 10 Royal Avatar Frames (`frame_wood` .. `frame_diamond`).
-class RoyalFrameStyle {
-  final String frameKey;
-  final String name;
-  final int tierIndex; // 1..10
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color highlightColor;
-  final bool hasOctagonalStar;
-  final bool hasCornerGems;
-  final bool hasCrownCrest;
-  final double strokeRatio;
-
-  const RoyalFrameStyle({
-    required this.frameKey,
-    required this.name,
-    required this.tierIndex,
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.highlightColor,
-    this.hasOctagonalStar = false,
-    this.hasCornerGems = false,
-    this.hasCrownCrest = false,
-    this.strokeRatio = 0.085,
-  });
-
-  static const Map<String, RoyalFrameStyle> styles = {
-    'frame_wood': RoyalFrameStyle(
-      frameKey: 'frame_wood',
-      name: 'الإطار الخشبي العتيق',
-      tierIndex: 1,
-      primaryColor: Color(0xFF78350F),
-      secondaryColor: Color(0xFFB45309),
-      highlightColor: Color(0xFFFDE68A),
-      strokeRatio: 0.075,
-    ),
-    'frame_copper': RoyalFrameStyle(
-      frameKey: 'frame_copper',
-      name: 'الإطار النحاسي المنقوش',
-      tierIndex: 2,
-      primaryColor: Color(0xFF9A3412),
-      secondaryColor: Color(0xFFD97706),
-      highlightColor: Color(0xFFFED7AA),
-      hasCornerGems: true,
-      strokeRatio: 0.08,
-    ),
-    'frame_bronze': RoyalFrameStyle(
-      frameKey: 'frame_bronze',
-      name: 'الإطار البرونزي المذهب',
-      tierIndex: 3,
-      primaryColor: Color(0xFF92400E),
-      secondaryColor: Color(0xFFF59E0B),
-      highlightColor: Color(0xFFFEF3C7),
-      hasOctagonalStar: true,
-      strokeRatio: 0.085,
-    ),
-    'frame_silver': RoyalFrameStyle(
-      frameKey: 'frame_silver',
-      name: 'الإطار الفضي الدمشقي',
-      tierIndex: 4,
-      primaryColor: Color(0xFF475569),
-      secondaryColor: Color(0xFFCBD5E1),
-      highlightColor: Color(0xFFFFFFFF),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      strokeRatio: 0.088,
-    ),
-    'frame_gold': RoyalFrameStyle(
-      frameKey: 'frame_gold',
-      name: 'الإطار الذهبي الموحد',
-      tierIndex: 5,
-      primaryColor: Color(0xFFB45309),
-      secondaryColor: Color(0xFFF3C644),
-      highlightColor: Color(0xFFFFFBEB),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      strokeRatio: 0.092,
-    ),
-    'frame_emerald': RoyalFrameStyle(
-      frameKey: 'frame_emerald',
-      name: 'الإطار الزمردي الملكي',
-      tierIndex: 6,
-      primaryColor: Color(0xFF065F46),
-      secondaryColor: Color(0xFF10B981),
-      highlightColor: Color(0xFFA7F3D0),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      strokeRatio: 0.095,
-    ),
-    'frame_ruby': RoyalFrameStyle(
-      frameKey: 'frame_ruby',
-      name: 'الإطار الياقوتي المشرق',
-      tierIndex: 7,
-      primaryColor: Color(0xFF9F1239),
-      secondaryColor: Color(0xFFF43F5E),
-      highlightColor: Color(0xFFFECDD3),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      hasCrownCrest: true,
-      strokeRatio: 0.098,
-    ),
-    'frame_sapphire': RoyalFrameStyle(
-      frameKey: 'frame_sapphire',
-      name: 'الإطار اللازوردي السلطاني',
-      tierIndex: 8,
-      primaryColor: Color(0xFF1E40AF),
-      secondaryColor: Color(0xFF38BDF8),
-      highlightColor: Color(0xFFE0F2FE),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      hasCrownCrest: true,
-      strokeRatio: 0.10,
-    ),
-    'frame_platinum': RoyalFrameStyle(
-      frameKey: 'frame_platinum',
-      name: 'الإطار البلاتيني المتوهج',
-      tierIndex: 9,
-      primaryColor: Color(0xFF5B21B6),
-      secondaryColor: Color(0xFFC084FC),
-      highlightColor: Color(0xFFFAF5FF),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      hasCrownCrest: true,
-      strokeRatio: 0.105,
-    ),
-    'frame_diamond': RoyalFrameStyle(
-      frameKey: 'frame_diamond',
-      name: 'الإطار الماسي الأندلسي المشع',
-      tierIndex: 10,
-      primaryColor: Color(0xFF0284C7),
-      secondaryColor: Color(0xFF38BDF8),
-      highlightColor: Color(0xFFFFFFFF),
-      hasOctagonalStar: true,
-      hasCornerGems: true,
-      hasCrownCrest: true,
-      strokeRatio: 0.11,
-    ),
-  };
-
-  /// Builds a procedural [RoyalFrameStyle] from a dynamic CMS Store frame item.
-  factory RoyalFrameStyle.fromStoreItem(StoreItemModel item) {
-    final meta = item.metadata;
-    final secondary = CmsIconRegistry.tryParseColor(
-          meta['secondaryColor'] ??
-              meta['secondary_color'] ??
-              meta['previewColor'],
-        ) ??
-        item.previewColor;
-    final primary = CmsIconRegistry.tryParseColor(
-          meta['primaryColor'] ?? meta['primary_color'],
-        ) ??
-        Color.lerp(secondary, Colors.black, 0.45) ??
-        secondary;
-    final highlight = CmsIconRegistry.tryParseColor(
-          meta['highlightColor'] ??
-              meta['glow_color'] ??
-              meta['highlight_color'],
-        ) ??
-        Color.lerp(secondary, Colors.white, 0.65) ??
-        Colors.white;
-    final rawStroke =
-        ((meta['strokeRatio'] ?? meta['stroke_ratio']) as num?)?.toDouble() ??
-            0.095;
-    final tierFromLevel = ((item.minLevel / 10).ceil()).clamp(2, 10);
-
-    return RoyalFrameStyle(
-      frameKey: item.assetKey.isNotEmpty ? item.assetKey : item.id,
-      name: item.title,
-      tierIndex:
-          ((meta['tierIndex'] ?? meta['tier_index']) as num?)?.toInt() ??
-              tierFromLevel,
-      primaryColor: primary,
-      secondaryColor: secondary,
-      highlightColor: highlight,
-      hasOctagonalStar: (meta['hasOctagonalStar'] ??
-              meta['has_octagonal_star']) as bool? ??
-          true,
-      hasCornerGems: (meta['hasCornerGems'] ??
-              meta['show_gems'] ??
-              meta['has_corner_gems']) as bool? ??
-          true,
-      hasCrownCrest: (meta['hasCrownCrest'] ??
-              meta['has_crown_crest']) as bool? ??
-          (item.minLevel >= 60),
-      strokeRatio: rawStroke.clamp(0.06, 0.14),
-    );
-  }
-
-  /// Resolves a [RoyalFrameStyle] from [frameKey] (built-in or dynamic CMS)
-  /// or [level] (1..100).
-  static RoyalFrameStyle resolve({String? frameKey, int? level}) {
-    if (frameKey != null && styles.containsKey(frameKey)) {
-      return styles[frameKey]!;
-    }
-    if (frameKey != null && frameKey.isNotEmpty) {
-      final cloudFrame = CmsCacheService.instance.findStoreItemByAssetKey(
-        frameKey,
-        category: StoreItemCategory.frame,
-      );
-      if (cloudFrame != null) {
-        return RoyalFrameStyle.fromStoreItem(cloudFrame);
-      }
-    }
-    if (level != null) {
-      final tier = PlayerLevelInfo.resolveTier(level);
-      if (styles.containsKey(tier.frameKey)) {
-        return styles[tier.frameKey]!;
-      }
-    }
-    return styles['frame_wood']!;
-  }
-}
+export 'avatar_frame/royal_frame_style.dart';
 
 /// Procedural Royal Avatar Frame with Andalusian geometry, `ShaderMask` metallic sweep,
 /// and Win Streak Aura (`winStreak >= 3`).
@@ -256,9 +43,7 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
       vsync: this,
       duration: const Duration(milliseconds: 4200),
     );
-    if (widget.animate) {
-      _controller.repeat();
-    }
+    if (widget.animate) _controller.repeat();
   }
 
   @override
@@ -301,7 +86,6 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                // 1. Win Streak Glowing Aura (when winStreak >= 3)
                 if (hasWinStreakAura)
                   Container(
                     width: outerSize * (1.04 + 0.05 * pulse),
@@ -324,8 +108,6 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
                       ],
                     ),
                   ),
-
-                // 2. Ambient Tier Glow for Gold+ frames (Tier >= 5)
                 if (style.tierIndex >= 5)
                   Container(
                     width: outerSize * 0.94,
@@ -342,17 +124,11 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
                       ],
                     ),
                   ),
-
-                // 3. Inner Clipped Avatar Child
                 SizedBox(
                   width: avatarSize,
                   height: avatarSize,
-                  child: ClipOval(
-                    child: cachedAvatar,
-                  ),
+                  child: ClipOval(child: cachedAvatar),
                 ),
-
-                // 4. Procedural Andalusian Frame with ShaderMask Sweep
                 ShaderMask(
                   blendMode: BlendMode.srcATop,
                   shaderCallback: (bounds) {
@@ -372,15 +148,13 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
                   },
                   child: CustomPaint(
                     size: Size.square(outerSize),
-                    painter: _RoyalAvatarFramePainter(
+                    painter: RoyalAvatarFramePainter(
                       style: style,
                       phase: phase,
                       hasWinStreakAura: hasWinStreakAura,
                     ),
                   ),
                 ),
-
-                // 5. Win Streak Flame Pill (for compact/medium/large sizes when enabled)
                 if (hasWinStreakAura &&
                     widget.showStreakBadge &&
                     outerSize >= 44)
@@ -439,130 +213,5 @@ class _AnimatedAvatarFrameState extends State<AnimatedAvatarFrame>
         ),
       ),
     );
-  }
-}
-
-class _RoyalAvatarFramePainter extends CustomPainter {
-  final RoyalFrameStyle style;
-  final double phase;
-  final bool hasWinStreakAura;
-
-  _RoyalAvatarFramePainter({
-    required this.style,
-    required this.phase,
-    required this.hasWinStreakAura,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.shortestSide / 2) * 0.90;
-    final strokeWidth = size.shortestSide * style.strokeRatio;
-
-    // 1. Base Outer Bevel Ring
-    final basePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..color = style.secondaryColor;
-    canvas.drawCircle(center, radius, basePaint);
-
-    // 2. Inner Golden/Metallic Rim
-    final innerRimPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.2, strokeWidth * 0.24)
-      ..color = style.highlightColor.withValues(alpha: 0.85);
-    canvas.drawCircle(center, radius - strokeWidth * 0.44, innerRimPaint);
-
-    // 3. Octagonal Andalusian Star Filigree (for Tier >= 3)
-    if (style.hasOctagonalStar) {
-      final starPoints = style.tierIndex >= 10 ? 16 : 8;
-      final starPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.1, strokeWidth * 0.22)
-        ..strokeJoin = StrokeJoin.round
-        ..color = style.highlightColor.withValues(alpha: 0.75);
-
-      final path = Path();
-      final outerR = radius + strokeWidth * 0.36;
-      final innerR = radius - strokeWidth * 0.18;
-      final rotationOffset =
-          style.tierIndex >= 9 ? phase * math.pi * 0.25 : 0.0;
-
-      for (int i = 0; i < starPoints * 2; i++) {
-        final r = i.isEven ? outerR : innerR;
-        final angle =
-            rotationOffset + (i * math.pi / starPoints) - (math.pi / 2);
-        final pt = Offset(
-          center.dx + r * math.cos(angle),
-          center.dy + r * math.sin(angle),
-        );
-        if (i == 0) {
-          path.moveTo(pt.dx, pt.dy);
-        } else {
-          path.lineTo(pt.dx, pt.dy);
-        }
-      }
-      path.close();
-      canvas.drawPath(path, starPaint);
-    }
-
-    // 4. Corner Jewel Nodes (8 Andalusian Bosses around the ring)
-    if (style.hasCornerGems) {
-      final gemCount = style.tierIndex >= 8 ? 8 : 4;
-      final gemRadius = math.max(1.8, strokeWidth * 0.34);
-      final gemFill = Paint()
-        ..style = PaintingStyle.fill
-        ..color = style.highlightColor;
-      final gemBorder = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.0, strokeWidth * 0.16)
-        ..color = style.primaryColor;
-
-      for (int i = 0; i < gemCount; i++) {
-        final angle = (i * 2 * math.pi / gemCount) - (math.pi / 2);
-        final gemCenter = Offset(
-          center.dx + radius * math.cos(angle),
-          center.dy + radius * math.sin(angle),
-        );
-        canvas.drawCircle(gemCenter, gemRadius, gemFill);
-        canvas.drawCircle(gemCenter, gemRadius, gemBorder);
-      }
-    }
-
-    // 5. Royal Crown Crest at Top (for Ruby, Sapphire, Platinum, Diamond: Tier >= 7)
-    if (style.hasCrownCrest && size.shortestSide >= 36) {
-      final crestY = center.dy - radius - strokeWidth * 0.22;
-      final crestW = strokeWidth * 1.45;
-      final crestH = strokeWidth * 0.95;
-
-      final crownPath = Path()
-        ..moveTo(center.dx - crestW, crestY + crestH * 0.45)
-        ..lineTo(center.dx - crestW * 0.72, crestY - crestH * 0.45)
-        ..lineTo(center.dx - crestW * 0.30, crestY + crestH * 0.12)
-        ..lineTo(center.dx, crestY - crestH * 0.88)
-        ..lineTo(center.dx + crestW * 0.30, crestY + crestH * 0.12)
-        ..lineTo(center.dx + crestW * 0.72, crestY - crestH * 0.45)
-        ..lineTo(center.dx + crestW, crestY + crestH * 0.45)
-        ..close();
-
-      final crownFill = Paint()
-        ..style = PaintingStyle.fill
-        ..color = style.highlightColor;
-      final crownStroke = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.0, strokeWidth * 0.18)
-        ..strokeJoin = StrokeJoin.round
-        ..color = style.primaryColor;
-
-      canvas.drawPath(crownPath, crownFill);
-      canvas.drawPath(crownPath, crownStroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RoyalAvatarFramePainter oldDelegate) {
-    return oldDelegate.phase != phase ||
-        oldDelegate.style.frameKey != style.frameKey ||
-        oldDelegate.hasWinStreakAura != hasWinStreakAura;
   }
 }

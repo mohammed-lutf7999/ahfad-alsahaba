@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../core/app_routes.dart';
 import '../../../core/sound_service.dart';
-import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/app_control_models.dart';
 import '../../../data/models/player_profile_model.dart';
 import '../../../data/services/admin_service.dart';
+import 'announcements/announcement_composer_card.dart';
+import 'announcements/announcement_list_item.dart';
 import 'widgets/admin_ui_kit.dart';
 
 /// In-App Admin Screen for publishing global or targeted (`Google` & `SAH-XXXX` guests)
@@ -69,9 +69,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     setState(() => _isLoadingList = true);
     try {
       final list = await AdminService().listAnnouncements(limit: 50);
-      if (mounted) {
-        setState(() => _announcements = list);
-      }
+      if (mounted) setState(() => _announcements = list);
     } catch (e) {
       if (mounted) {
         showAdminFeedback(context, 'تعذر تحميل سجل الرسائل: $e', isError: true);
@@ -252,7 +250,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final customTheme = AppCustomTheme.of(context);
     return AdminScaffoldShell(
       title: 'الرسائل الموجّهة والبحث',
       subtitle: 'بث جماعي أو استهداف مباشر (Google & SAH-XXXX)',
@@ -266,259 +263,60 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AdminSectionCard(
-                title: 'إنشاء وإرسال رسالة جديدة',
-                icon: Icons.campaign_rounded,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'نوع الرسالة',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildTypeChip(
-                          AnnouncementType.normal,
-                          'عادية',
-                          customTheme.sovereignAccent,
-                        ),
-                        _buildTypeChip(
-                          AnnouncementType.mandatory,
-                          'إجبارية مقفلة',
-                          Colors.redAccent,
-                        ),
-                        _buildTypeChip(
-                          AnnouncementType.admin,
-                          'إدارية',
-                          const Color(0xFF38BDF8),
-                        ),
-                        _buildTypeChip(
-                          AnnouncementType.motivational,
-                          'تحفيزية',
-                          const Color(0xFF10B981),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'نطاق الاستهداف',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            key: const Key('scope_all_chip'),
-                            label: const Center(
-                              child: Text(
-                                'جميع اللاعبين',
-                                style: TextStyle(fontFamily: 'Cairo', fontSize: 12.5),
-                              ),
-                            ),
-                            selected: _targetScope == 'all',
-                            selectedColor:
-                                customTheme.sovereignAccent.withValues(alpha: 0.25),
-                            onSelected: (_) => setState(() => _targetScope = 'all'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ChoiceChip(
-                            key: const Key('scope_single_user_chip'),
-                            label: const Center(
-                              child: Text(
-                                'لاعب محدد 🎯',
-                                style: TextStyle(fontFamily: 'Cairo', fontSize: 12.5),
-                              ),
-                            ),
-                            selected: _targetScope == 'single_user',
-                            selectedColor:
-                                customTheme.sovereignAccent.withValues(alpha: 0.25),
-                            onSelected: (_) =>
-                                setState(() => _targetScope = 'single_user'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_targetScope == 'single_user') ...[
-                      const SizedBox(height: 12),
-                      _buildSingleUserTargetingBox(customTheme),
-                    ],
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _titleCtrl,
-                      label: 'عنوان الرسالة',
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _bodyCtrl,
-                      label: 'نص الرسالة',
-                      maxLines: 3,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _ctaLabelCtrl,
-                            label: 'نص زر الإجراء (اختياري)',
-                            hint: 'مثال: افتح المتجر',
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _ctaRouteCtrl,
-                            label: 'المسار أو الرابط (اختياري)',
-                            hint: AppRoutes.knightsStore,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _buildQuickRouteChip('المتجر', AppRoutes.knightsStore),
-                        _buildQuickRouteChip('التحدي', AppRoutes.challenge),
-                        _buildQuickRouteChip('المجد', AppRoutes.gloryRoad),
-                        _buildQuickRouteChip('المكتبة', AppRoutes.library),
-                        _buildQuickRouteChip('البريد', AppRoutes.royalInbox),
-                        _buildQuickRouteChip('الديوان', '/diwan'),
-                        _buildQuickRouteChip('الكتائب', AppRoutes.guilds),
-                        _buildQuickRouteChip('البطولة الحية', AppRoutes.liveArena),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _minVersionCtrl,
-                            label: 'من رقم بناء (اختياري)',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _maxVersionCtrl,
-                            label: 'إلى رقم بناء (اختياري)',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: customTheme.sovereignAccent,
-                              side: BorderSide(
-                                color: customTheme.sovereignAccent
-                                    .withValues(alpha: 0.45),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                            onPressed: () async {
-                              final picked = await pickAdminDateTime(
-                                context,
-                                initial: _expiresAt,
-                              );
-                              if (picked != null && mounted) {
-                                setState(() => _expiresAt = picked);
-                              }
-                            },
-                            icon: const Icon(Icons.event_rounded, size: 18),
-                            label: Text(
-                              _expiresAt == null
-                                  ? 'انتهاء الصلاحية: مفتوحة'
-                                  : 'تنتهي: ${formatAdminDateTime(_expiresAt)}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'Cairo',
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (_expiresAt != null) ...[
-                          const SizedBox(width: 6),
-                          IconButton(
-                            onPressed: () => setState(() => _expiresAt = null),
-                            icon: const Icon(
-                              Icons.close_rounded,
-                              color: Colors.white70,
-                            ),
-                            tooltip: 'مسح التاريخ',
-                          ),
-                        ],
-                      ],
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: Colors.redAccent,
-                      title: const Text(
-                        'منع الإغلاق العادي (قفل التخطي)',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        _messageType == AnnouncementType.mandatory
-                            ? 'مفعّل تلقائياً لأن النوع إجباري'
-                            : 'يطلب من اللاعب ضغط زر الموافقة',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 11,
-                        ),
-                      ),
-                      value: _messageType == AnnouncementType.mandatory
-                          ? true
-                          : !_isDismissible,
-                      onChanged: _messageType == AnnouncementType.mandatory
-                          ? null
-                          : (locked) => setState(() => _isDismissible = !locked),
-                    ),
-                    const SizedBox(height: 12),
-                    AdminPrimaryButton(
-                      key: const Key('admin_send_announcement_btn'),
-                      label: 'إرسال ونشر الرسالة 🚀',
-                      icon: Icons.send_rounded,
-                      isLoading: _isPublishing,
-                      onPressed: _submitAnnouncement,
-                    ),
-                  ],
-                ),
+              AnnouncementComposerCard(
+                titleCtrl: _titleCtrl,
+                bodyCtrl: _bodyCtrl,
+                ctaLabelCtrl: _ctaLabelCtrl,
+                ctaRouteCtrl: _ctaRouteCtrl,
+                minVersionCtrl: _minVersionCtrl,
+                maxVersionCtrl: _maxVersionCtrl,
+                searchCtrl: _searchCtrl,
+                manualPlayerCodeCtrl: _manualPlayerCodeCtrl,
+                messageType: _messageType,
+                targetScope: _targetScope,
+                isDismissible: _isDismissible,
+                expiresAt: _expiresAt,
+                isSearching: _isSearching,
+                isPublishing: _isPublishing,
+                searchResults: _searchResults,
+                selectedPlayer: _selectedPlayer,
+                onMessageTypeChanged: (type) {
+                  setState(() {
+                    _messageType = type;
+                    if (type == AnnouncementType.mandatory) {
+                      _isDismissible = false;
+                    }
+                  });
+                },
+                onTargetScopeChanged: (s) => setState(() => _targetScope = s),
+                onDismissibleChanged: (d) => setState(() => _isDismissible = d),
+                onPickExpiry: () async {
+                  final picked = await pickAdminDateTime(
+                    context,
+                    initial: _expiresAt,
+                  );
+                  if (picked != null && mounted) {
+                    setState(() => _expiresAt = picked);
+                  }
+                },
+                onClearExpiry: () => setState(() => _expiresAt = null),
+                onSearchChanged: _onSearchQueryChanged,
+                onSearchSubmitted: () {
+                  final q = _searchCtrl.text.trim();
+                  if (q.isNotEmpty) _executePlayerSearch(q);
+                },
+                onManualCodeChanged: (val) {
+                  if (_selectedPlayer != null && val.trim().isNotEmpty) {
+                    setState(() => _selectedPlayer = null);
+                  }
+                },
+                onSelectPlayer: (player) {
+                  _manualPlayerCodeCtrl.clear();
+                  setState(() => _selectedPlayer = player);
+                },
+                onClearSelectedPlayer: () =>
+                    setState(() => _selectedPlayer = null),
+                onSubmit: _submitAnnouncement,
               ),
               const SizedBox(height: 16),
               AdminSectionCard(
@@ -542,349 +340,19 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                           )
                         : Column(
                             children: _announcements
-                                .map(_buildAnnouncementItem)
+                                .map(
+                                  (ann) => AnnouncementListItem(
+                                    announcement: ann,
+                                    onToggleActive: (v) =>
+                                        _toggleAnnouncement(ann, v),
+                                  ),
+                                )
                                 .toList(),
                           ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTypeChip(AnnouncementType type, String label, Color color) {
-    final selected = _messageType == type;
-    return ChoiceChip(
-      key: Key('ann_type_${type.wireName}'),
-      label: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'Cairo',
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-          color: selected ? Colors.white : Colors.white70,
-        ),
-      ),
-      selected: selected,
-      selectedColor: color.withValues(alpha: 0.35),
-      side: BorderSide(
-        color: selected ? color : Colors.white.withValues(alpha: 0.2),
-      ),
-      onSelected: (_) {
-        SoundService().playClick();
-        setState(() {
-          _messageType = type;
-          if (type == AnnouncementType.mandatory) {
-            _isDismissible = false;
-          }
-        });
-      },
-    );
-  }
-
-  Widget _buildQuickRouteChip(String label, String route) {
-    return ActionChip(
-      label: Text(
-        '$label ($route)',
-        style: const TextStyle(fontFamily: 'Cairo', fontSize: 11),
-      ),
-      onPressed: () {
-        _ctaRouteCtrl.text = route;
-        if (_ctaLabelCtrl.text.trim().isEmpty) {
-          _ctaLabelCtrl.text = 'انتقل إلى $label';
-        }
-      },
-    );
-  }
-
-  Widget _buildSingleUserTargetingBox(AppCustomTheme customTheme) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.24),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: customTheme.sovereignAccent.withValues(alpha: 0.35),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AdminTextField(
-            key: const Key('admin_user_search_field'),
-            controller: _searchCtrl,
-            label: 'ابحث بالاسم أو البريد أو كود الضيف (SAH-XXXX)',
-            onChanged: _onSearchQueryChanged,
-            suffixIcon: IconButton(
-              icon: _isSearching
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.search_rounded),
-              onPressed: () {
-                final q = _searchCtrl.text.trim();
-                if (q.isNotEmpty) _executePlayerSearch(q);
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          AdminTextField(
-            controller: _manualPlayerCodeCtrl,
-            label: 'أو أدخل كود اللاعب يدوياً (اختياري)',
-            hint: 'SAH-XXXX',
-            onChanged: (val) {
-              if (_selectedPlayer != null && val.trim().isNotEmpty) {
-                setState(() => _selectedPlayer = null);
-              }
-            },
-          ),
-          if (_selectedPlayer != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.6),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF10B981),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'المستهدف: ${_selectedPlayer!.displayName}'
-                      '${_selectedPlayer!.playerCode != null ? ' (${_selectedPlayer!.playerCode})' : ''}',
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 18, color: Colors.white70),
-                    onPressed: () => setState(() => _selectedPlayer = null),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (_searchResults.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ..._searchResults.map((player) {
-              final isSelected = _selectedPlayer?.userId == player.userId &&
-                  _selectedPlayer?.playerCode == player.playerCode;
-              return ListTile(
-                dense: true,
-                enabled: player.isTargetable,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                tileColor: isSelected
-                    ? customTheme.sovereignAccent.withValues(alpha: 0.16)
-                    : null,
-                leading: Icon(
-                  player.isGuest
-                      ? Icons.person_outline_rounded
-                      : Icons.verified_user_rounded,
-                  color: player.isGuest
-                      ? Colors.amberAccent
-                      : const Color(0xFF38BDF8),
-                ),
-                title: Text(
-                  player.displayName,
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Text(
-                  '${player.isGuest ? 'ضيف 🎭' : (player.email ?? 'حساب Google')}'
-                  '${player.playerCode != null ? ' • ${player.playerCode}' : ''}'
-                  ' • 🏆 ${player.trophies}',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 11,
-                  ),
-                ),
-                trailing: player.isTargetable
-                    ? Text(
-                        isSelected ? 'مختار' : 'اختيار',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: customTheme.sovereignAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      )
-                    : const Text(
-                        'بلا معرّف',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Colors.white38,
-                          fontSize: 11,
-                        ),
-                      ),
-                onTap: player.isTargetable
-                    ? () {
-                        SoundService().playClick();
-                        _manualPlayerCodeCtrl.clear();
-                        setState(() => _selectedPlayer = player);
-                      }
-                    : null,
-              );
-            }),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnnouncementItem(AppAnnouncement ann) {
-    final badgeColor = switch (ann.messageType) {
-      AnnouncementType.mandatory => Colors.redAccent,
-      AnnouncementType.admin => const Color(0xFF38BDF8),
-      AnnouncementType.motivational => const Color(0xFF10B981),
-      AnnouncementType.normal => AppCustomTheme.of(context).sovereignAccent,
-    };
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: badgeColor.withValues(alpha: ann.isActive ? 0.5 : 0.18),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  ann.messageType.wireName,
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: badgeColor,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  ann.targetScope == 'single_user'
-                      ? 'موجهة: ${ann.targetPlayerCode ?? ann.targetUserId ?? 'مستخدم'}'
-                      : 'للجميع',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-              Text(
-                '👁️ ${ann.receiptCount}',
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: Colors.white70,
-                  fontSize: 11.5,
-                ),
-              ),
-              Switch.adaptive(
-                key: Key('toggle_announcement_${ann.id}'),
-                value: ann.isActive,
-                activeColor: badgeColor,
-                onChanged: (v) => _toggleAnnouncement(ann, v),
-              ),
-            ],
-          ),
-          Text(
-            ann.title,
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white,
-              fontSize: 13.5,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            ann.body,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white.withValues(alpha: 0.75),
-              fontSize: 12,
-            ),
-          ),
-          if (ann.minVersionCode != null ||
-              ann.maxVersionCode != null ||
-              ann.expiresAt != null ||
-              (ann.ctaRoute != null && ann.ctaRoute!.isNotEmpty)) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                if (ann.minVersionCode != null || ann.maxVersionCode != null)
-                  Text(
-                    'البناء: ${ann.minVersionCode ?? 1}..${ann.maxVersionCode ?? '∞'}',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontSize: 10.5,
-                    ),
-                  ),
-                if (ann.expiresAt != null)
-                  Text(
-                    'ينتهي: ${formatAdminDateTime(ann.expiresAt)}',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      color: Colors.amberAccent.withValues(alpha: 0.85),
-                      fontSize: 10.5,
-                    ),
-                  ),
-                if (ann.ctaRoute != null && ann.ctaRoute!.isNotEmpty)
-                  Text(
-                    'المسار: ${ann.ctaRoute}',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      color: badgeColor.withValues(alpha: 0.9),
-                      fontSize: 10.5,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ],
       ),
     );
   }

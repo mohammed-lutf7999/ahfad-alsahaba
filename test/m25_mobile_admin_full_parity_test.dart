@@ -264,10 +264,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('btn_paste_json_clipboard')));
-      // Allow the real `compute(...)` Isolate to complete inside testWidgets fake-async zone
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 250)),
-      );
+      // Wait deterministically for the real `compute(...)` Isolate to finish under any CPU load
+      for (int attempt = 0; attempt < 40; attempt++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+        if (find.textContaining('سؤالاً').evaluate().isNotEmpty) break;
+      }
       await tester.pumpAndSettle();
 
       // Scroll to action buttons and run Upload -> Save Config -> Publish Gzip

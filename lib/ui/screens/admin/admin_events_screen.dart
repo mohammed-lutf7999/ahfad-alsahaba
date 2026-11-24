@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/app_routes.dart';
 import '../../../core/sound_service.dart';
-import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/app_control_models.dart';
 import '../../../data/services/admin_service.dart';
 import '../../widgets/home_dynamic_event_banner.dart';
-import '../dynamic_event_detail_screen.dart';
+import 'events/admin_event_form_card.dart';
+import 'events/admin_event_list_item.dart';
 import 'widgets/admin_ui_kit.dart';
 
 /// In-App Admin Screen for creating, editing, scheduling, toggling, and deleting
@@ -41,28 +40,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   bool _isLoadingList = true;
   bool _isSaving = false;
   List<AppDynamicEvent> _events = [];
-
-  static const List<String> _colorPresets = [
-    '#D4AF37',
-    '#10B981',
-    '#E11D48',
-    '#3B82F6',
-    '#8B5CF6',
-  ];
-
-  static const List<String> _iconPresets = [
-    'auto_awesome',
-    'mosque',
-    'stars',
-    'celebration',
-    'military_tech',
-    'emoji_events',
-    'campaign',
-    'bolt',
-    'castle',
-    'menu_book',
-    'shield',
-  ];
 
   @override
   void initState() {
@@ -171,7 +148,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
   Future<void> _saveEvent() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     if (_startsAt != null && _endsAt != null && !_endsAt!.isAfter(_startsAt!)) {
       showAdminFeedback(
         context,
@@ -180,7 +156,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       );
       return;
     }
-
     SoundService().playClick();
     setState(() => _isSaving = true);
     try {
@@ -206,7 +181,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         startsAt: _startsAt,
         endsAt: _endsAt,
       );
-
       if (!mounted) return;
       if (saved != null) {
         final wasEditing = _editingEventId != null;
@@ -254,62 +228,8 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
   Future<void> _confirmAndDeleteEvent(AppDynamicEvent ev) async {
     SoundService().playClick();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: AppCustomTheme.of(ctx).surfaceCard,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Text(
-            'حذف الحدث نهائياً؟',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            'سيتم حذف «${ev.title}» من قاعدة البيانات.',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 13.5,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text(
-                'إلغاء',
-                style: TextStyle(fontFamily: 'Cairo', color: Colors.white70),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text(
-                'حذف',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
+    final confirmed = await showConfirmDeleteEventDialog(context, ev);
+    if (!confirmed || !mounted) return;
     final deleted = await AdminService().deleteDynamicEvent(ev.id);
     if (!mounted) return;
     if (deleted) {
@@ -325,7 +245,6 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final customTheme = AppCustomTheme.of(context);
     return AdminScaffoldShell(
       title: 'إدارة الأحداث والمواسم',
       subtitle: 'معاينة حيّة وجدولة زمنية عبر السحابة',
@@ -349,259 +268,43 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              AdminSectionCard(
-                title: _editingEventId == null
-                    ? 'إنشاء حدث ديناميكي جديد'
-                    : 'تعديل الحدث المحدد',
-                icon: Icons.auto_awesome_rounded,
-                trailing: _editingEventId == null
-                    ? null
-                    : TextButton(
-                        onPressed: _resetForm,
-                        child: const Text(
-                          'إلغاء التعديل',
-                          style: TextStyle(fontFamily: 'Cairo', fontSize: 12),
-                        ),
-                      ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: AdminTextField(
-                            controller: _badgeCtrl,
-                            label: 'نص الشارة',
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _priorityCtrl,
-                            label: 'الأولوية',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _titleCtrl,
-                      label: 'عنوان الحدث',
-                      onChanged: (_) => setState(() {}),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _subtitleCtrl,
-                      label: 'العنوان الفرعي (اختياري)',
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _bodyCtrl,
-                      label: 'النص التفصيلي في صفحة الحدث',
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'نوع الإجراء عند الضغط',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildActionTypeChip(
-                          DynamicEventActionType.openEventScreen,
-                          'فتح صفحة الحدث',
-                        ),
-                        _buildActionTypeChip(
-                          DynamicEventActionType.navigateRoute,
-                          'مسار داخلي',
-                        ),
-                        _buildActionTypeChip(
-                          DynamicEventActionType.openUrl,
-                          'رابط خارجي',
-                        ),
-                        _buildActionTypeChip(
-                          DynamicEventActionType.none,
-                          'عرض فقط',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AdminTextField(
-                            controller: _ctaLabelCtrl,
-                            label: 'نص الزر',
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        if (_actionType != DynamicEventActionType.none) ...[
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: AdminTextField(
-                              controller: _actionTargetCtrl,
-                              label: 'الهدف (مسار أو URL)',
-                              hint: _actionType == DynamicEventActionType.openUrl
-                                  ? 'https://example.com'
-                                  : AppRoutes.challenge,
-                              validator: (v) {
-                                final raw = v?.trim() ?? '';
-                                if ((_actionType ==
-                                            DynamicEventActionType
-                                                .navigateRoute ||
-                                        _actionType ==
-                                            DynamicEventActionType.openUrl) &&
-                                    raw.isEmpty) {
-                                  return 'أدخل المسار أو الرابط';
-                                }
-                                if (_actionType ==
-                                        DynamicEventActionType.openUrl &&
-                                    raw.isNotEmpty &&
-                                    !raw.toLowerCase().startsWith('http://') &&
-                                    !raw.toLowerCase().startsWith('https://')) {
-                                  return 'يجب أن يبدأ بـ https://';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    AdminTextField(
-                      controller: _colorHexCtrl,
-                      label: 'اللون السداسي (Hex)',
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: _colorPresets.map((hex) {
-                        final c = AppControlVisuals.parseHexColor(
-                          hex,
-                          customTheme.sovereignAccent,
-                        );
-                        final selected =
-                            _colorHexCtrl.text.trim().toUpperCase() == hex;
-                        return GestureDetector(
-                          onTap: () => setState(() => _colorHexCtrl.text = hex),
-                          child: Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: c,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: selected ? Colors.white : Colors.white24,
-                                width: selected ? 2.5 : 1,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'أيقونة الحدث',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _iconPresets.map((iconKey) {
-                        final selected = _iconName == iconKey;
-                        return ChoiceChip(
-                          label: Icon(
-                            AppControlVisuals.iconForName(iconKey),
-                            size: 18,
-                            color: selected
-                                ? customTheme.sovereignAccent
-                                : Colors.white70,
-                          ),
-                          selected: selected,
-                          onSelected: (_) =>
-                              setState(() => _iconName = iconKey),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSchedulePickerRow(
-                      label: 'يبدأ في:',
-                      value: _startsAt,
-                      onPick: () async {
-                        final dt = await pickAdminDateTime(
-                          context,
-                          initial: _startsAt,
-                        );
-                        if (dt != null && mounted) {
-                          setState(() => _startsAt = dt);
-                        }
-                      },
-                      onClear: () => setState(() => _startsAt = null),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSchedulePickerRow(
-                      label: 'ينتهي في:',
-                      value: _endsAt,
-                      onPick: () async {
-                        final dt = await pickAdminDateTime(
-                          context,
-                          initial: _endsAt,
-                        );
-                        if (dt != null && mounted) {
-                          setState(() => _endsAt = dt);
-                        }
-                      },
-                      onClear: () => setState(() => _endsAt = null),
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: customTheme.sovereignAccent,
-                      title: const Text(
-                        'تفعيل الحدث (Active)',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Colors.white,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      value: _isActive,
-                      onChanged: (v) => setState(() => _isActive = v),
-                    ),
-                    const SizedBox(height: 10),
-                    AdminPrimaryButton(
-                      key: const Key('admin_save_event_btn'),
-                      label: _editingEventId == null
-                          ? 'نشر الحدث الآن 🎉'
-                          : 'حفظ تعديلات الحدث ✅',
-                      icon: Icons.event_available_rounded,
-                      isLoading: _isSaving,
-                      onPressed: _saveEvent,
-                    ),
-                  ],
-                ),
+              AdminEventFormCard(
+                isEditing: _editingEventId != null,
+                isSaving: _isSaving,
+                badgeCtrl: _badgeCtrl,
+                titleCtrl: _titleCtrl,
+                subtitleCtrl: _subtitleCtrl,
+                bodyCtrl: _bodyCtrl,
+                ctaLabelCtrl: _ctaLabelCtrl,
+                actionTargetCtrl: _actionTargetCtrl,
+                colorHexCtrl: _colorHexCtrl,
+                priorityCtrl: _priorityCtrl,
+                actionType: _actionType,
+                iconName: _iconName,
+                isActive: _isActive,
+                startsAt: _startsAt,
+                endsAt: _endsAt,
+                onResetForm: _resetForm,
+                onPreviewFieldChanged: () => setState(() {}),
+                onActionTypeChanged: (t) => setState(() => _actionType = t),
+                onColorPresetSelected: (hex) =>
+                    setState(() => _colorHexCtrl.text = hex),
+                onIconSelected: (k) => setState(() => _iconName = k),
+                onPickStart: () async {
+                  final dt = await pickAdminDateTime(
+                    context,
+                    initial: _startsAt,
+                  );
+                  if (dt != null && mounted) setState(() => _startsAt = dt);
+                },
+                onClearStart: () => setState(() => _startsAt = null),
+                onPickEnd: () async {
+                  final dt = await pickAdminDateTime(context, initial: _endsAt);
+                  if (dt != null && mounted) setState(() => _endsAt = dt);
+                },
+                onClearEnd: () => setState(() => _endsAt = null),
+                onActiveChanged: (v) => setState(() => _isActive = v),
+                onSave: _saveEvent,
               ),
               const SizedBox(height: 16),
               AdminSectionCard(
@@ -624,162 +327,21 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
                             ),
                           )
                         : Column(
-                            children: _events.map(_buildEventRow).toList(),
+                            children: _events
+                                .map(
+                                  (ev) => AdminEventListItem(
+                                    event: ev,
+                                    onToggleActive: (v) => _toggleEvent(ev, v),
+                                    onEdit: () => _populateForEdit(ev),
+                                    onDelete: () => _confirmAndDeleteEvent(ev),
+                                  ),
+                                )
+                                .toList(),
                           ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionTypeChip(DynamicEventActionType type, String label) {
-    final selected = _actionType == type;
-    return ChoiceChip(
-      key: Key('event_action_${type.wireName}'),
-      label: Text(
-        label,
-        style: const TextStyle(fontFamily: 'Cairo', fontSize: 11.5),
-      ),
-      selected: selected,
-      onSelected: (_) => setState(() => _actionType = type),
-    );
-  }
-
-  Widget _buildSchedulePickerRow({
-    required String label,
-    required DateTime? value,
-    required VoidCallback onPick,
-    required VoidCallback onClear,
-  }) {
-    final accent = AppCustomTheme.of(context).sovereignAccent;
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: accent,
-              side: BorderSide(color: accent.withValues(alpha: 0.4)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            onPressed: onPick,
-            icon: const Icon(Icons.schedule_rounded, size: 17),
-            label: Text(
-              '$label ${formatAdminDateTime(value)}',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
-            ),
-          ),
-        ),
-        if (value != null)
-          IconButton(
-            onPressed: onClear,
-            icon: const Icon(Icons.close_rounded, color: Colors.white70),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildEventRow(AppDynamicEvent ev) {
-    final accent = AppControlVisuals.parseHexColor(
-      ev.themeColorHex,
-      AppCustomTheme.of(context).sovereignAccent,
-    );
-    final isLive = ev.isCurrentlyActiveAt(DateTime.now().toUtc());
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: accent.withValues(alpha: ev.isActive ? 0.52 : 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(AppControlVisuals.iconForName(ev.iconName), color: accent),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ev.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${isLive ? 'مباشر الآن 🟢' : (ev.isActive ? 'مجدول ⏳' : 'متوقف ⏸️')} • أولوية ${ev.priority}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white.withValues(alpha: 0.68),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                key: Key('toggle_event_${ev.id}'),
-                value: ev.isActive,
-                activeColor: accent,
-                onChanged: (v) => _toggleEvent(ev, v),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                key: Key('edit_event_${ev.id}'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                ),
-                onPressed: () => _populateForEdit(ev),
-                icon: const Icon(Icons.edit_rounded, size: 16),
-                label: const Text(
-                  'تعديل',
-                  style: TextStyle(fontFamily: 'Cairo', fontSize: 12),
-                ),
-              ),
-              const SizedBox(width: 6),
-              TextButton.icon(
-                key: Key('delete_event_${ev.id}'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                ),
-                onPressed: () => _confirmAndDeleteEvent(ev),
-                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: const Text(
-                  'حذف',
-                  style: TextStyle(fontFamily: 'Cairo', fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

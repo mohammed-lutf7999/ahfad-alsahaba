@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/app_theme.dart';
+
 import '../../../core/sound_service.dart';
 import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/live_session_model.dart';
@@ -8,6 +8,8 @@ import '../../../data/models/question_model.dart';
 import '../../../data/services/app_control_service.dart';
 import '../../../data/services/live_tournament_service.dart';
 import '../../../data/services/question_service.dart';
+import 'widgets/arena_lobby_view.dart';
+import 'widgets/arena_podium_view.dart';
 
 /// شاشة مشاركة الطالب/المتسابق في البطولات الجماعية الحية عبر PIN.
 class StudentParticipantScreen extends StatefulWidget {
@@ -56,9 +58,7 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
             : List<LiveParticipantModel>.from(_arena.participants);
       });
     } else if (event.type == 'finish') {
-      setState(() {
-        _showMidRoundReveal = false;
-      });
+      setState(() => _showMidRoundReveal = false);
     }
   }
 
@@ -81,9 +81,7 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
         seed: session.pinCode.hashCode,
         fallbackCategoryId: session.categoryId,
       );
-      if (mounted) {
-        setState(() => _questions = loaded);
-      }
+      if (mounted) setState(() => _questions = loaded);
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -105,6 +103,36 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
     );
   }
 
+  Widget _buildSessionView(LiveSessionModel session) {
+    if (session.status == 'waiting') {
+      return ArenaWaitingLobbyCard(title: session.title);
+    }
+    if (session.status == 'finished' ||
+        _questions.isEmpty ||
+        session.currentQuestionIndex < 0 ||
+        session.currentQuestionIndex >= _questions.length) {
+      return ArenaPodiumView(
+        isFinished: session.status == 'finished',
+        board: _arena.participants,
+      );
+    }
+    if (_showMidRoundReveal) {
+      return ArenaMidRoundRevealCard(
+        board: _revealBoard.isNotEmpty ? _revealBoard : _arena.participants,
+        myUserId: _arena.currentUserId,
+      );
+    }
+    final idx = session.currentQuestionIndex;
+    final q = _questions[idx];
+    return ArenaLiveQuestionView(
+      questionIndex: idx,
+      question: q,
+      answered: _answeredIndex == idx,
+      selectedOption: _selectedOption,
+      onAnswerOption: (optIdx) => _answer(idx, optIdx, q),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final customTheme = AppCustomTheme.of(context);
@@ -113,8 +141,8 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
     final isAdmin = control.isAdminNotifier.value;
     final flags = control.featureFlagsNotifier.value;
     final perms = control.playerPermissionsNotifier.value;
-    final arenaEnabled =
-        (isAdmin || flags.guildsArenas) && (isAdmin || !perms.isEffectivelyBannedNow);
+    final arenaEnabled = (isAdmin || flags.guildsArenas) &&
+        (isAdmin || !perms.isEffectivelyBannedNow);
     final session = _arena.activeSession;
 
     return Directionality(
@@ -179,8 +207,13 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       child: session == null
-                          ? _buildPinEntry(customTheme, accent)
-                          : _buildSessionView(customTheme, accent, session),
+                          ? ArenaPinEntryCard(
+                              pinController: _pinCtrl,
+                              isBusy: _arena.isBusy,
+                              error: _error,
+                              onJoin: _join,
+                            )
+                          : _buildSessionView(session),
                     ),
                   ),
               ],
@@ -188,387 +221,6 @@ class _StudentParticipantScreenState extends State<StudentParticipantScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildPinEntry(AppCustomTheme customTheme, Color accent) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: customTheme.surfaceCard.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accent.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'أدخل رمز البطولة المكون من 5 أرقام',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: accent,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const Key('student_arena_pin_input'),
-            controller: _pinCtrl,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 6,
-            ),
-            decoration: const InputDecoration(
-              hintText: '12345',
-              hintStyle: TextStyle(color: Colors.white24),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: const TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.amberAccent,
-                fontSize: 12.5,
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              key: const Key('student_join_arena_btn'),
-              onPressed: _arena.isBusy ? null : _join,
-              icon: const Icon(Icons.login_rounded),
-              label: const Text(
-                'انضمام فوري للبطولة',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  height: 1.2,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: AppTheme.primaryDark,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionView(
-    AppCustomTheme customTheme,
-    Color accent,
-    LiveSessionModel session,
-  ) {
-    if (session.status == 'waiting') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: customTheme.surfaceCard.withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accent.withValues(alpha: 0.45)),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.hourglass_top_rounded, color: accent, size: 42),
-            const SizedBox(height: 12),
-            Text(
-              session.title,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                color: accent,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'أنت جاهز! في انتظار ضغط المعلم على «ابدأ البطولة»...',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.white70,
-                fontSize: 13.5,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (session.status == 'finished' ||
-        _questions.isEmpty ||
-        session.currentQuestionIndex < 0 ||
-        session.currentQuestionIndex >= _questions.length) {
-      final board = _arena.participants;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            session.status == 'finished'
-                ? 'انتهت البطولة — الترتيب النهائي 🏆'
-                : 'جارٍ مزامنة أسئلة البطولة...',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: accent,
-              fontSize: 16.5,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (var i = 0; i < board.length; i++)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: customTheme.surfaceCard.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    '#${i + 1}',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      color: accent,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      board[i].displayName,
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${board[i].score} ⭐',
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      color: Color(0xFF10B981),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-    }
-
-    if (_showMidRoundReveal) {
-      final board = _revealBoard.isNotEmpty ? _revealBoard : _arena.participants;
-      final myUid = _arena.currentUserId;
-      final myRankIdx = myUid == null
-          ? -1
-          : board.indexWhere((p) => p.userId == myUid);
-      return Container(
-        key: const Key('student_mid_round_reveal_card'),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: customTheme.surfaceCard.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.4),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'الترتيب المرحلي المباشر 🏆',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                color: accent,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            if (myRankIdx >= 0) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accent.withValues(alpha: 0.4)),
-                ),
-                child: Text(
-                  'مرتبتك الحالية: #${myRankIdx + 1} — نقاطك: ${board[myRankIdx].score} ⭐',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            if (board.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'جارٍ تحديث لوحة الصدارة...',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Cairo', color: Colors.white70),
-                ),
-              )
-            else
-              for (var i = 0; i < board.length && i < 10; i++)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (myUid != null && board[i].userId == myUid)
-                        ? accent.withValues(alpha: 0.18)
-                        : Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: (myUid != null && board[i].userId == myUid)
-                          ? accent
-                          : Colors.white12,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '#${i + 1}',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: accent,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          board[i].displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${board[i].score} ⭐',
-                        style: const TextStyle(
-                          fontFamily: 'Cairo',
-                          color: Color(0xFF10B981),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            const SizedBox(height: 8),
-            const Text(
-              'في انتظار طرح السؤال التالي من المعلم...',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                color: Colors.white60,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final idx = session.currentQuestionIndex;
-    final q = _questions[idx];
-    final answered = _answeredIndex == idx;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: customTheme.surfaceCard.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withValues(alpha: 0.5)),
-          ),
-          child: Text(
-            'السؤال ${idx + 1}: ${q.questionText}',
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              height: 1.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        for (var i = 0; i < q.options.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: answered ? null : () => _answer(idx, i, q),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: answered && _selectedOption == i
-                      ? (i == q.correctAnswerIndex
-                          ? const Color(0xFF10B981)
-                          : Colors.redAccent)
-                      : customTheme.surfaceCard,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  side: BorderSide(color: accent.withValues(alpha: 0.45)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    q.options[i],
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

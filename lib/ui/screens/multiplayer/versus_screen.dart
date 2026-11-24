@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
-import '../../../core/app_theme.dart';
-import '../../../core/theme/app_custom_theme.dart';
+
+import 'package:flutter/material.dart';
+
 import '../../../core/sound_service.dart';
-import '../../../data/models/player_level_model.dart';
+import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/arena_model.dart';
+import '../../../data/models/player_level_model.dart';
 import '../../../data/services/app_control_service.dart';
 import '../../../data/services/multiplayer_service.dart';
 import '../../../data/services/profile_service.dart';
 import '../../../data/services/progression_service.dart';
-import '../../widgets/avatar_selector.dart';
-import '../../widgets/animated_avatar_frame.dart';
-import '../../widgets/level_badge_widget.dart';
-import '../chat/widgets/quick_phrases_bar.dart';
 import 'online_game_screen.dart';
+import 'widgets/versus_countdown_badge.dart';
+import 'widgets/versus_player_card.dart';
+import 'widgets/versus_timeout_dialog.dart';
 
 class VersusScreen extends StatefulWidget {
   final String matchId;
@@ -43,25 +43,27 @@ class VersusScreen extends StatefulWidget {
   State<VersusScreen> createState() => _VersusScreenState();
 }
 
-class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMixin {
+class _VersusScreenState extends State<VersusScreen>
+    with TickerProviderStateMixin {
   late AnimationController _vsController;
   late Animation<double> _vsScale;
-  
+
   Map<String, dynamic>? _opponentData;
   List<String>? _questionIds;
   bool _isLoading = true;
   bool _waitingForOpponent = false;
   bool _bothReady = false;
-  
+
   int _countdown = 3;
   Timer? _countdownTimer;
   Timer? _pollTimer;
   Timer? _safetyTimeoutTimer;
+  Timer? _botReadyTimer;
   Timer? _phraseTimer;
   Timer? _phraseEchoTimer;
-  StreamSubscription? _matchStateSubscription;
-  StreamSubscription? _reactionKeepaliveSub;
-  StreamSubscription? _phraseSubscription;
+  StreamSubscription<MatchState>? _matchStateSubscription;
+  StreamSubscription<String>? _reactionKeepaliveSub;
+  StreamSubscription<String>? _phraseSubscription;
   String? _activeQuickPhrase;
   bool _phraseIsMine = false;
 
@@ -73,26 +75,25 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 800),
     );
     _vsScale = CurvedAnimation(parent: _vsController, curve: Curves.elasticOut);
-    
     _loadDataAndConfirmReady();
   }
-  
+
   @override
   void dispose() {
-     _vsController.dispose();
-     _countdownTimer?.cancel();
-     _pollTimer?.cancel();
-     _safetyTimeoutTimer?.cancel();
-     _phraseTimer?.cancel();
-     _phraseEchoTimer?.cancel();
-     _matchStateSubscription?.cancel();
-     _reactionKeepaliveSub?.cancel();
-     _phraseSubscription?.cancel();
-     super.dispose();
+    _vsController.dispose();
+    _countdownTimer?.cancel();
+    _pollTimer?.cancel();
+    _safetyTimeoutTimer?.cancel();
+    _botReadyTimer?.cancel();
+    _phraseTimer?.cancel();
+    _phraseEchoTimer?.cancel();
+    _matchStateSubscription?.cancel();
+    _reactionKeepaliveSub?.cancel();
+    _phraseSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadDataAndConfirmReady() async {
-    // If ghost match with pre-fetched profile, launch countdown immediately
     if (widget.isGhost && widget.initialOpponentData != null) {
       if (!mounted) return;
       setState(() {
@@ -107,91 +108,83 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
       return;
     }
 
-    // 1. Fetch Opponent Data
-    final opponentData = await MultiplayerService.instance.fetchOpponentData(widget.opponentId);
+    final opponentData =
+        await MultiplayerService.instance.fetchOpponentData(widget.opponentId);
     if (!mounted) return;
-    
-    // 2. Fetch Match Data (if online) or use passed IDs (if bot)
+
     List<String> qIds = [];
     if (widget.isBot) {
-       qIds = widget.questionIds ?? [];
+      qIds = widget.questionIds ?? [];
     } else {
-       final matchData = await MultiplayerService.instance.getMatchData(widget.matchId);
-       if (matchData != null && matchData['question_ids'] != null) {
-          qIds = List<String>.from(matchData['question_ids']);
-       }
+      final matchData =
+          await MultiplayerService.instance.getMatchData(widget.matchId);
+      if (matchData != null && matchData['question_ids'] != null) {
+        qIds = List<String>.from(matchData['question_ids']);
+      }
     }
-    
     if (!mounted) return;
-    
+
     setState(() {
       _opponentData = opponentData;
       _questionIds = qIds;
       _isLoading = false;
     });
-    
-    // 3. Animate VS
+
     await _vsController.forward();
-    
-    // 4. Confirm Ready Logic
+
     if (widget.isBot) {
-       // Bot is always ready after a short delay
-       await Future.delayed(const Duration(seconds: 1));
-       if (mounted) {
-         _onBothPlayersReady();
-       }
-    } else {
-      // Online Match Logic: Dual-Trigger (Realtime Stream + Active Polling + 15s Safety Timeout)
-      _reactionKeepaliveSub = MultiplayerService.instance
-          .listenToReactions(widget.matchId)
-          .listen((_) {});
-      _phraseSubscription = MultiplayerService.instance.quickPhrasesStream
-          .listen((phrase) => _showQuickPhraseBanner(phrase, isMine: false));
-      _matchStateSubscription = MultiplayerService.instance
-          .listenToMatchState(widget.matchId)
-          .listen((state) {
-            if (!mounted) return;
-            if ((state.status == 'ready' || state.status == 'playing') && !_bothReady) {
-              _onBothPlayersReady();
-            }
-          });
-
-      // Active fallback polling every 1.5s in case WebSocket packet is dropped
-      _pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
-        if (!mounted || _bothReady) {
-          timer.cancel();
-          return;
-        }
-        final matchData = await MultiplayerService.instance.getMatchData(widget.matchId);
-        if (!mounted || _bothReady) return;
-        final status = matchData?['status'] as String?;
-        if (status == 'ready' || status == 'playing') {
-          if (_questionIds == null || _questionIds!.isEmpty) {
-            if (matchData?['question_ids'] != null) {
-              _questionIds = List<String>.from(matchData!['question_ids']);
-            }
-          }
-          _onBothPlayersReady();
-        }
+      _botReadyTimer?.cancel();
+      _botReadyTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) _onBothPlayersReady();
       });
+      return;
+    }
 
-      // 15-second safety timeout so player NEVER hangs forever on VS screen if opponent left
-      _safetyTimeoutTimer = Timer(const Duration(seconds: 15), () {
-        if (!mounted || _bothReady) return;
-        _pollTimer?.cancel();
-        _matchStateSubscription?.cancel();
-        unawaited(MultiplayerService.instance.cancelMatch(widget.matchId));
-        _showOpponentTimeoutDialog();
-      });
-      
-      // 5. Confirm this player is ready
-      setState(() => _waitingForOpponent = true);
-      final bothReady = await MultiplayerService.instance.confirmReady(widget.matchId);
-      
-      if (bothReady && mounted) {
+    _reactionKeepaliveSub = MultiplayerService.instance
+        .listenToReactions(widget.matchId)
+        .listen((_) {});
+    _phraseSubscription = MultiplayerService.instance.quickPhrasesStream
+        .listen((phrase) => _showQuickPhraseBanner(phrase, isMine: false));
+    _matchStateSubscription = MultiplayerService.instance
+        .listenToMatchState(widget.matchId)
+        .listen((state) {
+      if (!mounted) return;
+      if ((state.status == 'ready' || state.status == 'playing') &&
+          !_bothReady) {
         _onBothPlayersReady();
       }
-    }
+    });
+
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+      if (!mounted || _bothReady) {
+        timer.cancel();
+        return;
+      }
+      final matchData =
+          await MultiplayerService.instance.getMatchData(widget.matchId);
+      if (!mounted || _bothReady) return;
+      final status = matchData?['status'] as String?;
+      if (status == 'ready' || status == 'playing') {
+        if ((_questionIds == null || _questionIds!.isEmpty) &&
+            matchData?['question_ids'] != null) {
+          _questionIds = List<String>.from(matchData!['question_ids']);
+        }
+        _onBothPlayersReady();
+      }
+    });
+
+    _safetyTimeoutTimer = Timer(const Duration(seconds: 15), () {
+      if (!mounted || _bothReady) return;
+      _pollTimer?.cancel();
+      _matchStateSubscription?.cancel();
+      unawaited(MultiplayerService.instance.cancelMatch(widget.matchId));
+      showVersusOpponentTimeoutDialog(context);
+    });
+
+    setState(() => _waitingForOpponent = true);
+    final bothReady =
+        await MultiplayerService.instance.confirmReady(widget.matchId);
+    if (bothReady && mounted) _onBothPlayersReady();
   }
 
   void _onBothPlayersReady() {
@@ -205,132 +198,9 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
     _startCountdown();
   }
 
-  void _showOpponentTimeoutDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.primaryDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'الخصم غير متصل',
-          style: TextStyle(color: Colors.white, fontFamily: 'Cairo', fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        content: const Text(
-          'يبدو أن الخصم غادر الغرفة أو فقد الاتصال بالإنترنت.\nهل ترغب في بدء جولة فورية ضد الذكاء الاصطناعي؟',
-          style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('العودة', style: TextStyle(color: Colors.white60, fontFamily: 'Cairo')),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
-              foregroundColor: AppTheme.primaryDark,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              final profile = ProfileService.instance.activeProfile;
-              if (AppControlService
-                  .instance
-                  .featureFlagsNotifier
-                  .value
-                  .ghostMatches) {
-                try {
-                  final ghostResult = await MultiplayerService.instance
-                      .findOrCreateGhostMatch(
-                        trophies: profile?.trophies ?? 1000,
-                      )
-                      .timeout(const Duration(seconds: 4));
-                  if (ghostResult.success &&
-                      ghostResult.matchId != null &&
-                      mounted) {
-                    if (ghostResult.isHumanMatch) {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => VersusScreen(
-                            matchId: ghostResult.matchId!,
-                            opponentId: ghostResult.ghostUserId ?? '',
-                            seed: ghostResult.seed ?? 1000,
-                            isBot: false,
-                            isGhost: false,
-                            isFriendly: ghostResult.isFriendly,
-                            questionIds: ghostResult.questionIds,
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    final ghostLevel = ghostResult.ghostLevel ?? 5;
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => VersusScreen(
-                          matchId: ghostResult.matchId!,
-                          opponentId: ghostResult.ghostUserId ??
-                              'ghost_${DateTime.now().millisecondsSinceEpoch}',
-                          seed: ghostResult.seed ?? 1000,
-                          isBot: false,
-                          isGhost: true,
-                          isFriendly: ghostResult.isFriendly,
-                          ghostTimeline: ghostResult.timeline,
-                          initialOpponentData: {
-                            'display_name':
-                                ghostResult.ghostName ?? 'فارس الأندلس',
-                            'avatar_index': ghostResult.ghostAvatarIndex ?? 0,
-                            'equipped_frame':
-                                ghostResult.ghostFrame ?? 'frame_wood',
-                            'player_level': ghostLevel,
-                            'trophies': ghostResult.ghostTrophies ?? 1000,
-                            'score': PlayerLevelInfo.cumulativeXpForLevel(
-                              ghostLevel,
-                            ),
-                          },
-                          questionIds: ghostResult.questionIds,
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                } catch (e) {
-                  debugPrint('Versus timeout ghost fallback failed: $e');
-                }
-              }
-
-              final botResult = await MultiplayerService.instance.createBotMatch();
-              if (!mounted) return;
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => VersusScreen(
-                    matchId: botResult.matchId!,
-                    opponentId: botResult.opponentId!,
-                    seed: botResult.seed!,
-                    isBot: true,
-                    questionIds: botResult.questionIds,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.smart_toy_rounded),
-            label: const Text('تحدي الذكاء الاصطناعي', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-  
   void _showQuickPhraseBanner(String phrase, {required bool isMine}) {
-    if (!mounted) return;
-    if (!AppControlService.instance.featureFlagsNotifier.value.quickPhrases) {
+    if (!mounted ||
+        !AppControlService.instance.featureFlagsNotifier.value.quickPhrases) {
       return;
     }
     _phraseTimer?.cancel();
@@ -339,9 +209,7 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
       _phraseIsMine = isMine;
     });
     _phraseTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() => _activeQuickPhrase = null);
-      }
+      if (mounted) setState(() => _activeQuickPhrase = null);
     });
   }
 
@@ -349,27 +217,31 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
     SoundService().playClick();
     _showQuickPhraseBanner(phrase, isMine: true);
     if (!widget.isBot && !widget.isGhost) {
-      unawaited(MultiplayerService.instance.sendQuickPhrase(widget.matchId, phrase));
+      unawaited(
+        MultiplayerService.instance.sendQuickPhrase(widget.matchId, phrase),
+      );
     } else {
       _phraseEchoTimer?.cancel();
       _phraseEchoTimer = Timer(const Duration(milliseconds: 550), () {
         if (!mounted) return;
-        _showQuickPhraseBanner('وعليكم السلام ورحمة الله، حياك الله ⚔️', isMine: false);
+        _showQuickPhraseBanner(
+          'وعليكم السلام ورحمة الله، حياك الله ⚔️',
+          isMine: false,
+        );
       });
     }
   }
 
   void _startCountdown() {
-    if (_countdownTimer != null) return; // Already counting
-    
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-       if (_countdown > 1) {
-         if (mounted) setState(() => _countdown--);
-         SoundService().playClick();
-       } else {
-         _countdownTimer?.cancel();
-         _startGame();
-       }
+    if (_countdownTimer != null) return;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_countdown > 1) {
+        if (mounted) setState(() => _countdown--);
+        SoundService().playClick();
+      } else {
+        _countdownTimer?.cancel();
+        _startGame();
+      }
     });
   }
 
@@ -382,7 +254,8 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
           seed: widget.seed,
           questionIds: _questionIds ?? [],
           opponentName: _opponentData?['display_name'] ?? 'الخصم',
-          opponentAvatarIndex: (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0,
+          opponentAvatarIndex:
+              (_opponentData?['avatar_index'] as num?)?.toInt() ?? 0,
           isBot: widget.isBot,
           isGhost: widget.isGhost,
           isFriendly: widget.isFriendly,
@@ -408,402 +281,95 @@ class _VersusScreenState extends State<VersusScreen> with TickerProviderStateMix
         ? PlayerLevelInfo.forMilestoneLevel(oppLevelNum)
         : PlayerLevelInfo.fromTotalScore(oppScore);
     final oppArena = ArenaModel.fromTrophies(oppTrophies);
-    final oppFrame =
-        (_opponentData?['equipped_frame'] as String?) ?? oppLevelInfo.frameKey;
-    final oppWinStreak = (_opponentData?['win_streak'] as num?)?.toInt() ?? 0;
-    final oppTitle = _opponentData?['player_title'] as String?;
-    
+    final oppName = _opponentData?['display_name'] as String? ?? 'الخصم';
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: AppCustomTheme.of(context).backgroundGradient,
         ),
         child: SafeArea(
-           child: Stack(
-             children: [
-               Column(
-                 children: [
-                   // Top Half (Me)
-                   Expanded(
-                     child: Container(
-                       width: double.infinity,
-                       color: Colors.blue.withValues(alpha: 0.08),
-                       child: Center(
-                         child: SingleChildScrollView(
-                           padding: const EdgeInsets.symmetric(vertical: 8),
-                           child: Column(
-                             mainAxisAlignment: MainAxisAlignment.center,
-                             children: [
-                               AnimatedAvatarFrame(
-                                 size: 88,
-                                 frameKey:
-                                     myProfile?.equippedFrame ??
-                                     myLevelInfo.frameKey,
-                                 winStreak: myProfile?.winStreak ?? 0,
-                                 child: ProfileAvatar(
-                                   avatarIndex: myProfile?.avatarIndex ?? 0,
-                                   size: 76,
-                                 ),
-                               ),
-                               const SizedBox(height: 8),
-                               Padding(
-                                 padding: const EdgeInsets.symmetric(
-                                   horizontal: 24,
-                                 ),
-                                 child: Text(
-                                   myProfile?.name ?? 'أنا',
-                                   style: const TextStyle(
-                                     color: Colors.white,
-                                     fontSize: 20,
-                                     fontWeight: FontWeight.bold,
-                                     fontFamily: 'Cairo',
-                                   ),
-                                   maxLines: 1,
-                                   overflow: TextOverflow.ellipsis,
-                                 ),
-                               ),
-                               const SizedBox(height: 4),
-                               LevelBadgeWidget(
-                                 levelInfo: myLevelInfo,
-                                 customTitle: myProfile?.effectiveTitle,
-                                 isCompact: true,
-                               ),
-                               const SizedBox(height: 4),
-                               Text(
-                                 'النقاط: ${myProfile?.totalScore ?? 0}  •  🏆 ${myProfile?.trophies ?? 1000} (${myArena.name})',
-                                 style: const TextStyle(
-                                   color: Colors.white70,
-                                   fontSize: 12,
-                                   fontFamily: 'Cairo',
-                                 ),
-                               ),
-                               const SizedBox(height: 6),
-                               // Ready indicator
-                               Container(
-                                 padding: const EdgeInsets.symmetric(
-                                   horizontal: 12,
-                                   vertical: 4,
-                                 ),
-                                 decoration: BoxDecoration(
-                                   color: Colors.green.withValues(alpha: 0.3),
-                                   borderRadius: BorderRadius.circular(12),
-                                   border: Border.all(color: Colors.green),
-                                 ),
-                                 child: const Row(
-                                   mainAxisSize: MainAxisSize.min,
-                                   children: [
-                                     Icon(
-                                       Icons.check_circle,
-                                       color: Colors.green,
-                                       size: 16,
-                                     ),
-                                     SizedBox(width: 4),
-                                     Text(
-                                       'جاهز',
-                                       style: TextStyle(
-                                         color: Colors.green,
-                                         fontFamily: 'Cairo',
-                                       ),
-                                     ),
-                                   ],
-                                 ),
-                               ),
-                             ],
-                           ),
-                         ),
-                       ),
-                     ),
-                   ),
-
-                   // Dedicated Central VS & Countdown Band (Zero Overlap!)
-                   Container(
-                     width: double.infinity,
-                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                     decoration: BoxDecoration(
-                       color: Colors.black.withValues(alpha: 0.25),
-                       border: const Border.symmetric(
-                         horizontal: BorderSide(color: Colors.white12, width: 1),
-                       ),
-                     ),
-                     child: Column(
-                       mainAxisSize: MainAxisSize.min,
-                       children: [
-                         Row(
-                           mainAxisAlignment: MainAxisAlignment.center,
-                           children: [
-                             ScaleTransition(
-                               scale: _vsScale,
-                               child: Container(
-                                 padding: const EdgeInsets.all(14),
-                                 decoration: BoxDecoration(
-                                   shape: BoxShape.circle,
-                                   gradient: AppTheme.goldGradient,
-                                   boxShadow: [
-                                     BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15)
-                                   ],
-                                 ),
-                                 child: const Text(
-                                   'VS',
-                                   style: TextStyle(
-                                     color: AppTheme.primaryDark,
-                                     fontSize: 28,
-                                     fontWeight: FontWeight.w900,
-                                     fontStyle: FontStyle.italic,
-                                   ),
-                                 ),
-                               ),
-                             ),
-                             const SizedBox(width: 16),
-                             if (_bothReady)
-                               Text(
-                                 '$_countdown',
-                                 style: const TextStyle(
-                                   color: AppTheme.accentColor,
-                                   fontSize: 44,
-                                   fontWeight: FontWeight.bold,
-                                   shadows: [
-                                     Shadow(color: Colors.black, blurRadius: 10),
-                                   ],
-                                 ),
-                               )
-                             else if (_waitingForOpponent)
-                               const Flexible(
-                                 child: Text(
-                                   'في انتظار تأكيد الخصم...',
-                                   style: TextStyle(
-                                     color: Colors.white70,
-                                     fontSize: 16,
-                                     fontFamily: 'Cairo',
-                                   ),
-                                 ),
-                               ),
-                           ],
-                         ),
-                         if (_activeQuickPhrase != null) ...[
-                           const SizedBox(height: 6),
-                           Container(
-                             padding: const EdgeInsets.symmetric(
-                               horizontal: 12,
-                               vertical: 5,
-                             ),
-                             decoration: BoxDecoration(
-                               color: _phraseIsMine
-                                   ? AppTheme.accentColor.withValues(alpha: 0.18)
-                                   : Colors.black54,
-                               borderRadius: BorderRadius.circular(14),
-                               border: Border.all(
-                                 color: AppTheme.accentColor.withValues(alpha: 0.65),
-                               ),
-                             ),
-                             child: Text(
-                               _phraseIsMine
-                                   ? 'أنت: $_activeQuickPhrase'
-                                   : '${_opponentData?['display_name'] ?? 'الخصم'}: $_activeQuickPhrase',
-                               maxLines: 1,
-                               overflow: TextOverflow.ellipsis,
-                               style: const TextStyle(
-                                 fontFamily: 'Cairo',
-                                 color: Colors.white,
-                                 fontSize: 12,
-                                 fontWeight: FontWeight.w700,
-                               ),
-                             ),
-                           ),
-                         ],
-                         if (AppControlService
-                             .instance.featureFlagsNotifier.value.quickPhrases) ...[
-                           const SizedBox(height: 8),
-                           QuickPhrasesBar(
-                             compact: true,
-                             onPhraseSelected: _sendQuickPhrase,
-                           ),
-                         ],
-                         if (widget.isFriendly) ...[
-                           const SizedBox(height: 6),
-                           Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                             decoration: BoxDecoration(
-                               color: Colors.tealAccent.withValues(alpha: 0.14),
-                               borderRadius: BorderRadius.circular(14),
-                               border: Border.all(
-                                 color: Colors.tealAccent.withValues(alpha: 0.5),
-                               ),
-                             ),
-                             child: const Text(
-                               'مباراة ودية — الكؤوس والدروع محمية 🛡️',
-                               style: TextStyle(
-                                 color: Colors.tealAccent,
-                                 fontSize: 12,
-                                 fontWeight: FontWeight.bold,
-                                 fontFamily: 'Cairo',
-                               ),
-                               textAlign: TextAlign.center,
-                             ),
-                           ),
-                         ],
-                       ],
-                     ),
-                   ),
-                   
-                   // Bottom Half (Opponent)
-                   Expanded(
-                     child: Container(
-                       width: double.infinity,
-                       color: Colors.red.withValues(alpha: 0.08),
-                       child: Center(
-                         child: _isLoading 
-                           ? const CircularProgressIndicator(color: Colors.white)
-                           : SingleChildScrollView(
-                               padding: const EdgeInsets.symmetric(vertical: 8),
-                               child: Column(
-                                 mainAxisAlignment: MainAxisAlignment.center,
-                                 children: [
-                                   AnimatedAvatarFrame(
-                                     size: 88,
-                                     frameKey: oppFrame,
-                                     winStreak: oppWinStreak,
-                                     child: ProfileAvatar(
-                                       avatarIndex:
-                                           (_opponentData?['avatar_index']
-                                                   as num?)
-                                               ?.toInt() ??
-                                           0,
-                                       size: 76,
-                                     ),
-                                   ),
-                                   const SizedBox(height: 8),
-                                   Padding(
-                                     padding: const EdgeInsets.symmetric(
-                                       horizontal: 24,
-                                     ),
-                                     child: Text(
-                                       _opponentData?['display_name'] ?? 'الخصم',
-                                       style: const TextStyle(
-                                         color: Colors.white,
-                                         fontSize: 20,
-                                         fontWeight: FontWeight.bold,
-                                         fontFamily: 'Cairo',
-                                       ),
-                                       maxLines: 1,
-                                       overflow: TextOverflow.ellipsis,
-                                     ),
-                                   ),
-                                   const SizedBox(height: 4),
-                                   LevelBadgeWidget(
-                                     levelInfo: oppLevelInfo,
-                                     isCompact: true,
-                                     customTitle: oppTitle,
-                                   ),
-                                   const SizedBox(height: 4),
-                                   Text(
-                                     'النقاط: $oppScore  •  🏆 $oppTrophies (${oppArena.name})',
-                                     style: const TextStyle(
-                                       color: Colors.white70,
-                                       fontSize: 12,
-                                       fontFamily: 'Cairo',
-                                     ),
-                                   ),
-                                   const SizedBox(height: 6),
-                                   // Opponent ready indicator
-                                   if (_waitingForOpponent && !_bothReady)
-                                     Container(
-                                       padding: const EdgeInsets.symmetric(
-                                         horizontal: 12,
-                                         vertical: 4,
-                                       ),
-                                       decoration: BoxDecoration(
-                                         color: Colors.orange.withValues(
-                                           alpha: 0.3,
-                                         ),
-                                         borderRadius: BorderRadius.circular(12),
-                                         border: Border.all(
-                                           color: Colors.orange,
-                                         ),
-                                       ),
-                                       child: const Row(
-                                         mainAxisSize: MainAxisSize.min,
-                                         children: [
-                                           SizedBox(
-                                             width: 14,
-                                             height: 14,
-                                             child: CircularProgressIndicator(
-                                               strokeWidth: 2,
-                                               color: Colors.orange,
-                                             ),
-                                           ),
-                                           SizedBox(width: 6),
-                                           Text(
-                                             'في الانتظار...',
-                                             style: TextStyle(
-                                               color: Colors.orange,
-                                               fontFamily: 'Cairo',
-                                             ),
-                                           ),
-                                         ],
-                                       ),
-                                     )
-                                   else if (_bothReady)
-                                     Container(
-                                       padding: const EdgeInsets.symmetric(
-                                         horizontal: 12,
-                                         vertical: 4,
-                                       ),
-                                       decoration: BoxDecoration(
-                                         color: Colors.green.withValues(
-                                           alpha: 0.3,
-                                         ),
-                                         borderRadius: BorderRadius.circular(12),
-                                         border: Border.all(
-                                           color: Colors.green,
-                                         ),
-                                       ),
-                                       child: const Row(
-                                         mainAxisSize: MainAxisSize.min,
-                                         children: [
-                                           Icon(
-                                             Icons.check_circle,
-                                             color: Colors.green,
-                                             size: 16,
-                                           ),
-                                           SizedBox(width: 4),
-                                           Text(
-                                             'جاهز',
-                                             style: TextStyle(
-                                               color: Colors.green,
-                                               fontFamily: 'Cairo',
-                                             ),
-                                           ),
-                                         ],
-                                       ),
-                                     ),
-                                 ],
-                               ),
-                             ),
-                       ),
-                     ),
-                   ),
-                 ],
-               ),
-
-               // Top Bar Cancel Button (in case user wants to leave before match starts)
-               if (!_bothReady)
-                 Positioned(
-                   top: 8,
-                   left: 8,
-                   child: TextButton.icon(
-                     onPressed: () {
-                       SoundService().playClick();
-                       if (!widget.isBot) {
-                         unawaited(MultiplayerService.instance.cancelMatch(widget.matchId));
-                       }
-                       if (mounted) Navigator.of(context).pop();
-                     },
-                     icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
-                     label: const Text('إلغاء', style: TextStyle(color: Colors.white70, fontFamily: 'Cairo')),
-                   ),
-                 ),
-             ],
-           ),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: VersusPlayerCard(
+                      tintColor: Colors.blue,
+                      name: myProfile?.name ?? 'أنا',
+                      avatarIndex: myProfile?.avatarIndex ?? 0,
+                      frameKey:
+                          myProfile?.equippedFrame ?? myLevelInfo.frameKey,
+                      winStreak: myProfile?.winStreak ?? 0,
+                      levelInfo: myLevelInfo,
+                      arena: myArena,
+                      score: myProfile?.totalScore ?? 0,
+                      trophies: myProfile?.trophies ?? 1000,
+                      customTitle: myProfile?.effectiveTitle,
+                      isReady: true,
+                    ),
+                  ),
+                  VersusCountdownBadge(
+                    vsScale: _vsScale,
+                    bothReady: _bothReady,
+                    waitingForOpponent: _waitingForOpponent,
+                    countdown: _countdown,
+                    isFriendly: widget.isFriendly,
+                    opponentName: oppName,
+                    activeQuickPhrase: _activeQuickPhrase,
+                    phraseIsMine: _phraseIsMine,
+                    onQuickPhraseSelected: _sendQuickPhrase,
+                  ),
+                  Expanded(
+                    child: VersusPlayerCard(
+                      tintColor: Colors.red,
+                      name: oppName,
+                      avatarIndex:
+                          (_opponentData?['avatar_index'] as num?)?.toInt() ??
+                              0,
+                      frameKey: (_opponentData?['equipped_frame'] as String?) ??
+                          oppLevelInfo.frameKey,
+                      winStreak:
+                          (_opponentData?['win_streak'] as num?)?.toInt() ?? 0,
+                      levelInfo: oppLevelInfo,
+                      arena: oppArena,
+                      score: oppScore,
+                      trophies: oppTrophies,
+                      customTitle: _opponentData?['player_title'] as String?,
+                      isLoading: _isLoading,
+                      isReady: _bothReady,
+                      isWaiting: _waitingForOpponent,
+                    ),
+                  ),
+                ],
+              ),
+              if (!_bothReady)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      SoundService().playClick();
+                      if (!widget.isBot) {
+                        unawaited(
+                          MultiplayerService.instance.cancelMatch(widget.matchId),
+                        );
+                      }
+                      if (mounted) Navigator.of(context).pop();
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'إلغاء',
+                      style: TextStyle(color: Colors.white70, fontFamily: 'Cairo'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// A beautiful top notification that slides down like a curtain
@@ -105,6 +107,8 @@ class _TopNotificationWidgetState extends State<_TopNotificationWidget>
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
+  Timer? _autoDismissTimer;
+  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -132,21 +136,27 @@ class _TopNotificationWidgetState extends State<_TopNotificationWidget>
 
     _controller.forward();
 
-    // Auto dismiss after duration
-    Future.delayed(widget.duration, () {
+    // Auto dismiss after duration (cancellable on dispose or manual dismiss)
+    _autoDismissTimer = Timer(widget.duration, () {
       if (mounted) {
         _dismiss();
       }
     });
   }
 
-  void _dismiss() async {
-    await _controller.reverse();
+  Future<void> _dismiss() async {
+    if (_isDismissing) return;
+    _isDismissing = true;
+    _autoDismissTimer?.cancel();
+    if (mounted) {
+      await _controller.reverse();
+    }
     widget.onDismiss();
   }
 
   @override
   void dispose() {
+    _autoDismissTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

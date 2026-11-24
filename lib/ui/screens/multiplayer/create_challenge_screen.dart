@@ -5,6 +5,7 @@ import '../../../data/models/challenge_config.dart';
 import '../../../data/services/challenge_game_service.dart';
 import '../../../data/services/profile_service.dart';
 import 'waiting_room_screen.dart';
+import 'widgets/create_challenge_sections.dart';
 
 /// شاشة إنشاء تحدي جديد
 class CreateChallengeScreen extends StatefulWidget {
@@ -22,13 +23,13 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
   int _maxPlayers = 4;
   bool _isCreating = false;
 
-  final List<_CategoryOption> _categories = [
-    _CategoryOption('quran', 'القرآن', Icons.menu_book_rounded), // quran.json
-    _CategoryOption('hadith', 'الحديث', Icons.format_quote_rounded),
-    _CategoryOption('fiqh', 'الفقه', Icons.balance_rounded),
-    _CategoryOption('seerah', 'السيرة', Icons.mosque_rounded), // seerah.json
-    _CategoryOption('history', 'التاريخ', Icons.history_edu_rounded), // history.json
-    _CategoryOption('aqeedah', 'التوحيد', Icons.auto_awesome_rounded), // aqeedah.json
+  static const List<ChallengeCategoryOption> _categories = [
+    ChallengeCategoryOption('quran', 'القرآن', Icons.menu_book_rounded),
+    ChallengeCategoryOption('hadith', 'الحديث', Icons.format_quote_rounded),
+    ChallengeCategoryOption('fiqh', 'الفقه', Icons.balance_rounded),
+    ChallengeCategoryOption('seerah', 'السيرة', Icons.mosque_rounded),
+    ChallengeCategoryOption('history', 'التاريخ', Icons.history_edu_rounded),
+    ChallengeCategoryOption('aqeedah', 'التوحيد', Icons.auto_awesome_rounded),
   ];
 
   @override
@@ -46,36 +47,52 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // نوع التحدي
                       _buildSectionTitle('نوع التحدي'),
                       const SizedBox(height: 12),
-                      _buildChallengeTypeSelector(),
-                      
-                      // اختيار القسم (إذا كان نوع محدد)
+                      ChallengeTypeSelector(
+                        selectedType: _selectedType,
+                        onSelect: (type) => setState(() {
+                          _selectedType = type;
+                          if (type == ChallengeType.bruteForce) {
+                            _selectedCategoryId = null;
+                          }
+                        }),
+                      ),
                       if (_selectedType == ChallengeType.category) ...[
                         const SizedBox(height: 24),
                         _buildSectionTitle('اختر القسم'),
                         const SizedBox(height: 12),
-                        _buildCategorySelector(),
+                        ChallengeCategorySelector(
+                          categories: _categories,
+                          selectedCategoryId: _selectedCategoryId,
+                          onSelect: (id) =>
+                              setState(() => _selectedCategoryId = id),
+                        ),
                       ],
-                      
                       const SizedBox(height: 24),
-                      
-                      // عدد الأسئلة
                       _buildSectionTitle('عدد الأسئلة'),
                       const SizedBox(height: 12),
-                      _buildQuestionCountSelector(),
-                      
+                      ChallengeQuestionCountSelector(
+                        selectedCount: _questionCount,
+                        onSelect: (count) =>
+                            setState(() => _questionCount = count),
+                      ),
                       const SizedBox(height: 24),
-                      
-                      // الإعدادات الإضافية
                       _buildSectionTitle('الإعدادات'),
                       const SizedBox(height: 12),
-                      _buildSettingsPanel(),
-                      
+                      ChallengeSettingsPanel(
+                        speedMode: _speedMode,
+                        maxPlayers: _maxPlayers,
+                        onSpeedModeChanged: (v) =>
+                            setState(() => _speedMode = v),
+                        onDecrementPlayers: () {
+                          if (_maxPlayers > 2) setState(() => _maxPlayers--);
+                        },
+                        onIncrementPlayers: () {
+                          if (_maxPlayers < 8) setState(() => _maxPlayers++);
+                        },
+                      ),
                       const SizedBox(height: 40),
-                      
-                      // زر الإنشاء
                       _buildCreateButton(),
                     ],
                   ),
@@ -94,7 +111,6 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Title and Icon
           Row(
             children: [
               Container(
@@ -102,9 +118,18 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                 decoration: BoxDecoration(
                   gradient: AppTheme.goldGradient,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppTheme.accentColor.withAlpha(80), blurRadius: 10)],
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accentColor.withAlpha(80),
+                      blurRadius: 10,
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.primaryDark, size: 22),
+                child: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: AppTheme.primaryDark,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               ShaderMask(
@@ -113,12 +138,15 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                 ).createShader(bounds),
                 child: const Text(
                   'إنشاء تحدي',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
-          // Back button
           GestureDetector(
             onTap: () {
               SoundService().playClick();
@@ -131,7 +159,11 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.accentColor.withAlpha(80)),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.accentColor, size: 20),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: AppTheme.accentColor,
+                size: 20,
+              ),
             ),
           ),
         ],
@@ -150,306 +182,10 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
     );
   }
 
-  Widget _buildChallengeTypeSelector() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildTypeOption(
-            type: ChallengeType.bruteForce,
-            icon: '🎲',
-            title: 'القوة الغاشمة',
-            subtitle: 'عشوائي من الكل',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildTypeOption(
-            type: ChallengeType.category,
-            icon: '📚',
-            title: 'قسم محدد',
-            subtitle: 'اختر القسم',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTypeOption({
-    required ChallengeType type,
-    required String icon,
-    required String title,
-    required String subtitle,
-  }) {
-    final isSelected = _selectedType == type;
-    return GestureDetector(
-      onTap: () {
-        SoundService().playClick();
-        setState(() {
-          _selectedType = type;
-          if (type == ChallengeType.bruteForce) {
-            _selectedCategoryId = null;
-          }
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    AppTheme.accentColor.withValues(alpha: 0.3),
-                    AppTheme.accentColor.withValues(alpha: 0.1),
-                  ],
-                )
-              : null,
-          color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 32)),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppTheme.accentColor : Colors.white,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategorySelector() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 2.2,
-      ),
-      itemCount: _categories.length,
-      itemBuilder: (context, index) {
-        final cat = _categories[index];
-        final isSelected = _selectedCategoryId == cat.id;
-        return GestureDetector(
-          onTap: () {
-            SoundService().playClick();
-            setState(() => _selectedCategoryId = cat.id);
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              gradient: isSelected
-                  ? const LinearGradient(colors: [AppTheme.accentLight, AppTheme.accentColor])
-                  : null,
-              color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  cat.icon,
-                  size: 20,
-                  color: isSelected ? AppTheme.primaryDark : AppTheme.accentColor,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  cat.name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isSelected ? AppTheme.primaryDark : Colors.white,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildQuestionCountSelector() {
-    return Row(
-      children: [5, 10, 15, 20].map((count) {
-        final isSelected = _questionCount == count;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () {
-              SoundService().playClick();
-              setState(() => _questionCount = count);
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(colors: [AppTheme.accentLight, AppTheme.accentColor])
-                    : null,
-                color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? AppTheme.primaryDark : Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildSettingsPanel() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          // Speed Mode
-          Row(
-            children: [
-              Icon(Icons.speed_rounded, color: AppTheme.accentColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'نقاط السرعة',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'من يجيب أسرع يحصل على نقاط أكثر',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _speedMode,
-                activeColor: AppTheme.accentColor,
-                onChanged: (v) => setState(() => _speedMode = v),
-              ),
-            ],
-          ),
-          
-          const Divider(color: Colors.white12),
-          
-          // Max Players
-          Row(
-            children: [
-              Icon(Icons.people_rounded, color: AppTheme.accentColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'الحد الأقصى للاعبين',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '$_maxPlayers لاعبين',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: [
-                  _buildCounterButton(Icons.remove, () {
-                    if (_maxPlayers > 2) setState(() => _maxPlayers--);
-                  }),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      '$_maxPlayers',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-                  _buildCounterButton(Icons.add, () {
-                    if (_maxPlayers < 8) setState(() => _maxPlayers++);
-                  }),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCounterButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: () {
-        SoundService().playClick();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppTheme.accentColor.withValues(alpha: 0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: AppTheme.accentColor, size: 18),
-      ),
-    );
-  }
-
   Widget _buildCreateButton() {
-    final canCreate = _selectedType == ChallengeType.bruteForce || 
-                      _selectedCategoryId != null;
-    
+    final canCreate =
+        _selectedType == ChallengeType.bruteForce || _selectedCategoryId != null;
+
     return GestureDetector(
       onTap: canCreate && !_isCreating ? _createChallenge : null,
       child: AnimatedOpacity(
@@ -472,7 +208,9 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
             ],
           ),
           child: _isCreating
-              ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryDark))
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primaryDark),
+                )
               : const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -495,7 +233,7 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
 
   Future<void> _createChallenge() async {
     setState(() => _isCreating = true);
-    
+
     final profile = ProfileService.instance.activeProfile;
     if (profile == null) {
       setState(() => _isCreating = false);
@@ -514,15 +252,15 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
     );
 
     final success = await ChallengeGameService.instance.initAsHost(config);
-    
+    if (!mounted) return;
     setState(() => _isCreating = false);
 
-    if (success && mounted) {
+    if (success) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const WaitingRoomScreen()),
       );
-    } else if (mounted) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('فشل إنشاء التحدي، تأكد من الأذونات'),
@@ -531,12 +269,4 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
       );
     }
   }
-}
-
-class _CategoryOption {
-  final String id;
-  final String name;
-  final IconData icon;
-  
-  _CategoryOption(this.id, this.name, this.icon);
 }
