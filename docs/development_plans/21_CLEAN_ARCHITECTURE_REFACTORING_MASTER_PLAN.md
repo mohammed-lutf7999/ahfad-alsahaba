@@ -208,9 +208,10 @@ admin_web/js/
 2. **تفكيك [`app_control_dialogs.dart`](../../lib/ui/dialogs/app_control_dialogs.dart) (`972` سطراً ← 5 ملفات + Barrel):**
    - `dialogs/control/maintenance_gate_dialog.dart`, `update_gate_dialog.dart`, `announcement_popup_dialog.dart`, `ban_notice_dialog.dart`, `event_banner_card.dart`.
 3. **تفكيك بقية شاشات الإدارة بالاعتماد على `admin_shared_components.dart`:**
-   - [`admin_players_support_screen.dart`](../../lib/ui/screens/admin/admin_players_support_screen.dart) (`966`): فصل `player_search_panel.dart`, `player_dossier_card.dart`, `player_compensation_card.dart`, `player_permissions_card.dart` *(مع الحفاظ على `Key('player_permissions_card')` حرفياً!)*.
+   - [`admin_players_support_screen.dart`](../../lib/ui/screens/admin/admin_players_support_screen.dart) (`1,014`): فصل `player_search_panel.dart`, `player_dossier_card.dart`, `player_compensation_card.dart`, `player_permissions_card.dart` *(مع الحفاظ على `Key('player_permissions_card')` حرفياً!)*.
+   - [`admin_bulk_pack_manager_screen.dart`](../../lib/ui/screens/admin/admin_bulk_pack_manager_screen.dart) (`806`): فصل `bulk_category_config_card.dart`, `bulk_json_import_card.dart`, `bulk_pack_publish_card.dart` مع الحفاظ على `FittedBox` و`FileType.any` وتحليل `compute`.
    - [`admin_social_moderation_screen.dart`](../../lib/ui/screens/admin/admin_social_moderation_screen.dart) (`753`): فصل التبويبات الثلاثة (`diwan_reports_tab.dart`, `muted_users_tab.dart`, `guilds_arenas_mod_tab.dart`).
-   - [`admin_announcements_screen.dart`](../../lib/ui/screens/admin/admin_announcements_screen.dart) (`891`)، [`admin_events_screen.dart`](../../lib/ui/screens/admin/admin_events_screen.dart) (`786`)، [`admin_resources_screen.dart`](../../lib/ui/screens/admin/admin_resources_screen.dart) (`732`)، [`admin_dashboard_screen.dart`](../../lib/ui/screens/admin_dashboard_screen.dart) (`667`): استخراج نماذج التحرير (`editor_sheet`) في ملفات منفصلة.
+   - [`admin_announcements_screen.dart`](../../lib/ui/screens/admin/admin_announcements_screen.dart) (`891`)، [`admin_events_screen.dart`](../../lib/ui/screens/admin/admin_events_screen.dart) (`786`)، [`admin_resources_screen.dart`](../../lib/ui/screens/admin/admin_resources_screen.dart) (`732`)، [`admin_dashboard_screen.dart`](../../lib/ui/screens/admin/admin_dashboard_screen.dart) (`674`): استخراج نماذج التحرير (`editor_sheet`) في ملفات منفصلة.
 
 ### 🔹 الدفعة 3C: تفكيك شاشات المجتمع الحديثة *(تمهيد مباشر للخطط 17 و 18)*
 1. **تفكيك [`guild_dashboard_screen.dart`](../../lib/ui/screens/guilds/guild_dashboard_screen.dart) (`799` سطراً):**
@@ -229,8 +230,9 @@ admin_web/js/
 - [`knights_store_screen.dart`](../../lib/ui/screens/store/knights_store_screen.dart) (`707`) + [`result_screen.dart`](../../lib/ui/screens/result_screen.dart) (`698`) + [`achievement_popup.dart`](../../lib/ui/widgets/achievement_popup.dart) (`675`) + [`global_ranking_screen.dart`](../../lib/ui/screens/global_ranking_screen.dart) (`608`) ← فصل بطاقات العرض والرسامات الداخلية.
 
 ### ✅ بوابة التحقق للموجة 3 (`Gate 3`):
-- [ ] نجاح **`155/155` اختباراً** + إضافة اختبارات وحدة مستقلة لـ `OnlineMatchController`!
-- [ ] اجتياز اختبارات التوافق البصري `360x800dp` و`Edge-to-Edge` (`android15_edge_to_edge_test.dart` و`m22_admin_moderation_permissions_and_polish_test.dart`) بنسبة 100%.
+- [ ] نجاح **`179/179` اختباراً** (خط الأساس لـ `1.2.1+23`) + إضافة اختبارات وحدة مستقلة لـ `OnlineMatchController` (`dispose()` + `!timersPending`)!
+- [ ] اجتياز `flutter analyze lib test` (**`No issues found!`** — `0` أخطاء و`0` تحذيرات و`0` ملاحظات).
+- [ ] اجتياز اختبارات التوافق البصري `360x800dp` و`Edge-to-Edge` (`android15_edge_to_edge_test.dart` و`m22_admin_moderation_permissions_and_polish_test.dart` و`m25_mobile_admin_full_parity_test.dart`) بنسبة 100%.
 - [ ] عدم وجود أي شاشة في `lib/ui/` تتجاوز `400` سطر.
 
 ---

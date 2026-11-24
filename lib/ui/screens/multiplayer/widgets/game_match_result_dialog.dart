@@ -1,18 +1,16 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../../../core/app_theme.dart';
 import '../../../../core/sound_service.dart';
 import '../../../../data/services/app_control_service.dart';
 import '../../../../data/services/multiplayer_service.dart';
 import '../../../../data/services/profile_service.dart';
+import 'match_rewards_summary.dart';
+import 'rematch_action_bar.dart';
 
-enum RematchUIState {
-  idle,
-  waitingForOpponent,
-  receivedOffer,
-  launchingMatch,
-  opponentLeft,
-}
+export 'rematch_action_bar.dart' show RematchUIState;
 
 /// نافذة نتيجة المباراة النهائية في المنافسات المباشرة مع نظام إعادة النزال الفوري
 class GameMatchResultDialog {
@@ -37,7 +35,7 @@ class GameMatchResultDialog {
     Function(MatchmakingResult newMatch)? onRematchAccepted,
     Function(GhostMatchResult newGhostMatch)? onGhostRematchAccepted,
   }) {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _GameMatchResultDialogContent(
@@ -65,25 +63,6 @@ class GameMatchResultDialog {
 }
 
 class _GameMatchResultDialogContent extends StatefulWidget {
-  final bool isWinner;
-  final bool isDraw;
-  final int effectiveDelta;
-  final int? totalTrophies;
-  final int coinsEarned;
-  final bool shieldConsumed;
-  final bool xpBannerConsumed;
-  final int myScore;
-  final int opponentScore;
-  final String opponentName;
-  final VoidCallback onDismiss;
-  final String? matchId;
-  final String? opponentId;
-  final bool isBot;
-  final bool isGhost;
-  final bool isFriendly;
-  final Function(MatchmakingResult newMatch)? onRematchAccepted;
-  final Function(GhostMatchResult newGhostMatch)? onGhostRematchAccepted;
-
   const _GameMatchResultDialogContent({
     required this.isWinner,
     required this.isDraw,
@@ -104,6 +83,25 @@ class _GameMatchResultDialogContent extends StatefulWidget {
     this.onRematchAccepted,
     this.onGhostRematchAccepted,
   });
+
+  final bool isWinner;
+  final bool isDraw;
+  final int effectiveDelta;
+  final int? totalTrophies;
+  final int coinsEarned;
+  final bool shieldConsumed;
+  final bool xpBannerConsumed;
+  final int myScore;
+  final int opponentScore;
+  final String opponentName;
+  final VoidCallback onDismiss;
+  final String? matchId;
+  final String? opponentId;
+  final bool isBot;
+  final bool isGhost;
+  final bool isFriendly;
+  final Function(MatchmakingResult newMatch)? onRematchAccepted;
+  final Function(GhostMatchResult newGhostMatch)? onGhostRematchAccepted;
 
   @override
   State<_GameMatchResultDialogContent> createState() =>
@@ -139,19 +137,19 @@ class _GameMatchResultDialogContentState
             _rematchState = RematchUIState.receivedOffer;
             _countdown = 10;
           });
-          _startCountdown(onTimeout: () {
-            if (mounted && _rematchState == RematchUIState.receivedOffer) {
-              setState(() => _rematchState = RematchUIState.opponentLeft);
-            }
-          });
+          _startCountdown(
+            onTimeout: () {
+              if (mounted && _rematchState == RematchUIState.receivedOffer) {
+                setState(() => _rematchState = RematchUIState.opponentLeft);
+              }
+            },
+          );
         }
       } else if (type == 'accept') {
         _handleRematchLaunch();
       } else if (type == 'leave') {
         _countdownTimer?.cancel();
-        setState(() {
-          _rematchState = RematchUIState.opponentLeft;
-        });
+        setState(() => _rematchState = RematchUIState.opponentLeft);
       }
     });
   }
@@ -211,19 +209,19 @@ class _GameMatchResultDialogContentState
     }
 
     if (widget.matchId == null) return;
-
     setState(() {
       _rematchState = RematchUIState.waitingForOpponent;
       _countdown = 10;
     });
 
     await MultiplayerService.instance.sendRematchOffer(widget.matchId!);
-
-    _startCountdown(onTimeout: () {
-      if (mounted && _rematchState == RematchUIState.waitingForOpponent) {
-        setState(() => _rematchState = RematchUIState.opponentLeft);
-      }
-    });
+    _startCountdown(
+      onTimeout: () {
+        if (mounted && _rematchState == RematchUIState.waitingForOpponent) {
+          setState(() => _rematchState = RematchUIState.opponentLeft);
+        }
+      },
+    );
   }
 
   Future<void> _handleRematchLaunch() async {
@@ -233,7 +231,6 @@ class _GameMatchResultDialogContentState
     final result = await MultiplayerService.instance.createInstantRematch(
       parentMatchId: widget.matchId!,
     );
-
     if (!mounted) return;
 
     if (result.success && result.matchId != null) {
@@ -274,474 +271,32 @@ class _GameMatchResultDialogContentState
         textAlign: TextAlign.center,
       ),
       content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon
-            Icon(
-              widget.isDraw
-                  ? Icons.handshake
-                  : (widget.isWinner
-                      ? Icons.emoji_events
-                      : Icons.sentiment_dissatisfied),
-              size: 56,
-              color: widget.isDraw
-                  ? Colors.blue
-                  : (widget.isWinner ? AppTheme.accentColor : Colors.red),
-            ),
-            const SizedBox(height: 12),
-
-            // Result Title
-            Text(
-              widget.isDraw
-                  ? 'تعادل!'
-                  : (widget.isWinner ? '🎉 أنت الفائز!' : 'حظاً أوفر..'),
-              style: TextStyle(
-                color: widget.isDraw
-                    ? Colors.blue
-                    : (widget.isWinner ? Colors.green : Colors.red),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Cairo',
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Trophies and Coins badges
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (widget.effectiveDelta >= 0
-                            ? Colors.amber
-                            : Colors.redAccent)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: (widget.effectiveDelta >= 0
-                              ? Colors.amber
-                              : Colors.redAccent)
-                          .withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Text(
-                    '${widget.effectiveDelta >= 0 ? "+${widget.effectiveDelta}" : "${widget.effectiveDelta}"} كأساً 🏆${widget.totalTrophies != null ? " (${widget.totalTrophies})" : ""}',
-                    style: TextStyle(
-                      color: widget.effectiveDelta >= 0
-                          ? Colors.amberAccent
-                          : Colors.redAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ),
-                if (widget.coinsEarned > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFFFD700).withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Text(
-                      '+${widget.coinsEarned} 🪙 دنانير الفتح',
-                      style: const TextStyle(
-                        color: Color(0xFFFFD700),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-
-            if (widget.isFriendly) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.tealAccent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.tealAccent.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: const Text(
-                  'مباراة ودية — الكؤوس والدروع محمية 🛡️',
-                  style: TextStyle(
-                    color: Colors.tealAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Cairo',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-
-            if (widget.shieldConsumed || widget.xpBannerConsumed) ...[
-              const SizedBox(height: 8),
-              Text(
-                widget.shieldConsumed
-                    ? '🛡️ درع الحماية حمى كؤوسك وسلسلة انتصاراتك!'
-                    : '🚩 راية المضاعفة ضاعفت خبرتك المكتسبة (2x)!',
-                style: const TextStyle(
-                  color: Colors.cyanAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Cairo',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            const SizedBox(height: 14),
-
-            // Scores comparison card
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Text(
-                          'أنت',
-                          style: TextStyle(
-                              color: Colors.white70, fontFamily: 'Cairo'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '${widget.myScore}',
-                          style: const TextStyle(
-                            color: AppTheme.accentColor,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 2,
-                    height: 45,
-                    color: Colors.white24,
-                  ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          widget.opponentName,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontFamily: 'Cairo',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                        Text(
-                          '${widget.opponentScore}',
-                          style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Rematch Status Banner if received or opponent left
-            if (_rematchState == RematchUIState.receivedOffer) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.accentColor),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.flash_on,
-                        color: AppTheme.accentColor, size: 20),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'الخصم يطلب إعادة النزال! (${_countdown}s)',
-                        style: const TextStyle(
-                          color: AppTheme.accentColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          fontFamily: 'Cairo',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            if (_rematchState == RematchUIState.opponentLeft) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.door_back_door_outlined,
-                        color: Colors.white60, size: 18),
-                    SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'غادر الخصم شاشة النزال أو انتهى الوقت',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontFamily: 'Cairo',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+        child: MatchRewardsSummary(
+          isWinner: widget.isWinner,
+          isDraw: widget.isDraw,
+          effectiveDelta: widget.effectiveDelta,
+          totalTrophies: widget.totalTrophies,
+          coinsEarned: widget.coinsEarned,
+          shieldConsumed: widget.shieldConsumed,
+          xpBannerConsumed: widget.xpBannerConsumed,
+          isFriendly: widget.isFriendly,
+          myScore: widget.myScore,
+          opponentScore: widget.opponentScore,
+          opponentName: widget.opponentName,
+          rematchState: _rematchState,
+          countdown: _countdown,
         ),
       ),
       actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       actions: [
-        // Action Buttons according to Rematch State
-        if (_rematchState == RematchUIState.receivedOffer) ...[
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      elevation: 3,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _handleRematchLaunch,
-                    icon: const Icon(Icons.sports_kabaddi, size: 18),
-                    label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'قبول النزال ⚔️',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          fontFamily: 'Cairo',
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white24),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _handleLeave,
-                    child: const Text(
-                      'انسحاب',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        fontSize: 13,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ] else if (_rematchState == RematchUIState.launchingMatch) ...[
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: AppTheme.primaryDark,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: null,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primaryDark,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'جاري تجهيز ساحة المعركة...',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Cairo',
-                          color: AppTheme.primaryDark,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else ...[
-          // Rematch Button
-          if (_rematchState == RematchUIState.waitingForOpponent)
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor.withValues(alpha: 0.8),
-                  foregroundColor: AppTheme.primaryDark,
-                  elevation: 2,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: null,
-                icon: const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppTheme.primaryDark,
-                  ),
-                ),
-                label: Text(
-                  'بانتظار رد الخصم (${_countdown}s)...',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Cairo',
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            )
-          else if (_rematchState != RematchUIState.opponentLeft)
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  foregroundColor: AppTheme.primaryDark,
-                  elevation: 3,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _requestRematch,
-                icon: const Icon(Icons.replay_rounded, size: 20),
-                label: Text(
-                  widget.isGhost ? 'مباراة جديدة ⚔️' : 'طلب إعادة النزال ⚔️',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    fontFamily: 'Cairo',
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-          // Return to Home button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white30),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: _handleLeave,
-              child: const Text(
-                'العودة للرئيسية',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'Cairo',
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ],
+        RematchActionBar(
+          rematchState: _rematchState,
+          countdown: _countdown,
+          isGhost: widget.isGhost,
+          onAcceptRematch: _handleRematchLaunch,
+          onRequestRematch: _requestRematch,
+          onLeave: _handleLeave,
+        ),
       ],
     );
   }
