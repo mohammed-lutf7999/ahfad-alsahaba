@@ -131,7 +131,9 @@ mixin AdminReleaseConfigMixin on AdminServiceBase {
             'guestPlayers': overview.guestPlayers,
           };
         }
-      } catch (_) {}
+      } catch (overviewErr) {
+        debugPrint('Admin stats overview fallback failed: $overviewErr');
+      }
 
       try {
         final countResponse =

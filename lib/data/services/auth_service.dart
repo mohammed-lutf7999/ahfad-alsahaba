@@ -354,13 +354,19 @@ class AuthService extends ChangeNotifier {
       if (user != null && client != null) {
         try {
           await client.from('user_progress').delete().eq('user_id', user.id);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Delete user_progress error: $e');
+        }
         try {
           await client.from('leaderboard').delete().eq('user_id', user.id);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Delete leaderboard error: $e');
+        }
         try {
           await client.from('matchmaking_queue').delete().eq('user_id', user.id);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Delete matchmaking_queue error: $e');
+        }
       }
 
       await SharedPrefsService.resetAllProgress();
@@ -369,10 +375,14 @@ class AuthService extends ChangeNotifier {
       try {
         final GoogleSignIn googleSignIn = GoogleSignIn();
         await googleSignIn.signOut();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('GoogleSignIn signOut error during deleteAccount: $e');
+      }
       try {
         await client?.auth.signOut();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Supabase auth signOut error during deleteAccount: $e');
+      }
 
       notifyListeners();
       return true;

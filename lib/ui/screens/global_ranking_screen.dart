@@ -17,8 +17,9 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _fadeController;
-  late Stream<List<RankEntry>> _leaderboardStream;
-  bool _isLoading = true;
+  Stream<List<RankEntry>>? _leaderboardStream;
+  bool _hasRequestedGlobal = false;
+  bool _isLoading = false;
   bool _isOffline = false;
   List<RankEntry> _globalRanks = [];
 
@@ -56,58 +57,43 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _fadeController = AnimationController(
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 650),
       vsync: this,
-    );
-    _leaderboardStream = LeaderboardService().getLeaderboardStream(limit: 50);
-    _loadGlobalRanks();
+    )..forward();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.index == 1 && !_hasRequestedGlobal) {
+      _loadGlobalRanks();
+    }
   }
 
   Future<void> _loadGlobalRanks({bool refreshStream = false}) async {
+    _hasRequestedGlobal = true;
+    setState(() => _isLoading = true);
+
+    final hasConnection = await _checkConnectivity();
+    if (!mounted) return;
+    if (!hasConnection) {
+      setState(() {
+        _isLoading = false;
+        _isOffline = true;
+        _leaderboardStream = null;
+        _globalRanks = _getMockData();
+      });
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
-      if (refreshStream) {
+      _isOffline = false;
+      _isLoading = false;
+      if (_leaderboardStream == null || refreshStream) {
         _leaderboardStream =
             LeaderboardService().getLeaderboardStream(limit: 50);
       }
     });
-
-    final hasConnection = await _checkConnectivity();
-    if (!hasConnection) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isOffline = true;
-          _globalRanks = _getMockData();
-        });
-        _fadeController.forward();
-      }
-      return;
-    }
-
-    try {
-      final ranks =
-          await LeaderboardService().fetchGlobalLeaderboard(limit: 50);
-      if (mounted) {
-        setState(() {
-          _globalRanks = ranks;
-          _isLoading = false;
-          _isOffline = false;
-        });
-        _fadeController.forward();
-      }
-    } catch (e) {
-      debugPrint('GlobalRankingScreen fetch failed: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isOffline = true;
-          _globalRanks = _getMockData();
-        });
-        _fadeController.forward();
-      }
-    }
   }
 
   Future<bool> _checkConnectivity() async {
@@ -146,6 +132,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -262,8 +249,22 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
   }
 
   Widget _buildGlobalStreamTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+      );
+    }
+    if (_isOffline) {
+      return _buildList(_globalRanks);
+    }
+    final stream = _leaderboardStream;
+    if (stream == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+      );
+    }
     return StreamBuilder<List<RankEntry>>(
-      stream: _leaderboardStream,
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           final error = snapshot.error.toString();

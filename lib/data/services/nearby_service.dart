@@ -351,9 +351,21 @@ class NearbyService extends ChangeNotifier {
 
   /// إيقاف كل شيء
   Future<void> stopAll() async {
-    try { await _nearby.stopAdvertising(); } catch (_) {}
-    try { await _nearby.stopDiscovery(); } catch (_) {}
-    try { await _nearby.stopAllEndpoints(); } catch (_) {}
+    try {
+      await _nearby.stopAdvertising();
+    } catch (e) {
+      debugPrint('Nearby stopAdvertising notice: $e');
+    }
+    try {
+      await _nearby.stopDiscovery();
+    } catch (e) {
+      debugPrint('Nearby stopDiscovery notice: $e');
+    }
+    try {
+      await _nearby.stopAllEndpoints();
+    } catch (e) {
+      debugPrint('Nearby stopAllEndpoints notice: $e');
+    }
     
     _connectionState = ConnectionState.disconnected;
     _connectedPlayers.clear();

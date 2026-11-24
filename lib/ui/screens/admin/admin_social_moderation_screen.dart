@@ -58,6 +58,28 @@ class _AdminSocialModerationScreenState
     }
   }
 
+  Future<void> _reloadDiwanOnly() async {
+    try {
+      final queue = await AdminService().getDiwanModerationQueue(limit: 50);
+      if (mounted) setState(() => _diwanQueue = queue);
+    } catch (e) {
+      if (mounted) {
+        showAdminFeedback(context, 'تعذر تحديث الديوان: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _reloadGuildsArenasOnly() async {
+    try {
+      final snapshot = await AdminService().listGuildsAndArenas(limit: 50);
+      if (mounted) setState(() => _guildsArenas = snapshot);
+    } catch (e) {
+      if (mounted) {
+        showAdminFeedback(context, 'تعذر تحديث الكتائب والساحات: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _moderateDiwanAction({
     required String action,
     String? messageId,
@@ -77,7 +99,7 @@ class _AdminSocialModerationScreenState
       if (!mounted) return;
       if (res != null) {
         showAdminFeedback(context, 'تم تنفيذ الإجراء بنجاح ✅');
-        await _loadAll();
+        await _reloadDiwanOnly();
       } else {
         showAdminFeedback(context, 'فشل تنفيذ الإجراء', isError: true);
       }
@@ -103,7 +125,7 @@ class _AdminSocialModerationScreenState
       if (!mounted) return;
       if (res != null) {
         showAdminFeedback(context, 'تم تنفيذ الإجراء وتحديث الحالة ✅');
-        await _loadAll();
+        await _reloadGuildsArenasOnly();
       } else {
         showAdminFeedback(context, 'فشل تنفيذ الإجراء', isError: true);
       }

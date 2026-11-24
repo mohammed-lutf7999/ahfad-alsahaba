@@ -248,7 +248,9 @@ class StoreService extends ChangeNotifier {
       if (SharedPrefsService.getVibrationEnabled()) {
         HapticFeedback.mediumImpact();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StoreService haptic error: $e');
+    }
 
     try {
       if (isPurchase) {
@@ -256,6 +258,8 @@ class StoreService extends ChangeNotifier {
       } else {
         SoundService().playClick();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StoreService sound error: $e');
+    }
   }
 }

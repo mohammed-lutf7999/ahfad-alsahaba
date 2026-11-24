@@ -58,6 +58,32 @@ class _AdminTelemetrySecurityScreenState
     }
   }
 
+  Future<void> _reloadGhostsAndAudit() async {
+    try {
+      final admin = AdminService();
+      final res = await Future.wait<dynamic>([
+        admin.listGhosts(limit: 40),
+        admin.listAuditLogs(limit: 50),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _ghosts = res[0] as List<AdminGhostSummary>;
+        _logs = res[1] as List<AdminAuditLogEntry>;
+      });
+    } catch (e) {
+      debugPrint('AdminTelemetry reload ghosts/audit failed: $e');
+    }
+  }
+
+  Future<void> _reloadAuditOnly() async {
+    try {
+      final logs = await AdminService().listAuditLogs(limit: 50);
+      if (mounted) setState(() => _logs = logs);
+    } catch (e) {
+      debugPrint('AdminTelemetry reload audit failed: $e');
+    }
+  }
+
   Future<void> _toggleGhost(AdminGhostSummary ghost, bool nextActive) async {
     try {
       final ok = await AdminService().toggleGhost(ghost.id, nextActive);
@@ -67,7 +93,7 @@ class _AdminTelemetrySecurityScreenState
           context,
           nextActive ? 'تم تفعيل الشبح ✅' : 'تم إيقاف الشبح ⏸️',
         );
-        await _loadAll();
+        await _reloadGhostsAndAudit();
       } else {
         showAdminFeedback(
           context,
@@ -105,7 +131,7 @@ class _AdminTelemetrySecurityScreenState
       _newAdminEmailCtrl.clear();
       setState(() => _roster = updated);
       showAdminFeedback(context, 'تمت إضافة المشرف بنجاح ✅');
-      await _loadAll();
+      await _reloadAuditOnly();
     } catch (e) {
       if (!mounted) return;
       showAdminFeedback(context, 'تعذر إضافة المشرف: $e', isError: true);
@@ -165,7 +191,7 @@ class _AdminTelemetrySecurityScreenState
       }
       setState(() => _roster = updated);
       showAdminFeedback(context, 'تمت إزالة المشرف ✅');
-      await _loadAll();
+      await _reloadAuditOnly();
     } catch (e) {
       if (!mounted) return;
       showAdminFeedback(context, 'تعذر إزالة المشرف: $e', isError: true);

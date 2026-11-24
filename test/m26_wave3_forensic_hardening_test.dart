@@ -10,6 +10,7 @@ import 'package:ahfad_alsahaba/data/services/admin_service.dart';
 import 'package:ahfad_alsahaba/data/services/app_control_service.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_cms_manager_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_resources_screen.dart';
+import 'package:ahfad_alsahaba/ui/screens/admin/admin_social_moderation_screen.dart';
 import 'package:ahfad_alsahaba/ui/screens/admin/admin_telemetry_security_screen.dart';
 
 Widget _wrap360(Widget child) {
@@ -214,6 +215,54 @@ void main() {
 
         expect(find.textContaining('تم تنظيف 0 سجل'), findsNothing);
         expect(find.textContaining('تعذر تنفيذ التنظيف'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'AdminSocialModerationScreen reloads only Diwan queue on Diwan action (saves 50% RPCs)',
+      (tester) async {
+        final admin = AdminService();
+        int diwanHits = 0;
+        int guildHits = 0;
+
+        admin.diwanQueueFetcherOverride = ({int limit = 50}) async {
+          diwanHits++;
+          return const AdminDiwanModerationQueue(
+            mutedUsers: [
+              AdminMutedUser(
+                userId: 'usr_muted_1',
+                displayName: 'مكتوم اختباري',
+                reason: 'اختبار',
+              ),
+            ],
+          );
+        };
+        admin.guildsArenasFetcherOverride = ({int limit = 50}) async {
+          guildHits++;
+          return const AdminGuildsAndArenasSnapshot();
+        };
+        admin.diwanModeratorOverride = ({
+          required String action,
+          String? messageId,
+          String? targetUserId,
+          int muteHours = 24,
+          String reason = '',
+        }) async =>
+            {'ok': true};
+
+        await tester.pumpWidget(_wrap360(const AdminSocialModerationScreen()));
+        await tester.pumpAndSettle();
+        expect(diwanHits, 1);
+        expect(guildHits, 1);
+
+        await tester.tap(find.byKey(const Key('admin_social_moderation_tab_muted')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('فك الكتم').first);
+        await tester.pumpAndSettle();
+
+        expect(diwanHits, 2);
+        expect(guildHits, 1);
         expect(tester.takeException(), isNull);
       },
     );

@@ -85,11 +85,34 @@ class MatchRealtimeChannel {
     }
   }
 
+  Future<void> _sendOrHttpBroadcast({
+    required RealtimeChannel? activeChannel,
+    required String channelName,
+    required String event,
+    required Map<String, dynamic> payload,
+  }) async {
+    if (activeChannel != null) {
+      await activeChannel.sendBroadcastMessage(event: event, payload: payload);
+      return;
+    }
+    final temp = _client.channel(channelName);
+    try {
+      await temp.httpSend(
+        event: event,
+        payload: payload,
+        timeout: const Duration(seconds: 4),
+      );
+    } finally {
+      unawaited(_client.removeChannel(temp));
+    }
+  }
+
   /// Sends a reaction (emoji) to the opponent via Broadcast.
   Future<void> sendReaction(String matchId, String emoji) async {
     try {
-      final channel = _reactionChannel ?? _client.channel('reactions_$matchId');
-      await channel.sendBroadcastMessage(
+      await _sendOrHttpBroadcast(
+        activeChannel: _reactionChannel,
+        channelName: 'reactions_$matchId',
         event: 'reaction',
         payload: {'emoji': emoji, 'senderId': _currentUserId},
       );
@@ -109,8 +132,9 @@ class MatchRealtimeChannel {
     }
     _lastQuickPhraseAt = now;
     try {
-      final channel = _reactionChannel ?? _client.channel('reactions_$matchId');
-      await channel.sendBroadcastMessage(
+      await _sendOrHttpBroadcast(
+        activeChannel: _reactionChannel,
+        channelName: 'reactions_$matchId',
         event: 'quick_phrase',
         payload: {'phrase': trimmed, 'senderId': _currentUserId},
       );
@@ -158,9 +182,9 @@ class MatchRealtimeChannel {
   /// Sends a rematch offer to the opponent via Broadcast.
   Future<void> sendRematchOffer(String matchId) async {
     try {
-      final channel = _rematchChannel ?? _client.channel('rematch_$matchId');
-      _rematchChannel = channel;
-      await channel.sendBroadcastMessage(
+      await _sendOrHttpBroadcast(
+        activeChannel: _rematchChannel,
+        channelName: 'rematch_$matchId',
         event: 'rematch_offer',
         payload: {'senderId': _currentUserId},
       );
@@ -176,9 +200,9 @@ class MatchRealtimeChannel {
     required String newMatchId,
   }) async {
     try {
-      final channel =
-          _rematchChannel ?? _client.channel('rematch_$parentMatchId');
-      await channel.sendBroadcastMessage(
+      await _sendOrHttpBroadcast(
+        activeChannel: _rematchChannel,
+        channelName: 'rematch_$parentMatchId',
         event: 'rematch_accept',
         payload: {'senderId': senderId, 'matchId': newMatchId},
       );
@@ -190,8 +214,9 @@ class MatchRealtimeChannel {
   /// Sends a rematch leave/exit signal to notify opponent immediately.
   Future<void> sendRematchLeave(String matchId) async {
     try {
-      final channel = _rematchChannel ?? _client.channel('rematch_$matchId');
-      await channel.sendBroadcastMessage(
+      await _sendOrHttpBroadcast(
+        activeChannel: _rematchChannel,
+        channelName: 'rematch_$matchId',
         event: 'rematch_leave',
         payload: {'senderId': _currentUserId},
       );
