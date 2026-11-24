@@ -68,6 +68,12 @@ class _AdminTelemetrySecurityScreenState
           nextActive ? 'تم تفعيل الشبح ✅' : 'تم إيقاف الشبح ⏸️',
         );
         await _loadAll();
+      } else {
+        showAdminFeedback(
+          context,
+          'تعذر تحديث حالة الشبح؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -88,10 +94,16 @@ class _AdminTelemetrySecurityScreenState
         role: 'admin',
       );
       if (!mounted) return;
+      if (updated == null) {
+        showAdminFeedback(
+          context,
+          'تعذر إضافة المشرف؛ تحقق من صلاحيات المالك والاتصال.',
+          isError: true,
+        );
+        return;
+      }
       _newAdminEmailCtrl.clear();
-      setState(() {
-        if (updated != null) _roster = updated;
-      });
+      setState(() => _roster = updated);
       showAdminFeedback(context, 'تمت إضافة المشرف بنجاح ✅');
       await _loadAll();
     } catch (e) {
@@ -143,9 +155,15 @@ class _AdminTelemetrySecurityScreenState
         email: email,
       );
       if (!mounted) return;
-      setState(() {
-        if (updated != null) _roster = updated;
-      });
+      if (updated == null) {
+        showAdminFeedback(
+          context,
+          'تعذر إزالة المشرف؛ تحقق من صلاحيات المالك والاتصال.',
+          isError: true,
+        );
+        return;
+      }
+      setState(() => _roster = updated);
       showAdminFeedback(context, 'تمت إزالة المشرف ✅');
       await _loadAll();
     } catch (e) {

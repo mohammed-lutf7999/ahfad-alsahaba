@@ -24,6 +24,13 @@ class _AdminEmailScreenState extends State<AdminEmailScreen> {
     _loadUsers();
   }
 
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     final users = await AdminService().getAllUsers();

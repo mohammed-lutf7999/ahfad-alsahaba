@@ -17,6 +17,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _fadeController;
+  late Stream<List<RankEntry>> _leaderboardStream;
   bool _isLoading = true;
   bool _isOffline = false;
   List<RankEntry> _globalRanks = [];
@@ -59,11 +60,18 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
       duration: const Duration(seconds: 1),
       vsync: this,
     );
+    _leaderboardStream = LeaderboardService().getLeaderboardStream(limit: 50);
     _loadGlobalRanks();
   }
 
-  Future<void> _loadGlobalRanks() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadGlobalRanks({bool refreshStream = false}) async {
+    setState(() {
+      _isLoading = true;
+      if (refreshStream) {
+        _leaderboardStream =
+            LeaderboardService().getLeaderboardStream(limit: 50);
+      }
+    });
 
     final hasConnection = await _checkConnectivity();
     if (!hasConnection) {
@@ -89,7 +97,8 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
         });
         _fadeController.forward();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('GlobalRankingScreen fetch failed: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -254,7 +263,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
 
   Widget _buildGlobalStreamTab() {
     return StreamBuilder<List<RankEntry>>(
-      stream: LeaderboardService().getLeaderboardStream(limit: 50),
+      stream: _leaderboardStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           final error = snapshot.error.toString();
@@ -293,7 +302,7 @@ class _GlobalRankingScreenState extends State<GlobalRankingScreen>
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: _loadGlobalRanks,
+                    onPressed: () => _loadGlobalRanks(refreshStream: true),
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('إعادة المحاولة'),
                     style: ElevatedButton.styleFrom(

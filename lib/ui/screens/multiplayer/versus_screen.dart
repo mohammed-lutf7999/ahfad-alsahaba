@@ -58,6 +58,7 @@ class _VersusScreenState extends State<VersusScreen>
   Timer? _countdownTimer;
   Timer? _pollTimer;
   Timer? _safetyTimeoutTimer;
+  Timer? _botReadyTimer;
   Timer? _phraseTimer;
   Timer? _phraseEchoTimer;
   StreamSubscription<MatchState>? _matchStateSubscription;
@@ -83,6 +84,7 @@ class _VersusScreenState extends State<VersusScreen>
     _countdownTimer?.cancel();
     _pollTimer?.cancel();
     _safetyTimeoutTimer?.cancel();
+    _botReadyTimer?.cancel();
     _phraseTimer?.cancel();
     _phraseEchoTimer?.cancel();
     _matchStateSubscription?.cancel();
@@ -131,8 +133,10 @@ class _VersusScreenState extends State<VersusScreen>
     await _vsController.forward();
 
     if (widget.isBot) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) _onBothPlayersReady();
+      _botReadyTimer?.cancel();
+      _botReadyTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) _onBothPlayersReady();
+      });
       return;
     }
 

@@ -109,7 +109,15 @@ class _AdminResourcesScreenState extends State<AdminResourcesScreen> {
         olderThanDays: 30,
       );
       if (!mounted) return;
-      final deleted = result?['deleted_count'] ?? 0;
+      if (result == null) {
+        showAdminFeedback(
+          context,
+          'تعذر تنفيذ التنظيف؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
+        return;
+      }
+      final deleted = result['deleted_count'] ?? 0;
       showAdminFeedback(context, 'تم تنظيف $deleted سجل قديم بنجاح ✅');
       await _loadHealth();
     } catch (e) {

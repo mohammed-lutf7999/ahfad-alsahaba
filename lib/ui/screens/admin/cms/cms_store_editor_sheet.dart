@@ -228,7 +228,7 @@ Future<bool?> openCmsStoreEditor(
                         existing?.metadata['primaryColor'] ?? '#1A0F2E';
                     nextMeta['highlightColor'] = selectedAccentHex;
                   }
-                  await AdminService().upsertStoreItem(
+                  final saved = await AdminService().upsertStoreItem(
                     id: ctrls['id']!.text.trim().toLowerCase(),
                     title: ctrls['title']!.text.trim(),
                     description: ctrls['desc']!.text.trim(),
@@ -241,6 +241,15 @@ Future<bool?> openCmsStoreEditor(
                     metadata: nextMeta,
                   );
                   if (!ctx.mounted) return;
+                  if (saved == null) {
+                    setModalState(() => saving = false);
+                    showAdminFeedback(
+                      ctx,
+                      'لم يتم حفظ العنصر؛ تحقق من الاتصال وصلاحيات المشرف.',
+                      isError: true,
+                    );
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 } catch (e) {
                   setModalState(() => saving = false);

@@ -99,7 +99,9 @@ class MatchSessionService {
           score: fallbackScore,
           questionIndex: questionIndex + 1,
         );
-      } catch (_) {}
+      } catch (fallbackErr) {
+        debugPrint('Fallback updateProgress failed ($matchId): $fallbackErr');
+      }
     }
     return {'myScore': fallbackScore, 'opponentScore': 0};
   }
@@ -289,7 +291,8 @@ class MatchSessionService {
         };
       }
       return Map<String, dynamic>.from(fallback);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error fetching opponent data ($opponentId): $e');
       return Map<String, dynamic>.from(fallback);
     }
   }

@@ -207,6 +207,12 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
         if (mounted && updated != null) {
           setState(() => _detail = updated);
         }
+      } else {
+        showAdminFeedback(
+          context,
+          'تعذر فك كتم اللاعب؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -253,7 +259,7 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
 
     setState(() => _isCompensating = true);
     try {
-      await AdminService().grantPlayerCompensation(
+      final res = await AdminService().grantPlayerCompensation(
         userId: detail.userId!,
         coinsDelta: coins,
         gemsDelta: gems,
@@ -261,6 +267,15 @@ class _AdminPlayersSupportScreenState extends State<AdminPlayersSupportScreen> {
         reason: reason,
       );
       if (!mounted) return;
+      if (res == null) {
+        setState(() => _isCompensating = false);
+        showAdminFeedback(
+          context,
+          'تعذر منح التعويض؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
+        return;
+      }
       _coinsCtrl.text = '0';
       _gemsCtrl.text = '0';
       _xpCtrl.text = '0';

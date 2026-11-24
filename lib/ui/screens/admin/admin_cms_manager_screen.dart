@@ -72,6 +72,44 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
     }
   }
 
+  Future<void> _reloadScope(String scope) async {
+    try {
+      final admin = AdminService();
+      if (scope == 'store') {
+        final items = await admin.listStoreItems();
+        if (mounted) setState(() => _storeItems = items);
+      } else if (scope == 'library') {
+        final libRes = await admin.listLibraryContent();
+        if (mounted) {
+          setState(() {
+            _libSections = libRes.sections;
+            _libItems = libRes.items;
+          });
+        }
+      } else if (scope == 'quiz') {
+        final quizRes = await admin.listQuizContent(limit: 80);
+        if (mounted) {
+          setState(() {
+            _quizCategories = quizRes.categories;
+            _quizQuestions = quizRes.questions;
+          });
+        }
+      } else {
+        await _loadAll();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAdminFeedback(context, 'تعذر تحديث القسم: $e', isError: true);
+    }
+  }
+
+  String _scopeForEntityType(String entityType) {
+    if (entityType == 'store_item') return 'store';
+    if (entityType.startsWith('library_')) return 'library';
+    if (entityType.startsWith('quiz_')) return 'quiz';
+    return 'all';
+  }
+
   Future<void> _toggleVisibility(
     String entityType,
     String id,
@@ -89,7 +127,13 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
           context,
           nextVisible ? 'تم إظهار العنصر للجميع ✅' : 'تم إخفاء العنصر بأمان 👁️‍🗨️',
         );
-        await _loadAll();
+        await _reloadScope(_scopeForEntityType(entityType));
+      } else {
+        showAdminFeedback(
+          context,
+          'تعذر تحديث حالة الظهور؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -97,10 +141,14 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
     }
   }
 
-  Future<void> _handleEditorResult(bool? saved, String successMessage) async {
+  Future<void> _handleEditorResult(
+    bool? saved,
+    String successMessage, {
+    required String scope,
+  }) async {
     if (saved == true && mounted) {
       showAdminFeedback(context, successMessage);
-      await _loadAll();
+      await _reloadScope(scope);
     }
   }
 
@@ -148,10 +196,12 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                           onAddItem: () async => _handleEditorResult(
                             await openCmsStoreEditor(context),
                             'تم حفظ عنصر المتجر بنجاح ✅',
+                            scope: 'store',
                           ),
                           onEditItem: (item) async => _handleEditorResult(
                             await openCmsStoreEditor(context, existing: item),
                             'تم حفظ عنصر المتجر بنجاح ✅',
+                            scope: 'store',
                           ),
                           onToggleVisibility: (id, v) =>
                               _toggleVisibility('store_item', id, v),
@@ -165,6 +215,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                           onAddSection: () async => _handleEditorResult(
                             await openCmsLibSectionEditor(context),
                             'تم حفظ قسم المكتبة بنجاح ✅',
+                            scope: 'library',
                           ),
                           onAddItem: () async => _handleEditorResult(
                             await openCmsLibItemEditor(
@@ -172,10 +223,12 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                               sections: _libSections,
                             ),
                             'تم حفظ بطاقة المكتبة بنجاح ✅',
+                            scope: 'library',
                           ),
                           onEditSection: (sec) async => _handleEditorResult(
                             await openCmsLibSectionEditor(context, existing: sec),
                             'تم حفظ قسم المكتبة بنجاح ✅',
+                            scope: 'library',
                           ),
                           onEditItem: (item) async => _handleEditorResult(
                             await openCmsLibItemEditor(
@@ -184,6 +237,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                               existing: item,
                             ),
                             'تم حفظ بطاقة المكتبة بنجاح ✅',
+                            scope: 'library',
                           ),
                           onToggleVisibility: _toggleVisibility,
                         ),
@@ -196,6 +250,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                           onAddCategory: () async => _handleEditorResult(
                             await openCmsQuizCategoryEditor(context),
                             'تم حفظ قسم المسابقة بنجاح ✅',
+                            scope: 'quiz',
                           ),
                           onAddQuestion: () async => _handleEditorResult(
                             await openCmsQuizQuestionEditor(
@@ -203,6 +258,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                               categories: _quizCategories,
                             ),
                             'تم حفظ السؤال السحابي بنجاح ✅',
+                            scope: 'quiz',
                           ),
                           onEditCategory: (cat) async => _handleEditorResult(
                             await openCmsQuizCategoryEditor(
@@ -210,6 +266,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                               existing: cat,
                             ),
                             'تم حفظ قسم المسابقة بنجاح ✅',
+                            scope: 'quiz',
                           ),
                           onEditQuestion: (q) async => _handleEditorResult(
                             await openCmsQuizQuestionEditor(
@@ -218,6 +275,7 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                               existing: q,
                             ),
                             'تم حفظ السؤال السحابي بنجاح ✅',
+                            scope: 'quiz',
                           ),
                           onToggleVisibility: _toggleVisibility,
                         ),

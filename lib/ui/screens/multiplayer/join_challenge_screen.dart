@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/sound_service.dart';
@@ -17,6 +19,7 @@ class JoinChallengeScreen extends StatefulWidget {
 class _JoinChallengeScreenState extends State<JoinChallengeScreen>
     with TickerProviderStateMixin {
   late AnimationController _searchController;
+  Timer? _connectCheckTimer;
   bool _isSearching = false;
   bool _isConnecting = false;
 
@@ -33,6 +36,7 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
 
   @override
   void dispose() {
+    _connectCheckTimer?.cancel();
     _searchController.dispose();
     nearby.NearbyService.instance.removeListener(_onNearbyStateChanged);
     super.dispose();
@@ -74,15 +78,17 @@ class _JoinChallengeScreenState extends State<JoinChallengeScreen>
     debugPrint('🔗 Connection request result: $success');
 
     if (success && mounted) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      if (nearby.NearbyService.instance.connectionState ==
-          nearby.ConnectionState.connected) {
-        debugPrint('✅ Connected successfully! Navigating to waiting room...');
-        _navigateToWaitingRoom();
-      } else {
-        debugPrint('⏳ Waiting for connection to complete...');
-      }
+      _connectCheckTimer?.cancel();
+      _connectCheckTimer = Timer(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        if (nearby.NearbyService.instance.connectionState ==
+            nearby.ConnectionState.connected) {
+          debugPrint('✅ Connected successfully! Navigating to waiting room...');
+          _navigateToWaitingRoom();
+        } else {
+          debugPrint('⏳ Waiting for connection to complete...');
+        }
+      });
     } else if (!success && mounted) {
       setState(() => _isConnecting = false);
       ScaffoldMessenger.of(context).showSnackBar(

@@ -182,7 +182,7 @@ class _AdminBulkPackManagerScreenState
       if (name.length < 2) {
         throw ArgumentError('يرجى إدخال اسم القسم العربي قبل الحفظ.');
       }
-      await AdminService().upsertQuizCategory(
+      final created = await AdminService().upsertQuizCategory(
         id: catId,
         name: name,
         description: _newCatDescCtrl.text.trim(),
@@ -192,6 +192,9 @@ class _AdminBulkPackManagerScreenState
             : _newCatColorCtrl.text.trim(),
         totalLevels: totalLevels,
       );
+      if (created == null) {
+        throw StateError('تعذر إنشاء القسم؛ تحقق من الاتصال وصلاحيات المشرف.');
+      }
       final updated = await AdminService().updateQuizCategoryConfig(
         categoryId: catId,
         totalLevels: totalLevels,
@@ -200,18 +203,9 @@ class _AdminBulkPackManagerScreenState
       );
       if (mounted) {
         setState(() {
-          final added = updated ??
-              DynamicQuizCategoryData(
-                id: catId,
-                name: name,
-                totalLevels: totalLevels,
-                questionsPerLevel: qPerLevel,
-                levelDrawMode: _drawMode,
-              );
-          _categories = [
-            ..._categories.where((c) => c.id != catId),
-            added,
-          ]..sort((a, b) => a.id.compareTo(b.id));
+          final added = updated ?? created;
+          _categories = [..._categories.where((c) => c.id != catId), added]
+            ..sort((a, b) => a.id.compareTo(b.id));
           _selectedCategoryId = catId;
           _isNewCategoryMode = false;
         });
@@ -226,12 +220,13 @@ class _AdminBulkPackManagerScreenState
         questionsPerLevel: qPerLevel,
         levelDrawMode: _drawMode,
       );
-      if (updated != null && mounted) {
+      if (updated == null) {
+        throw StateError('تعذر حفظ إعدادات القسم؛ تحقق من الاتصال وصلاحيات المشرف.');
+      }
+      if (mounted) {
         setState(() {
-          _categories = [
-            ..._categories.where((c) => c.id != catId),
-            updated,
-          ]..sort((a, b) => a.id.compareTo(b.id));
+          _categories = [..._categories.where((c) => c.id != catId), updated]
+            ..sort((a, b) => a.id.compareTo(b.id));
         });
       }
     }
@@ -322,6 +317,10 @@ class _AdminBulkPackManagerScreenState
               '✅ نُشرت الحزمة ${res.storagePath} (${res.questionsCount} سؤالاً — $rawKb KB ← $gzKb KB Gzip).';
         });
         showAdminFeedback(context, 'تم نشر حزمة Gzip CDN بنجاح ($gzKb KB) ✅');
+      } else {
+        const msg = 'تعذر نشر الحزمة؛ تحقق من الاتصال وصلاحيات المشرف.';
+        setState(() => _progressLog = '❌ $msg');
+        showAdminFeedback(context, msg, isError: true);
       }
     } catch (e) {
       if (!mounted) return;

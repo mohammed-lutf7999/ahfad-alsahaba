@@ -106,7 +106,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
           Navigator.of(context).pop(true);
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ProfileSetupScreen save error: $e');
       if (mounted) TopNotification.showError(context, 'حدث خطأ أثناء الحفظ');
     } finally {
       if (mounted) setState(() => _isSaving = false);

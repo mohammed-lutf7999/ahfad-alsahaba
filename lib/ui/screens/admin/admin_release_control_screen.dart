@@ -94,7 +94,8 @@ class _AdminReleaseControlScreenState extends State<AdminReleaseControlScreen> {
       if (overview != null) {
         setState(() => _hydrateFromConfig(overview.releaseConfig));
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AdminReleaseControl refresh failed: $e');
       if (mounted) {
         showAdminFeedback(
           context,

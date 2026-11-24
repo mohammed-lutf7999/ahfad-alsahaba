@@ -79,14 +79,20 @@ class LevelUpCelebrationDialog extends StatefulWidget {
         Future<void>.delayed(const Duration(milliseconds: 150), () {
           try {
             HapticFeedback.heavyImpact();
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('LevelUpCelebration delayed haptic error: $e');
+          }
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LevelUpCelebration haptic error: $e');
+    }
 
     try {
       await SoundService().playRankUp();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LevelUpCelebration sound error: $e');
+    }
   }
 
   @override
@@ -131,7 +137,9 @@ class _LevelUpCelebrationDialogState extends State<LevelUpCelebrationDialog>
         '⚔️ بحمد الله ارتقيت إلى المستوى ${lvl.level} ونلت لقب «${lvl.title}» في معركة أحفاد الصحابة! هل تستطيع منافستي في ميادين المعرفة؟ 👑';
     try {
       await SharePlus.instance.share(ShareParams(text: shareText));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('LevelUpCelebration share error: $e');
+    }
   }
 
   @override

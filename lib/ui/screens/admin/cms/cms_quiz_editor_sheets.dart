@@ -76,7 +76,7 @@ Future<bool?> openCmsQuizCategoryEditor(
                 if (!(formKey.currentState?.validate() ?? false)) return;
                 setModalState(() => saving = true);
                 try {
-                  await AdminService().upsertQuizCategory(
+                  final saved = await AdminService().upsertQuizCategory(
                     id: ctrls['id']!.text.trim().toLowerCase(),
                     name: ctrls['name']!.text.trim(),
                     totalLevels:
@@ -89,6 +89,15 @@ Future<bool?> openCmsQuizCategoryEditor(
                     isLocked: existing?.isLocked ?? false,
                   );
                   if (!ctx.mounted) return;
+                  if (saved == null) {
+                    setModalState(() => saving = false);
+                    showAdminFeedback(
+                      ctx,
+                      'لم يتم حفظ قسم المسابقة؛ تحقق من الاتصال وصلاحيات المشرف.',
+                      isError: true,
+                    );
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 } catch (e) {
                   setModalState(() => saving = false);
@@ -269,7 +278,7 @@ Future<bool?> openCmsQuizQuestionEditor(
                 if (!(formKey.currentState?.validate() ?? false)) return;
                 setModalState(() => saving = true);
                 try {
-                  await AdminService().upsertQuizQuestion(
+                  final saved = await AdminService().upsertQuizQuestion(
                     id: existing?.id,
                     categoryId: catId,
                     levelNumber:
@@ -289,6 +298,15 @@ Future<bool?> openCmsQuizQuestionEditor(
                     isVisible: visible,
                   );
                   if (!ctx.mounted) return;
+                  if (saved == null) {
+                    setModalState(() => saving = false);
+                    showAdminFeedback(
+                      ctx,
+                      'لم يتم حفظ السؤال؛ تحقق من الاتصال وصلاحيات المشرف.',
+                      isError: true,
+                    );
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 } catch (e) {
                   setModalState(() => saving = false);

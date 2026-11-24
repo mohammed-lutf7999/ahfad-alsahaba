@@ -69,7 +69,7 @@ Future<bool?> openCmsLibSectionEditor(
                 if (!(formKey.currentState?.validate() ?? false)) return;
                 setModalState(() => saving = true);
                 try {
-                  await AdminService().upsertLibrarySection(
+                  final saved = await AdminService().upsertLibrarySection(
                     id: ctrls['id']!.text.trim().toLowerCase(),
                     title: ctrls['title']!.text.trim(),
                     iconName: existing?.iconName ?? 'auto_stories_rounded',
@@ -78,6 +78,15 @@ Future<bool?> openCmsLibSectionEditor(
                     isVisible: visible,
                   );
                   if (!ctx.mounted) return;
+                  if (saved == null) {
+                    setModalState(() => saving = false);
+                    showAdminFeedback(
+                      ctx,
+                      'لم يتم حفظ القسم؛ تحقق من الاتصال وصلاحيات المشرف.',
+                      isError: true,
+                    );
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 } catch (e) {
                   setModalState(() => saving = false);
@@ -178,7 +187,7 @@ Future<bool?> openCmsLibItemEditor(
                 if (!(formKey.currentState?.validate() ?? false)) return;
                 setModalState(() => saving = true);
                 try {
-                  await AdminService().upsertLibraryItem(
+                  final saved = await AdminService().upsertLibraryItem(
                     id: existing?.id,
                     sectionId: sectionId,
                     title: ctrls['title']!.text.trim(),
@@ -189,6 +198,15 @@ Future<bool?> openCmsLibItemEditor(
                     isVisible: visible,
                   );
                   if (!ctx.mounted) return;
+                  if (saved == null) {
+                    setModalState(() => saving = false);
+                    showAdminFeedback(
+                      ctx,
+                      'لم يتم حفظ البطاقة؛ تحقق من الاتصال وصلاحيات المشرف.',
+                      isError: true,
+                    );
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 } catch (e) {
                   setModalState(() => saving = false);

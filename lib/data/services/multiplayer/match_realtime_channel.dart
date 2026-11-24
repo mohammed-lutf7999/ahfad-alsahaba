@@ -23,11 +23,15 @@ class MatchRealtimeChannel {
   RealtimeChannel? _reactionChannel;
   RealtimeChannel? _rematchChannel;
   StreamController<MatchState>? _matchStateController;
+  StreamController<String>? _reactionController;
+  StreamController<Map<String, dynamic>>? _rematchController;
   StreamController<String>? _phraseController;
   DateTime? _lastQuickPhraseAt;
 
   Stream<String> get quickPhrasesStream {
-    _phraseController ??= StreamController<String>.broadcast();
+    if (_phraseController == null || _phraseController!.isClosed) {
+      _phraseController = StreamController<String>.broadcast();
+    }
     return _phraseController!.stream;
   }
 
@@ -36,7 +40,8 @@ class MatchRealtimeChannel {
     _matchStateController?.close();
     _matchChannel?.unsubscribe();
 
-    _matchStateController = StreamController<MatchState>.broadcast();
+    final controller = StreamController<MatchState>.broadcast();
+    _matchStateController = controller;
 
     _matchChannel = _client
         .channel('match_$matchId')
@@ -50,17 +55,21 @@ class MatchRealtimeChannel {
             value: matchId,
           ),
           callback: (payload) {
+            if (controller.isClosed) return;
             final state = MatchState.fromJson(payload.newRecord);
-            _matchStateController?.add(state);
+            controller.add(state);
           },
         )
         .subscribe();
 
-    _fetchMatchState(matchId);
-    return _matchStateController!.stream;
+    _fetchMatchState(matchId, controller);
+    return controller.stream;
   }
 
-  Future<void> _fetchMatchState(String matchId) async {
+  Future<void> _fetchMatchState(
+    String matchId,
+    StreamController<MatchState> controller,
+  ) async {
     try {
       final data = await _client
           .from('matches')
@@ -68,8 +77,8 @@ class MatchRealtimeChannel {
           .eq('id', matchId)
           .maybeSingle();
 
-      if (data != null) {
-        _matchStateController?.add(MatchState.fromJson(data));
+      if (data != null && !controller.isClosed) {
+        controller.add(MatchState.fromJson(data));
       }
     } catch (e) {
       debugPrint('Error fetching match state: $e');
@@ -113,13 +122,16 @@ class MatchRealtimeChannel {
   /// Listens to reactions & chivalric quick phrases from the opponent on one channel.
   Stream<String> listenToReactions(String matchId) {
     _reactionChannel?.unsubscribe();
+    _reactionController?.close();
     final controller = StreamController<String>.broadcast();
+    _reactionController = controller;
 
     _reactionChannel = _client.channel('reactions_$matchId');
     _reactionChannel!
         .onBroadcast(
           event: 'reaction',
           callback: (payload) {
+            if (controller.isClosed) return;
             final senderId = payload['senderId'] as String?;
             if (senderId != null && senderId == _currentUserId) return;
             final emoji = payload['emoji'] as String? ?? '';
@@ -191,12 +203,15 @@ class MatchRealtimeChannel {
   /// Listens to rematch events (offer, accept, leave).
   Stream<Map<String, dynamic>> listenToRematchEvents(String matchId) {
     _rematchChannel?.unsubscribe();
+    _rematchController?.close();
     final controller = StreamController<Map<String, dynamic>>.broadcast();
+    _rematchController = controller;
 
     _rematchChannel = _client.channel('rematch_$matchId');
     _rematchChannel!.onBroadcast(
       event: 'rematch_offer',
       callback: (payload) {
+        if (controller.isClosed) return;
         final senderId = payload['senderId'] as String?;
         if (senderId != null && senderId != _currentUserId) {
           controller.add({'event': 'offer', 'senderId': senderId});
@@ -206,6 +221,7 @@ class MatchRealtimeChannel {
     _rematchChannel!.onBroadcast(
       event: 'rematch_accept',
       callback: (payload) {
+        if (controller.isClosed) return;
         final senderId = payload['senderId'] as String?;
         final newMatchId = payload['matchId'] as String?;
         if (senderId != null && senderId != _currentUserId) {
@@ -220,6 +236,7 @@ class MatchRealtimeChannel {
     _rematchChannel!.onBroadcast(
       event: 'rematch_leave',
       callback: (payload) {
+        if (controller.isClosed) return;
         final senderId = payload['senderId'] as String?;
         if (senderId != null && senderId != _currentUserId) {
           controller.add({'event': 'leave', 'senderId': senderId});
@@ -234,6 +251,8 @@ class MatchRealtimeChannel {
   void closeRematchChannel() {
     _rematchChannel?.unsubscribe();
     _rematchChannel = null;
+    _rematchController?.close();
+    _rematchController = null;
   }
 
   void dispose() {
@@ -245,6 +264,10 @@ class MatchRealtimeChannel {
     _rematchChannel = null;
     _matchStateController?.close();
     _matchStateController = null;
+    _reactionController?.close();
+    _reactionController = null;
+    _rematchController?.close();
+    _rematchController = null;
     _phraseController?.close();
     _phraseController = null;
   }
