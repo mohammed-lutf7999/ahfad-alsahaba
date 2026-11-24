@@ -1,64 +1,60 @@
 # لوحة التحكم السحابية المستقلة (`admin_web/`) — معركة أحفاد الصحابة
 
-واجهة ويب ساكنة (`Static SPA`) باللغة العربية، معزولة كلياً عن حزمة بناء تطبيق الأندرويد (`APK` / `AAB`) حتى لا تزيد حجمه بأي بايت، وتستخدم فقط رابط المشروع ومفتاح `anon` العام وتستدعي نفس دوال `RPC` الآمنة من الترحيلات السحابية (`015_app_control_and_messages.sql` حتى `021_admin_moderation_permissions_and_guards.sql`) بـ 8 تبويبات إدارية متكاملة تشمل التحكم بالإصدار، المتجر والمحتوى CMS، ملف اللاعبين والصلاحيات الفردية، والتبويب الثامن للديوان والكتائب وإنهاء البطولات الحية عبر REST.
+واجهة ويب ساكنة (`Static SPA`) باللغة العربية، مبنية بوحدات المتصفح القياسية (**Native ES Modules** — صفر `npm` وصفر خطوة بناء)، معزولة كلياً عن حزمة تطبيق الأندرويد (`APK` / `AAB`) وتستدعي دوال `RPC` المحمية في Supabase (`015` حتى `023`) بـ **8 تبويبات** إدارية محمّلة كسولاً (`Lazy-Loaded`):
+الإصدارات والصيانة، الرسائل والبحث، الأحداث والمواسم، متجر الفرسان CMS، المكتبة والمسابقات (بما في ذلك مستورد JSON الجماعي وناشر حزم Gzip CDN)، اللاعبون والتعويضات والصلاحيات، الموارد والأشباح والتدقيق، وإشراف الديوان والكتائب والبطولات الحية.
 
 ---
 
-## 1️⃣ التشغيل المحلي على جهازك للتجربة
+## 1️⃣ البنية المعمارية (Native ES Modules — الموجة 2)
 
-> **تنبيه مهم:** لا تفتح `index.html` مباشرةً بصيغة `file://` لأن تسجيل الدخول عبر Google (`OAuth`) وتحقق الروابط (`window.location.origin`) يتطلبان خادم `http(s)://`.
-> وعلى نظام **Windows** قد يرسل الأمر الافتراضي `python -m http.server` ملفات `.js` بنوع `text/plain` بسبب إعدادات سجل النظام، لذلك استخدم السكربت المرفق `serve.py` الذي يفرض ترويسات `application/javascript` و`text/css` تلقائياً:
+```text
+admin_web/
+├── index.html                  # هيكل الصفحة والأشرطة العلوية + 8 حاويات كسولة
+├── styles/
+│   ├── tokens.css              # متغيرات الألوان والخطوط والأساسيات
+│   ├── layout.css              # الشبكات والتخطيط المتجاوب
+│   └── components.css          # البطاقات، الأزرار، المفاتيح، المعاينات
+├── js/
+│   ├── main.js                 # المنسّق الرئيسي وسجل التحميل الكسول للتبويبات
+│   ├── core/
+│   │   ├── config.js           # مفاتيح anon العامة وثوابت المشروع
+│   │   ├── ui_utils.js         # escapeHtml, safeHexColor, safeCsvCell, Toasts
+│   │   ├── supabase_client.js  # عميل Supabase وحالة المشرف المشتركة
+│   │   ├── rest_broadcast.js   # البث اللحظي عبر REST (control_ping / arena)
+│   │   ├── app_bus.js          # جسر غير دائري لتنسيق الوحدات وإخفاء العناصر
+│   │   └── auth.js             # OAuth Google + Magic Link / OTP + check_is_admin
+│   └── modules/                # 14 وحدة متخصصة (كل ملف <= 350 سطراً)
+├── vercel.json                 # ترويسات الأمان + منع الفهرسة + no-cache
+├── robots.txt                  # منع محركات البحث
+├── .vercelignore               # استبعاد serve.py و README.md من النشر
+└── serve.py                    # خادم التطوير المحلي على Windows
+```
 
-### الخيار أ (الموصى به على Windows — باستخدام `serve.py` المرفق):
+---
+
+## 2️⃣ التشغيل المحلي للتطوير
+
+> **تنبيه:** لا تفتح `index.html` عبر `file://` لأن `<script type="module">` ومصادقة OAuth يتطلبان خادم `http(s)://`.
+
 ```bash
 python admin_web/serve.py
 ```
 
-### الخيار ب (باستخدام Node / npx):
-```bash
-npx serve admin_web -l 8080
-```
-
-ثم افتح المتصفح على:
-`http://localhost:8080`
+ثم افتح: `http://localhost:8080`
 
 ---
 
-## 2️⃣ إعداد الروابط والمصادقة في لوحة Supabase (ضروري جداً)
+## 3️⃣ النشر على Vercel (الإنتاج)
 
-قبل استخدام **Google OAuth** أو **Magic Link (OTP)** سواء محلياً أو بعد الاستضافة:
-1. ادخل إلى **Supabase Dashboard** ← مشروع `khatzzpqxaiwuoodgcst`.
-2. اذهب إلى **Authentication → URL Configuration**.
-3. أضف رابط التشغيل المحلي + رابط الاستضافة النهائي تحت **Redirect URLs**:
-   - `http://localhost:8080`
-   - `http://localhost:8080/`
-   - `https://your-admin-domain.pages.dev` *(أو نطاق Vercel / Netlify الخاص بك)*
-   - `https://your-admin-domain.pages.dev/`
-4. تأكد من إدراج بريد المشرف (`dia666111@gmail.com`) في جدول `public.app_admins` (مُضاف بالفعل في الترحيل `015`).
+1. اربط المستودع واختر **Root Directory** = `admin_web`.
+2. **Framework Preset** = `Other`، واترك **Build Command** فارغاً.
+3. أضف رابط النطاق في Supabase **Authentication → URL Configuration → Redirect URLs**.
 
 ---
 
-## 3️⃣ النشر المجاني على استضافة HTTPS
-
-لأن اللوحة ملفات ساكنة (`index.html`, `styles.css`, `app.js`, `cms_suite.js`, `favicon.svg`, ومعها `serve.py` للتشغيل المحلي على Windows) بدون خطوة بناء:
-
-### Cloudflare Pages
-1. أنشئ مشروعاً جديداً ووصّله بالمستودع (أو ارفع مجلد `admin_web/` مباشرةً via Direct Upload).
-2. **Build command:** اتركه فارغاً (`None`).
-3. **Build output directory:** `admin_web`.
-
-### Vercel
-1. اربط المشروع واختر **Root Directory** = `admin_web`.
-2. **Framework Preset** = `Other`، واترك Build Command فارغاً.
-
-### Netlify
-1. اسحب مجلد `admin_web/` مباشرةً في **Netlify Drop** أو اربط المستودع بـ **Publish directory** = `admin_web`.
-
----
-
-## 4️⃣ الضوابط الأمنية المطبّقة
-* لا يوجد أي `service_role` أو توكن إداري في ملفات الويب.
+## 4️⃣ الضوابط الأمنية
+* لا يوجد أي `service_role` أو مفتاح سري في ملفات الويب.
 * كل استدعاء إداري يتحقق داخل PostgreSQL عبر `check_is_admin()`.
-* أي حساب غير مسجل في `app_admins` يُسجّل خروجه تلقائياً فور المصادقة مع رسالة الرفض.
-* جميع نصوص اللاعبين والرسائل تُمرَّر عبر `escapeHtml` / `textContent` لمنع `XSS`.
-
+* أي حساب غير مسجل في `app_admins` يُسجّل خروجه تلقائياً فور المصادقة.
+* جميع نصوص المستخدمين تمر عبر `escapeHtml` / `textContent` مع حماية CSV ضد حقن الصيغ (`safeCsvCell`).
+* لا توجد أي دوال `onclick=` / `onchange=` / `onsubmit=` مضمّنة في HTML.
