@@ -3,7 +3,7 @@
 > **تاريخ التحديث:** 24 نوفمبر 2026  
 > **الإصدار الحالي المستقر والمدمج على `main`:** `1.2.1+23` *(نسخة الإنتاج المنشورة سابقاً على Google Play: `1.1.0+21`، وحزمة `1.2.1+23` جاهزة للرفع)*  
 > **كبير المهندسين ومسؤول المعمارية:** م. محمد لطف  
-> **معيار الجودة والهندسة:** معايير التطوير العالمية لبيئات الإنتاج (Clean Architecture + Zero-Lag Realtime + RLS Enterprise Security + `179/179` Tests + `0` Analyzer Issues).
+> **معيار الجودة والهندسة:** معايير التطوير العالمية لبيئات الإنتاج (Clean Architecture Plan 21 — Waves 1–4 مكتملة 100% + Zero-Lag Realtime + RLS Enterprise Security + `189/189` Tests + `0` Analyzer Issues).
 
 ---
 
@@ -33,10 +33,11 @@
 | **📬 10** | **صندوق البريد الملكي، كفاءة موارد Supabase، ديوان الأحفاد، الكتائب، والبطولات الحية** | [`10_ROYAL_INBOX_RESOURCES_AND_SOCIAL_ECOSYSTEM.md`](./10_ROYAL_INBOX_RESOURCES_AND_SOCIAL_ECOSYSTEM.md) | **✅ مكتمل 100%** | الترحيلات `017`–`020` (`1.1.0+21`) |
 | **🛡️ 11** | **لوحة الإشراف المتقدمة (الديوان والكتائب)، حظر وصلاحيات اللاعبين الفردية، والتحصين الشامل** | [`11_ADMIN_MODERATION_PERMISSIONS_AND_POLISH.md`](./11_ADMIN_MODERATION_PERMISSIONS_AND_POLISH.md) | **✅ مكتمل 100%** | الترحيل `021` (`1.1.0+21`) |
 | **🩹 022** | **الإصلاح الجراحي الحي لفلتر أخلاق الديوان (`E'...'` + فصل الجذور القصيرة)** | [`022_hotfix_diwan_profanity_filter.sql`](../../supabase/migrations/022_hotfix_diwan_profanity_filter.sql) | **✅ مطبّق ومختبر حياً (16/16)** | الترحيل `022` |
-| **🏗️ 21 (W1)** | **الموجة الأولى من الكود النظيف: تفكيك `app_control_models` و`AdminService` وتصفير `203` تحذير** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 1 مكتملة 100%** | `M23` (`1.2.0+22`) — *الموجات 2–4 لاحقة* |
-| **📦 20** | **المستويات المرنة (`1–100`)، الاستيراد الجماعي لـ `JSON`، حزم `Gzip CDN`، `rotating_pool`، والتطابق الإداري الكامل من الجوال + تصدير CSV** | [`20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md`](./20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md) | **✅ مكتمل 100% ومطبّق حياً** | الترحيل `023` (`1.2.0+22` + `1.2.1+23` / `179` اختباراً) |
-| **🌐 21 (W2)** | **الموجة الثانية من الكود النظيف: تفكيك `admin_web/` إلى `27` وحدة `Native ES Modules` وتحميل كسول لـ `8` تبويبات + `3` ملفات CSS** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 2 مكتملة 100%** | فرع `refactor/wave-2-admin-web-modularization` (`Gate 2`: Edge CDP `8/8`، `0` أخطاء) |
-| **🧩 21 (W3)** | **الموجة الثالثة من الكود النظيف: تفكيك `MultiplayerService` و`OnlineMatchController` وجميع الـ `45` شاشة/ودجت `> 400` سطر (`3A–3D`)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 3 مكتملة 100%** | فرع `refactor/wave-3-ui-god-screens-and-multiplayer` (`Gate 3`: `0` UI `> 400`، `0` God Files، `185/185`، `0` Analyze) |
+| **🏗️ 21 (W1)** | **الموجة الأولى من الكود النظيف: تفكيك `app_control_models` و`AdminService` وتصفير `203` تحذير** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ مدمجة في `main`** | `M23` (`1.2.0+22`) |
+| **📦 20** | **المستويات المرنة (`1–100`)، الاستيراد الجماعي لـ `JSON`، حزم `Gzip CDN`، `rotating_pool`، والتطابق الإداري الكامل من الجوال + تصدير CSV** | [`20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md`](./20_BULK_QUESTIONS_CDN_PACKS_DYNAMIC_LEVELS_AND_SCALING.md) | **✅ مكتمل 100% ومطبّق حياً** | الترحيل `023` (`1.2.0+22` + `1.2.1+23`) |
+| **🌐 21 (W2)** | **الموجة الثانية من الكود النظيف: تفكيك `admin_web/` إلى `27` وحدة `Native ES Modules` وتحميل كسول لـ `8` تبويبات + `3` ملفات CSS** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ مدمجة في `main`** | `Gate 2`: Edge CDP `8/8`، `0` أخطاء (`0fa53f3`) |
+| **🧩 21 (W3)** | **الموجة الثالثة + التحصين الجنائي: تفكيك `MultiplayerService` و`OnlineMatchController` وكل الـ `45` ملف UI `> 400` سطر + تصفير التسريبات و`empty_catch`** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ مدمجة في `main`** | `Gate 3`: `0` UI `> 400`، `0` God Files، `189/189` (`1bbb465`) |
+| **🗄️ 21 (W4)** | **الموجة الرابعة والأخيرة (إتمام الخطة 21 بنسبة 100%): المولد الحتمي `tools/export_supabase_schema.py` + `supabase/schema/` (`8` ملفات + `FUNCTIONS_INDEX.md`) + `functions/_shared/cors_and_auth.ts` (باستثناء `privacy-policy`)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | **✅ الموجة 4 مكتملة 100%** | فرع `refactor/wave-4-supabase-schema-and-shared-functions` (`Gate 4`: `28` جدولاً، `8` مشغّلات، `87` دالة، `0` لمس لـ `migrations/` أو `privacy-policy`) |
 
 *(ملاحظة معمارية: تم استيعاب وتطوير المسودات السابقة للخطة 03 «ديوان الأحفاد» والخطة 07 «الكتائب والبطولات» بالكامل وتطبيقهما حياً ضمن الخطتين المكتملتين 10 و 11).*
 
@@ -47,7 +48,6 @@
 | # | اسم الخطة التطويرية المستهدفة | الملف التوثيقي | المحطة المقترحة | الترحيل القادم | الأولوية |
 | :-: | :--- | :--- | :--- | :---: | :---: |
 | **🚀 12** | **محرّك النمو الفيروسي وبطاقات النصر التفاعلية وودجت أندرويد 14/15 («مخطوطة اليوم»)** | [`12_VIRAL_CARDS_AND_ANDROID_WIDGETS.md`](./12_VIRAL_CARDS_AND_ANDROID_WIDGETS.md) | **`1.3.0+24`** *(التالي المقترح)* | — | 🔥 قصوى |
-| **🏗️ 21 (W4)** | **استكمال الموجة الرابعة والأخيرة من الكود النظيف (`supabase/schema/` التوليدي + `functions/_shared/` باستثناء `privacy-policy`)** | [`21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md`](./21_CLEAN_ARCHITECTURE_REFACTORING_MASTER_PLAN.md) | بالتوازي بين الإصدارات | — | 🔴 عالية |
 | **🛡️ 17** | **موسوعة فلتر الأخلاق الديناميكي، تطوير الديوان (`v2`)، طلبات الصداقة، ودردشة الكتيبة والخاص** | [`17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md`](./17_DYNAMIC_ETHICS_FILTER_AND_SOCIAL_CHAT_V2.md) | Milestone 25 | `024` | 🔥 قصوى |
 | **⚔️ 18** | **حوكمة الكتائب المتقدمة، صلاحيات القائد والنائب، محرك الاستقطاب والدعوات، والبطولات الداخلية** | [`18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md`](./18_GUILDS_GOVERNANCE_AND_RECRUITMENT_SYSTEM.md) | Milestone 26 | `025` | 🔴 عالية |
 | **💰 19** | **منظومة الدخل الحلال المستدام، اشتراكات «الفارس الملكي VIP»، زر الدعم، وتوافق Google Play** | [`19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md`](./19_MONETIZATION_VIP_SUBSCRIPTIONS_AND_GOOGLE_PLAY_COMPLIANCE.md) | Milestone 27 | `026` | 🔥 سيادية |
