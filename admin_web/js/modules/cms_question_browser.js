@@ -10,7 +10,7 @@ import {
 
 const state = {
   mounted: false,
-  busy: false,
+  busyCount: 0,
   categories: [],
   questions: [],
   hiddenLocalIds: [],
@@ -23,6 +23,45 @@ const state = {
   onJumpToPublish: null,
 };
 
+function isBusy() {
+  return state.busyCount > 0;
+}
+
+function syncBusyUi() {
+  const busy = isBusy();
+  const totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
+  const ids = [
+    'btn-qb-search',
+    'btn-qb-run-bulk',
+    'btn-qb-local-hide',
+    'btn-qb-select-all',
+    'btn-qb-clear-sel',
+  ];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = busy;
+  });
+  const prevBtn = document.getElementById('btn-qb-prev');
+  const nextBtn = document.getElementById('btn-qb-next');
+  if (prevBtn) prevBtn.disabled = busy || state.page <= 1;
+  if (nextBtn) nextBtn.disabled = busy || state.page >= totalPages;
+  document
+    .querySelectorAll('#qb-list button, #qb-local-list button')
+    .forEach((btn) => {
+      btn.disabled = busy;
+    });
+}
+
+function beginBusy() {
+  state.busyCount += 1;
+  syncBusyUi();
+}
+
+function endBusy() {
+  state.busyCount = Math.max(0, state.busyCount - 1);
+  syncBusyUi();
+}
+
 function updateSelectionBadge() {
   const el = document.getElementById('qb-selected-count');
   if (el) el.textContent = `المحدد: ${state.selectedIds.size}`;
@@ -32,8 +71,6 @@ function renderListAndFooter() {
   const listEl = document.getElementById('qb-list');
   const totalEl = document.getElementById('qb-total-badge');
   const pageInfo = document.getElementById('qb-page-info');
-  const prevBtn = document.getElementById('btn-qb-prev');
-  const nextBtn = document.getElementById('btn-qb-next');
   const banner = document.getElementById('qb-republish-banner');
   const localList = document.getElementById('qb-local-list');
   const localCount = document.getElementById('qb-local-count');
@@ -41,14 +78,13 @@ function renderListAndFooter() {
   const totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
   if (totalEl) totalEl.textContent = `${state.totalCount} سؤال`;
   if (pageInfo) pageInfo.textContent = `صفحة ${state.page} من ${totalPages} (إجمالي ${state.totalCount})`;
-  if (prevBtn) prevBtn.disabled = state.busy || state.page <= 1;
-  if (nextBtn) nextBtn.disabled = state.busy || state.page >= totalPages;
   banner?.classList.toggle('hidden', !state.packNeedsRepublish);
 
   if (listEl) listEl.innerHTML = renderBrowserQuestionsHtml(state.questions, state.selectedIds);
   if (localList) localList.innerHTML = renderHiddenLocalIdsHtml(state.hiddenLocalIds);
   if (localCount) localCount.textContent = String(state.hiddenLocalIds.length);
   updateSelectionBadge();
+  syncBusyUi();
 }
 
 export function syncQuestionBrowserCategories(categories) {
@@ -76,10 +112,13 @@ export async function loadQuestionBrowser({ resetPage = false } = {}) {
   const catId = document.getElementById('qb-filter-cat')?.value || null;
   const lvlRaw = document.getElementById('qb-filter-level')?.value.trim();
   const lvl = lvlRaw ? Number.parseInt(lvlRaw, 10) : null;
+  if (lvlRaw && (!Number.isFinite(lvl) || lvl < 1 || lvl > 100)) {
+    return showToast('رقم المستوى يجب أن يكون بين 1 و 100.', true);
+  }
   const vis = document.getElementById('qb-filter-vis')?.value || 'all';
   const search = document.getElementById('qb-filter-search')?.value.trim() || null;
 
-  state.busy = true;
+  beginBusy();
   try {
     const { data, error } = await client.rpc('admin_browse_quiz_questions', {
       p_category_id: catId || null,
@@ -90,8 +129,16 @@ export async function loadQuestionBrowser({ resetPage = false } = {}) {
       p_page_size: state.pageSize,
     });
     if (error) throw error;
-    state.questions = Array.isArray(data?.questions) ? data.questions : [];
-    state.totalCount = Number(data?.total_count || 0);
+    const rows = Array.isArray(data?.questions) ? data.questions : [];
+    const total = Number(data?.total_count || 0);
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    if (rows.length === 0 && total > 0 && state.page > totalPages) {
+      state.page = totalPages;
+      endBusy();
+      return loadQuestionBrowser();
+    }
+    state.questions = rows;
+    state.totalCount = total;
     state.packNeedsRepublish = Boolean(data?.pack_needs_republish);
     state.hiddenLocalIds = Array.isArray(data?.hidden_local_question_ids)
       ? data.hidden_local_question_ids
@@ -100,48 +147,58 @@ export async function loadQuestionBrowser({ resetPage = false } = {}) {
   } catch (err) {
     showToast(`تعذر تحميل متصفح الأسئلة: ${err?.message || err}`, true);
   } finally {
-    state.busy = false;
-    renderListAndFooter();
+    endBusy();
   }
 }
 
 async function handleDeleteSingle(questionId) {
+  if (isBusy()) return;
   if (!window.confirm('هل أنت متأكد من الحذف النهائي لهذا السؤال السحابي؟ لا يمكن التراجع.')) {
     return;
   }
   const client = getSupabase();
   if (!client) return;
+  beginBusy();
   try {
-    const { error } = await client.rpc('admin_delete_quiz_question', {
+    const { data, error } = await client.rpc('admin_delete_quiz_question', {
       p_question_id: questionId,
     });
     if (error) throw error;
+    if (!data?.ok) throw new Error('لم يؤكد الخادم حذف السؤال.');
     state.selectedIds.delete(questionId);
     showToast('تم حذف السؤال بنجاح ✅');
     broadcastWebControlPing('ALL');
     await Promise.all([loadQuestionBrowser(), state.onMutated?.(), refreshOverview(), refreshAudit()]);
   } catch (err) {
     showToast(`فشل حذف السؤال: ${err?.message || err}`, true);
+  } finally {
+    endBusy();
   }
 }
 
 async function handleRunBulkAction() {
   const client = getSupabase();
-  if (!client || state.busy) return;
+  if (!client || isBusy()) return;
   const catId = document.getElementById('qb-filter-cat')?.value;
   if (!catId) return showToast('اختر القسم أولاً قبل تنفيذ إجراء جماعي.', true);
 
   const action = document.getElementById('qb-bulk-action').value;
   const fromRaw = document.getElementById('qb-bulk-from').value.trim();
   const toRaw = document.getElementById('qb-bulk-to').value.trim();
+  if (Boolean(fromRaw) !== Boolean(toRaw)) {
+    return showToast('يجب إدخال «من مستوى» و«إلى مستوى» معاً لتحديد النطاق.', true);
+  }
   const fromLv = fromRaw ? Number.parseInt(fromRaw, 10) : null;
   const toLv = toRaw ? Number.parseInt(toRaw, 10) : null;
-  const targetLv = Number.parseInt(document.getElementById('qb-bulk-target-level').value || '1', 10);
+  const targetLv = Number.parseInt(document.getElementById('qb-bulk-target-level').value || '0', 10);
   const ids = Array.from(state.selectedIds);
 
-  const hasValidRange = Number.isFinite(fromLv) && Number.isFinite(toLv) && fromLv >= 1 && toLv >= fromLv;
+  const hasValidRange = Number.isFinite(fromLv) && Number.isFinite(toLv) && fromLv >= 1 && toLv <= 100 && toLv >= fromLv;
   if (ids.length === 0 && !hasValidRange) {
-    return showToast('يجب تحديد سؤال واحد على الأقل أو إدخال نطاق مستويات صالح (من <= إلى).', true);
+    return showToast('يجب تحديد سؤال واحد على الأقل أو إدخال نطاق مستويات صالح (1..100 ومن <= إلى).', true);
+  }
+  if (action === 'move_level' && (!Number.isFinite(targetLv) || targetLv < 1 || targetLv > 100)) {
+    return showToast('المستوى الهدف للنقل يجب أن يكون بين 1 و 100.', true);
   }
 
   const scopeDesc = ids.length > 0 ? `${ids.length} سؤال محدد` : `المستويات ${fromLv}..${toLv} في القسم ${catId}`;
@@ -153,7 +210,7 @@ async function handleRunBulkAction() {
     return;
   }
 
-  state.busy = true;
+  beginBusy();
   try {
     const { data, error } = await client.rpc('admin_bulk_manage_questions', {
       p_category_id: catId,
@@ -171,15 +228,16 @@ async function handleRunBulkAction() {
   } catch (err) {
     showToast(`فشل الإجراء الجماعي: ${err?.message || err}`, true);
   } finally {
-    state.busy = false;
-    renderListAndFooter();
+    endBusy();
   }
 }
 
 async function toggleLocalHidden(questionId, hide) {
+  if (isBusy()) return;
   const client = getSupabase();
   const catId = document.getElementById('qb-filter-cat')?.value;
   if (!client || !catId || !questionId) return;
+  beginBusy();
   try {
     const { error } = await client.rpc('admin_toggle_hidden_local_question', {
       p_category_id: catId,
@@ -192,6 +250,8 @@ async function toggleLocalHidden(questionId, hide) {
     await Promise.all([loadQuestionBrowser(), state.onMutated?.(), refreshAudit()]);
   } catch (err) {
     showToast(`تعذر تحديث السؤال المحلي: ${err?.message || err}`, true);
+  } finally {
+    endBusy();
   }
 }
 
@@ -203,6 +263,14 @@ export function mountQuestionBrowser(container, { onMutated, onJumpToPublish } =
   state.mounted = true;
 
   document.getElementById('btn-qb-search').addEventListener('click', () => loadQuestionBrowser({ resetPage: true }));
+  ['qb-filter-search', 'qb-filter-level'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        loadQuestionBrowser({ resetPage: true });
+      }
+    });
+  });
   document.getElementById('qb-filter-cat').addEventListener('change', () => loadQuestionBrowser({ resetPage: true }));
   document.getElementById('qb-filter-vis').addEventListener('change', () => loadQuestionBrowser({ resetPage: true }));
   document.getElementById('qb-bulk-action').addEventListener('change', (e) => {
@@ -246,9 +314,14 @@ export function mountQuestionBrowser(container, { onMutated, onJumpToPublish } =
     const delBtn = e.target.closest('button[data-qb-delete]');
     if (delBtn) return handleDeleteSingle(delBtn.dataset.qbDelete);
     const togBtn = e.target.closest('button[data-qb-toggle]');
-    if (togBtn) {
+    if (togBtn && !isBusy()) {
       const nextVis = togBtn.dataset.qbNext === 'true';
-      toggleEntityVisibility('quiz_question', togBtn.dataset.qbToggle, nextVis, () => loadQuestionBrowser());
+      beginBusy();
+      Promise.resolve(
+        toggleEntityVisibility('quiz_question', togBtn.dataset.qbToggle, nextVis, async () => {
+          await Promise.all([loadQuestionBrowser(), state.onMutated?.()]);
+        }),
+      ).finally(() => endBusy());
     }
   });
 

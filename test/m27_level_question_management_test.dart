@@ -3,9 +3,11 @@ import 'package:ahfad_alsahaba/core/theme/app_custom_theme.dart';
 import 'package:ahfad_alsahaba/data/local/shared_prefs_service.dart';
 import 'package:ahfad_alsahaba/data/models/cms_models.dart';
 import 'package:ahfad_alsahaba/data/models/player_profile_model.dart';
+import 'package:ahfad_alsahaba/data/services/admin/admin_cms_level_mgmt_mixin.dart';
 import 'package:ahfad_alsahaba/data/services/admin_service.dart';
 import 'package:ahfad_alsahaba/data/services/cms_cache_service.dart';
 import 'package:ahfad_alsahaba/data/services/profile_service.dart';
+import 'package:ahfad_alsahaba/data/services/question/question_cms_merger.dart';
 import 'package:ahfad_alsahaba/data/services/question/question_pack_cache_service.dart';
 import 'package:ahfad_alsahaba/data/services/question_service.dart';
 import 'package:ahfad_alsahaba/logic/game_controller.dart';
@@ -556,6 +558,243 @@ void main() {
         await tester.pumpAndSettle();
         expect(deletedQId, equals('cloud_q_1'));
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    test(
+      '024c Forensic: un-hiding a local question takes effect at 0ms even with stale packData.hiddenIds',
+      () {
+        final snapWithCategory = const CmsCacheSnapshot(
+          cmsVersion: 25,
+          quizCategories: {
+            'quran': DynamicQuizCategoryData(
+              id: 'quran',
+              name: 'القرآن الكريم',
+              hiddenQuestionIds: [],
+              hiddenLocalQuestionIds: [],
+            ),
+          },
+        );
+        final stalePackData = <String, dynamic>{
+          'hiddenIds': ['q1_1', 'q1_2'],
+        };
+
+        // Category snapshot is authoritative -> stale pack hiddenIds are ignored
+        final hiddenWhenCatPresent = QuestionCmsMerger.collectHiddenQuestionIds(
+          'quran',
+          snapshot: snapWithCategory,
+          packData: stalePackData,
+        );
+        expect(hiddenWhenCatPresent, isEmpty);
+
+        // Fallback to packData.hiddenIds ONLY when category is absent from snapshot
+        final hiddenWhenCatMissing = QuestionCmsMerger.collectHiddenQuestionIds(
+          'quran',
+          snapshot: CmsCacheSnapshot.empty(),
+          packData: stalePackData,
+        );
+        expect(hiddenWhenCatMissing, equals({'q1_1', 'q1_2'}));
+      },
+    );
+
+    test(
+      '024c Forensic: incremental delta for non-Gzip category (packVersion == 0) purges hard-deleted ghost questions',
+      () {
+        const initialSnap = CmsCacheSnapshot(
+          cmsVersion: 10,
+          quizCategories: {
+            'quran': DynamicQuizCategoryData(
+              id: 'quran',
+              name: 'القرآن الكريم',
+              packVersion: 0,
+            ),
+          },
+          quizQuestions: {
+            'cloud_keep': DynamicQuizQuestionData(
+              id: 'cloud_keep',
+              categoryId: 'quran',
+              levelNumber: 11,
+              questionText: 'سؤال باقٍ',
+              options: ['أ', 'ب', 'ج', 'د'],
+              correctIndex: 0,
+            ),
+            'cloud_deleted': DynamicQuizQuestionData(
+              id: 'cloud_deleted',
+              categoryId: 'quran',
+              levelNumber: 11,
+              questionText: 'سؤال محذوف',
+              options: ['أ', 'ب', 'ج', 'د'],
+              correctIndex: 1,
+            ),
+            'hadith_untouched': DynamicQuizQuestionData(
+              id: 'hadith_untouched',
+              categoryId: 'hadith',
+              levelNumber: 11,
+              questionText: 'سؤال قسم آخر لم يتغير',
+              options: ['أ', 'ب', 'ج', 'د'],
+              correctIndex: 2,
+            ),
+          },
+        );
+
+        final merged = initialSnap.mergeBundle({
+          'changed': true,
+          'incremental': true,
+          'cms_version': 11,
+          'quiz_categories': [
+            {
+              'id': 'quran',
+              'name': 'القرآن الكريم',
+              'pack_version': 0,
+            },
+          ],
+          'quiz_questions': [
+            {
+              'id': 'cloud_keep',
+              'category_id': 'quran',
+              'level_number': 11,
+              'question_text': 'سؤال باقٍ',
+              'options': ['أ', 'ب', 'ج', 'د'],
+              'correct_index': 0,
+            },
+          ],
+        }, DateTime.utc(2026, 11, 25));
+
+        expect(merged.quizQuestions.containsKey('cloud_keep'), isTrue);
+        expect(merged.quizQuestions.containsKey('cloud_deleted'), isFalse);
+        expect(merged.quizQuestions.containsKey('hadith_untouched'), isTrue);
+      },
+    );
+
+    test(
+      '024c Forensic: future coming_soon level above totalLevels appears in getLevelsForCategory & resolveNextVisibleLevel',
+      () {
+        CmsCacheService.instance.setSnapshotForTesting(
+          CmsCacheSnapshot(
+            cmsVersion: 30,
+            quizCategories: {
+              'quran': DynamicQuizCategoryData(
+                id: 'quran',
+                name: 'القرآن الكريم',
+                totalLevels: 10,
+                levelOverrides: {
+                  11: const LevelOverrideConfig(
+                    status: CategoryAvailabilityStatus.comingSoon,
+                    message: 'المستوى 11 قريباً ⏳',
+                  ),
+                },
+              ),
+            },
+          ),
+        );
+
+        expect(
+          CmsCacheService.instance.getDisplayTotalLevelsForCategory('quran'),
+          equals(11),
+        );
+        final ctrl = GameController()..initializeCategories();
+        final levels = ctrl.getLevelsForCategory('quran');
+        expect(levels.length, equals(11));
+        expect(levels.last.levelNumber, equals(11));
+        expect(levels.last.isComingSoon, isTrue);
+
+        final nextAfter10 =
+            CmsCacheService.instance.resolveNextVisibleLevel('quran', 10);
+        expect(nextAfter10.levelNumber, equals(11));
+        expect(nextAfter10.isComingSoon, isTrue);
+      },
+    );
+
+    test(
+      '024c Forensic: loadQuestionsForLevel rejects coming_soon/hidden & buildLiveArenaQuestionSpecs excludes hidden IDs',
+      () async {
+        final slot0 = await QuestionService().loadQuestionBySpec(
+          categoryId: 'quran',
+          levelNumber: 1,
+          questionIndex: 0,
+        );
+        expect(slot0, isNotNull);
+        final hiddenLocalId = slot0!.id;
+
+        CmsCacheService.instance.setSnapshotForTesting(
+          CmsCacheSnapshot(
+            cmsVersion: 31,
+            quizCategories: {
+              'quran': DynamicQuizCategoryData(
+                id: 'quran',
+                name: 'القرآن الكريم',
+                totalLevels: 10,
+                hiddenQuestionIds: [hiddenLocalId],
+                hiddenLocalQuestionIds: [hiddenLocalId],
+                levelOverrides: {
+                  2: const LevelOverrideConfig(
+                    status: CategoryAvailabilityStatus.comingSoon,
+                    message: 'المستوى 2 قريباً ⏳',
+                  ),
+                },
+              ),
+              'hadith': const DynamicQuizCategoryData(
+                id: 'hadith',
+                name: 'الحديث الشريف',
+                availabilityStatus: 'coming_soon',
+                comingSoonMessage: 'قسم الحديث قريباً ⏳',
+              ),
+            },
+          ),
+        );
+
+        final ctrl = GameController()..initializeCategories();
+        await ctrl.loadQuestionsForLevel('quran', 2);
+        expect(ctrl.currentQuestions, isEmpty);
+        expect(ctrl.error, equals('المستوى 2 قريباً ⏳'));
+
+        await ctrl.loadQuestionsForLevel('hadith', 1);
+        expect(ctrl.currentQuestions, isEmpty);
+        expect(ctrl.error, equals('قسم الحديث قريباً ⏳'));
+
+        // Live Arena spec builder MUST exclude hidden bundled slot0 (`quran:1:0`)
+        final specs = await QuestionService().buildLiveArenaQuestionSpecs(
+          categoryId: 'quran',
+          levelNumber: 1,
+          count: 20,
+        );
+        expect(specs, isNotEmpty);
+        expect(specs.contains('quran:1:0'), isFalse);
+      },
+    );
+
+    test(
+      '024c Forensic: deleteQuizQuestion response parser rejects ok:false & bulkManageQuestions rejects half-range',
+      () async {
+        expect(AdminCmsLevelMgmtMixin.isDeleteOkResponse({'ok': true}), isTrue);
+        expect(
+          AdminCmsLevelMgmtMixin.isDeleteOkResponse({'ok': false}),
+          isFalse,
+        );
+        expect(
+          AdminCmsLevelMgmtMixin.isDeleteOkResponse({'deleted': true}),
+          isFalse,
+        );
+        expect(AdminCmsLevelMgmtMixin.isDeleteOkResponse(null), isFalse);
+
+        await expectLater(
+          AdminService().bulkManageQuestions(
+            categoryId: 'quran',
+            action: 'hide',
+            fromLevel: 2,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+        await expectLater(
+          AdminService().bulkManageQuestions(
+            categoryId: 'quran',
+            action: 'move_level',
+            fromLevel: 1,
+            toLevel: 2,
+            targetLevel: 101,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
       },
     );
   });

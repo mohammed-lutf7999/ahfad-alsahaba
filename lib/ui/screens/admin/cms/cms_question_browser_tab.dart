@@ -43,6 +43,7 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
   String _bulkAction = 'hide';
   int _page = 1;
   bool _isLoading = false;
+  bool _isBusy = false;
 
   @override
   void initState() {
@@ -86,6 +87,11 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
         pageSize: 25,
       );
       if (!mounted) return;
+      if (res.questions.isEmpty && res.totalCount > 0 && _page > res.totalPages) {
+        _page = res.totalPages;
+        await _loadPage();
+        return;
+      }
       setState(() {
         _pageData = res;
         _isLoading = false;
@@ -97,74 +103,93 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
     }
   }
 
-  Future<bool> _confirmDialog(String title, String body) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF17202E),
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              color: Colors.amberAccent,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            body,
-            style: const TextStyle(fontFamily: 'Cairo', color: Colors.white),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              child: const Text('تأكيد', style: TextStyle(fontFamily: 'Cairo')),
-            ),
-          ],
-        ),
-      ),
-    );
-    return ok == true;
+  Future<void> _toggleSingleVisibility(DynamicQuizQuestionData q) async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      final nextVis = !q.isVisible;
+      final ok = await AdminService().setContentVisibility(
+        entityType: 'quiz_question',
+        id: q.id,
+        isVisible: nextVis,
+      );
+      if (!mounted) return;
+      if (!ok) {
+        showAdminFeedback(
+          context,
+          'تعذر تحديث ظهور السؤال؛ تحقق من الصلاحيات.',
+          isError: true,
+        );
+        return;
+      }
+      showAdminFeedback(
+        context,
+        nextVis ? 'تم إظهار السؤال ✅' : 'تم إخفاء السؤال 👁️‍🗨️',
+      );
+      await Future.wait([_loadPage(), widget.onMutated()]);
+    } catch (e) {
+      if (!mounted) return;
+      showAdminFeedback(context, 'تعذر تبديل الظهور: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
   }
 
   Future<void> _deleteSingle(DynamicQuizQuestionData q) async {
-    final confirmed = await _confirmDialog(
-      'تأكيد حذف السؤال',
-      'هل تريد حذف السؤال نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+    if (_isBusy) return;
+    final confirmed = await showCmsConfirmDialog(
+      context,
+      title: 'تأكيد حذف السؤال',
+      body: 'هل تريد حذف السؤال نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
     );
     if (!confirmed) return;
+    setState(() => _isBusy = true);
     try {
-      await AdminService().deleteQuizQuestion(q.id);
+      final ok = await AdminService().deleteQuizQuestion(q.id);
       if (!mounted) return;
+      if (!ok) {
+        showAdminFeedback(
+          context,
+          'تعذر حذف السؤال؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
+        return;
+      }
       _selectedIds.remove(q.id);
       showAdminFeedback(context, 'تم حذف السؤال بنجاح ✅');
       await Future.wait([_loadPage(), widget.onMutated()]);
     } catch (e) {
       if (!mounted) return;
       showAdminFeedback(context, 'تعذر حذف السؤال: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
   Future<void> _runBulkAction() async {
+    if (_isBusy) return;
     final ids = _selectedIds.toList();
-    final fromLv = int.tryParse(_bulkFromCtrl.text.trim());
-    final toLv = int.tryParse(_bulkToCtrl.text.trim());
-    final hasRange =
-        fromLv != null && toLv != null && fromLv >= 1 && toLv >= fromLv;
+    final fromRaw = _bulkFromCtrl.text.trim();
+    final toRaw = _bulkToCtrl.text.trim();
+    final fromLv = fromRaw.isEmpty ? null : int.tryParse(fromRaw);
+    final toLv = toRaw.isEmpty ? null : int.tryParse(toRaw);
+    if ((fromRaw.isEmpty) != (toRaw.isEmpty)) {
+      showAdminFeedback(
+        context,
+        'يجب إدخال «من م» و«إلى م» معاً لتحديد النطاق.',
+        isError: true,
+      );
+      return;
+    }
+    final hasRange = fromLv != null &&
+        toLv != null &&
+        fromLv >= 1 &&
+        toLv <= 100 &&
+        toLv >= fromLv;
     if (ids.isEmpty && !hasRange) {
       showAdminFeedback(
         context,
-        'حدّد سؤالاً واحداً على الأقل أو أدخل نطاق مستويات صالح.',
+        'حدّد سؤالاً واحداً على الأقل أو أدخل نطاق مستويات صالح (1..100).',
         isError: true,
       );
       return;
@@ -172,11 +197,15 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
     final scopeText = ids.isNotEmpty
         ? '${ids.length} سؤال محدد'
         : 'المستويات $fromLv..$toLv';
-    final confirmed = await _confirmDialog(
-      _bulkAction == 'delete' ? 'تأكيد الحذف الجماعي' : 'تأكيد الإجراء الجماعي',
-      'هل تريد تنفيذ ($_bulkAction) على $scopeText؟',
+    final confirmed = await showCmsConfirmDialog(
+      context,
+      title: _bulkAction == 'delete'
+          ? 'تأكيد الحذف الجماعي'
+          : 'تأكيد الإجراء الجماعي',
+      body: 'هل تريد تنفيذ ($_bulkAction) على $scopeText؟',
     );
     if (!confirmed) return;
+    setState(() => _isBusy = true);
     try {
       final affected = await AdminService().bulkManageQuestions(
         categoryId: widget.selectedCategoryId,
@@ -185,7 +214,7 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
         fromLevel: ids.isEmpty ? fromLv : null,
         toLevel: ids.isEmpty ? toLv : null,
         targetLevel: _bulkAction == 'move_level'
-            ? (int.tryParse(_bulkTargetCtrl.text.trim()) ?? 1)
+            ? int.tryParse(_bulkTargetCtrl.text.trim())
             : null,
       );
       if (!mounted) return;
@@ -195,12 +224,15 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
     } catch (e) {
       if (!mounted) return;
       showAdminFeedback(context, 'فشل الإجراء الجماعي: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
   Future<void> _toggleLocalHidden(String qid, bool hide) async {
     final clean = qid.trim();
-    if (clean.isEmpty) return;
+    if (clean.isEmpty || _isBusy) return;
+    setState(() => _isBusy = true);
     try {
       await AdminService().toggleHiddenLocalQuestion(
         categoryId: widget.selectedCategoryId,
@@ -217,6 +249,8 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
     } catch (e) {
       if (!mounted) return;
       showAdminFeedback(context, 'تعذر تحديث السؤال المحلي: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
@@ -264,12 +298,19 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
         CmsBrowserBulkAndLocalCards(
           selectedCount: _selectedIds.length,
           bulkAction: _bulkAction,
+          isBusy: _isBusy,
           bulkFromCtrl: _bulkFromCtrl,
           bulkToCtrl: _bulkToCtrl,
           bulkTargetCtrl: _bulkTargetCtrl,
           localIdCtrl: _localIdCtrl,
           hiddenLocalIds: _pageData.hiddenLocalQuestionIds,
           onBulkActionChanged: (v) => setState(() => _bulkAction = v),
+          onSelectPage: () => setState(() {
+            for (final q in _pageData.questions) {
+              _selectedIds.add(q.id);
+            }
+          }),
+          onClearSelection: () => setState(() => _selectedIds.clear()),
           onRunBulk: _runBulkAction,
           onHideLocal: () => _toggleLocalHidden(_localIdCtrl.text.trim(), true),
           onUnhideLocal: (id) => _toggleLocalHidden(id, false),
@@ -295,6 +336,7 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
             (q) => CmsBrowserQuestionTile(
               question: q,
               selected: _selectedIds.contains(q.id),
+              isBusy: _isBusy,
               onSelectChanged: (checked) => setState(() {
                 if (checked) {
                   _selectedIds.add(q.id);
@@ -302,60 +344,23 @@ class _CmsQuestionBrowserTabState extends State<CmsQuestionBrowserTab> {
                   _selectedIds.remove(q.id);
                 }
               }),
+              onToggleVisibility: () => _toggleSingleVisibility(q),
               onDelete: () => _deleteSingle(q),
             ),
           ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            OutlinedButton(
-              onPressed: _page > 1 && !_isLoading
-                  ? () {
-                      setState(() => _page -= 1);
-                      _loadPage();
-                    }
-                  : null,
-              style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                minimumSize: const Size(64, 36),
-              ),
-              child: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text('السابق', style: TextStyle(fontFamily: 'Cairo')),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                'صفحة $_page من ${_pageData.totalPages}',
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            OutlinedButton(
-              onPressed: _page < _pageData.totalPages && !_isLoading
-                  ? () {
-                      setState(() => _page += 1);
-                      _loadPage();
-                    }
-                  : null,
-              style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                minimumSize: const Size(64, 36),
-              ),
-              child: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text('التالي', style: TextStyle(fontFamily: 'Cairo')),
-              ),
-            ),
-          ],
+        CmsBrowserPaginationBar(
+          page: _page,
+          totalPages: _pageData.totalPages,
+          disabled: _isLoading || _isBusy,
+          onPrevious: () {
+            setState(() => _page -= 1);
+            _loadPage();
+          },
+          onNext: () {
+            setState(() => _page += 1);
+            _loadPage();
+          },
         ),
       ],
     );

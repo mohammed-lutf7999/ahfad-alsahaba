@@ -26,7 +26,7 @@ export function buildLevelManagerTemplate() {
             </div>
             <div class="form-group">
               <label class="field-label" for="lvl-mgr-cat-msg">رسالة تشويقية (اختياري عند قريباً)</label>
-              <input id="lvl-mgr-cat-msg" class="input" type="text" maxlength="200" placeholder="مثال: قسم جديد يُطلق مطلع رمضان بإذن الله ⏳" />
+              <input id="lvl-mgr-cat-msg" class="input" type="text" maxlength="180" placeholder="مثال: قسم جديد يُطلق مطلع رمضان بإذن الله ⏳" />
             </div>
           </div>
           <button id="btn-lvl-save-cat" class="btn btn-gold btn-block" type="submit">حفظ حالة القسم</button>
@@ -59,7 +59,7 @@ export function buildLevelManagerTemplate() {
           </div>
           <div class="form-group">
             <label class="field-label" for="lvl-mgr-range-msg">رسالة تشويقية للمستويات (اختياري)</label>
-            <input id="lvl-mgr-range-msg" class="input" type="text" maxlength="200" placeholder="تظهر عند النقر على المستوى الموسوم قريباً ⏳" />
+            <input id="lvl-mgr-range-msg" class="input" type="text" maxlength="160" placeholder="تظهر عند النقر على المستوى الموسوم قريباً ⏳" />
           </div>
           <button id="btn-lvl-apply-range" class="btn btn-outline btn-block" type="submit">تطبيق على النطاق المحدد</button>
         </form>
@@ -85,10 +85,16 @@ export function renderLevelGridHtml(category) {
   if (!category) {
     return '<p class="muted-text">اختر قسماً لعرض مستوياته وإدارة حالتها.</p>';
   }
-  const total = Math.max(1, Math.min(100, Number(category.total_levels || 10)));
+  const baseTotal = Math.max(1, Math.min(100, Number(category.total_levels || 10)));
   const overrides = category.level_overrides && typeof category.level_overrides === 'object'
     ? category.level_overrides
     : {};
+  let maxOverrideLevel = 0;
+  Object.keys(overrides).forEach((k) => {
+    const lv = Number.parseInt(k, 10);
+    if (Number.isFinite(lv) && lv > maxOverrideLevel) maxOverrideLevel = lv;
+  });
+  const total = Math.max(baseTotal, Math.min(100, maxOverrideLevel));
 
   const items = [];
   for (let lv = 1; lv <= total; lv += 1) {

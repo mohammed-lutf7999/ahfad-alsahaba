@@ -102,12 +102,12 @@ export function buildQuestionBrowserTemplate() {
           <span id="qb-local-count" class="badge-pill">0</span>
         </div>
         <p class="muted-text mb-sm">
-          لإخفاء سؤال مدمج من المستويات (1–10) فورياً بـ 0ms عبر <code class="code-tag">hidden_question_ids</code>، أدخل معرّف السؤال (مثل <code class="code-tag">q_1_1</code>) واختر القسم.
+          لإخفاء سؤال مدمج من المستويات (1–10) فورياً بـ 0ms عبر <code class="code-tag">hidden_question_ids</code>، أدخل معرّف السؤال (مثل <code class="code-tag">q1_1</code> أو <code class="code-tag">a1_3</code>) واختر القسم.
         </p>
         <form id="qb-local-hide-form" class="stack-sm">
           <div class="form-group">
             <label class="field-label" for="qb-local-id">معرّف السؤال المحلي</label>
-            <input id="qb-local-id" class="input ltr-input" type="text" placeholder="مثال: q_1_1 أو hadith_l2_q3" required />
+            <input id="qb-local-id" class="input ltr-input" type="text" placeholder="مثال: q1_1 أو a1_3" required />
           </div>
           <button id="btn-qb-local-hide" class="btn btn-outline btn-block" type="submit">إخفاء هذا السؤال المحلي</button>
         </form>

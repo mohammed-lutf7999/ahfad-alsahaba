@@ -61,12 +61,15 @@ class _AdminLevelQuestionManagerScreenState
     }
   }
 
-  void _openBulkPackPublisher() {
-    Navigator.of(context).push(
+  Future<void> _openBulkPackPublisher() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => const AdminBulkPackManagerScreen(),
       ),
     );
+    if (mounted) {
+      await _loadCategories();
+    }
   }
 
   @override
@@ -101,7 +104,7 @@ class _AdminLevelQuestionManagerScreenState
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: _isLoading
+              child: (_isLoading && _categories.isEmpty)
                   ? Center(child: CircularProgressIndicator(color: accent))
                   : TabBarView(
                       children: [

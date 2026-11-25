@@ -19,8 +19,10 @@ class QuestionAssetLoader {
   void clear([String? categoryId]) {
     if (categoryId != null) {
       _baseAssetCache.remove(categoryId);
+      _inFlightLoads.remove(categoryId);
     } else {
       _baseAssetCache.clear();
+      _inFlightLoads.clear();
     }
   }
 

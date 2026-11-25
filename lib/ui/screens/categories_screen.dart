@@ -43,6 +43,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   @override
   void dispose() {
     CmsCacheService.instance.removeListener(_onCmsUpdated);
+    _gameController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -155,10 +156,13 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                             return AnimatedBuilder(
                               animation: _animationController,
                               builder: (context, child) {
-                                final delay = index * 0.1;
-                                final animValue = Curves.easeOutCubic.transform(
-                                  (_animationController.value - delay).clamp(0.0, 1.0),
-                                );
+                                final delay = (index * 0.06).clamp(0.0, 0.45);
+                                final progress =
+                                    ((_animationController.value - delay) /
+                                            (1.0 - delay))
+                                        .clamp(0.0, 1.0);
+                                final animValue =
+                                    Curves.easeOutCubic.transform(progress);
                                 return Transform.translate(
                                   offset: Offset(0, 50 * (1 - animValue)),
                                   child: Opacity(opacity: animValue, child: child),

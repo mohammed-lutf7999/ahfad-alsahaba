@@ -142,12 +142,15 @@ class CmsBrowserFilterCard extends StatelessWidget {
 class CmsBrowserBulkAndLocalCards extends StatelessWidget {
   final int selectedCount;
   final String bulkAction;
+  final bool isBusy;
   final TextEditingController bulkFromCtrl;
   final TextEditingController bulkToCtrl;
   final TextEditingController bulkTargetCtrl;
   final TextEditingController localIdCtrl;
   final List<String> hiddenLocalIds;
   final ValueChanged<String> onBulkActionChanged;
+  final VoidCallback onSelectPage;
+  final VoidCallback onClearSelection;
   final VoidCallback onRunBulk;
   final VoidCallback onHideLocal;
   final ValueChanged<String> onUnhideLocal;
@@ -156,12 +159,15 @@ class CmsBrowserBulkAndLocalCards extends StatelessWidget {
     super.key,
     required this.selectedCount,
     required this.bulkAction,
+    required this.isBusy,
     required this.bulkFromCtrl,
     required this.bulkToCtrl,
     required this.bulkTargetCtrl,
     required this.localIdCtrl,
     required this.hiddenLocalIds,
     required this.onBulkActionChanged,
+    required this.onSelectPage,
+    required this.onClearSelection,
     required this.onRunBulk,
     required this.onHideLocal,
     required this.onUnhideLocal,
@@ -253,11 +259,54 @@ class CmsBrowserBulkAndLocalCards extends StatelessWidget {
                   ],
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: isBusy ? null : onSelectPage,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'تحديد الصفحة',
+                          style: TextStyle(fontFamily: 'Cairo', fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: isBusy ? null : onClearSelection,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'إلغاء التحديد',
+                          style: TextStyle(fontFamily: 'Cairo', fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               AdminPrimaryButton(
                 label: 'تنفيذ الإجراء الجماعي',
                 icon: Icons.playlist_add_check_rounded,
-                onPressed: onRunBulk,
+                isLoading: isBusy,
+                onPressed: isBusy ? null : onRunBulk,
               ),
             ],
           ),
@@ -278,12 +327,12 @@ class CmsBrowserBulkAndLocalCards extends StatelessWidget {
                         fontFamily: 'Cairo',
                         color: Colors.white,
                       ),
-                      decoration: cmsAdminInputDecoration('مثال: q_1_1'),
+                      decoration: cmsAdminInputDecoration('مثال: q1_1 أو a1_3'),
                     ),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: onHideLocal,
+                    onPressed: isBusy ? null : onHideLocal,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -315,7 +364,7 @@ class CmsBrowserBulkAndLocalCards extends StatelessWidget {
                             fontSize: 11.5,
                           ),
                         ),
-                        onDeleted: () => onUnhideLocal(id),
+                        onDeleted: isBusy ? null : () => onUnhideLocal(id),
                       ),
                   ],
                 ),

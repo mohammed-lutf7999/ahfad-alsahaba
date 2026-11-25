@@ -87,9 +87,12 @@ class QuestionCmsMerger {
     return ids;
   }
 
-  /// Collects the complete set of hidden question IDs for [categoryId] across
-  /// the CMS snapshot (`hiddenQuestionIds`, `hiddenLocalQuestionIds`, hidden
-  /// `quizQuestions`) and optional Gzip pack metadata (`hiddenIds`).
+  /// Collects the authoritative set of hidden question IDs for [categoryId].
+  ///
+  /// When [snapshot.quizCategories] contains [categoryId], the CMS snapshot is
+  /// treated as the latest source of truth (so un-hiding a local question takes
+  /// effect at 0ms without waiting for a Gzip CDN republish). [packData]
+  /// `hiddenIds` is used strictly as fallback when no category snapshot exists.
   static Set<String> collectHiddenQuestionIds(
     String categoryId, {
     required CmsCacheSnapshot snapshot,
@@ -100,13 +103,14 @@ class QuestionCmsMerger {
     if (cat != null) {
       ids.addAll(cat.hiddenQuestionIds);
       ids.addAll(cat.hiddenLocalQuestionIds);
+    } else {
+      ids.addAll(extractPackHiddenIds(packData));
     }
     for (final q in snapshot.quizQuestions.values) {
       if (q.categoryId == categoryId && !q.isVisible && q.id.isNotEmpty) {
         ids.add(q.id);
       }
     }
-    ids.addAll(extractPackHiddenIds(packData));
     return ids;
   }
 

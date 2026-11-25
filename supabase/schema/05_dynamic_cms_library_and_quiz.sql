@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 05_dynamic_cms_library_and_quiz.sql (المحتوى الديناميكي CMS، المكتبة، بنك الأسئلة، وحزم Gzip CDN)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 4 tables | 4 RLS policies | 4 indexes | 5 triggers | 24 functions
 -- ============================================================================
@@ -216,7 +216,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public._bump_cms_version(TEXT, UUID) TO service_role;
 --   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public._bump_cms_version FROM PUBLIC, anon; -- via DO block
 
--- Function: public.admin_browse_quiz_questions | latest: 024b_level_question_management_admin_rpcs.sql | redefinitions: 1 | security_definer: True | search_path: True
+-- Function: public.admin_browse_quiz_questions | latest: 024c_level_question_management_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_browse_quiz_questions(
     p_category_id TEXT DEFAULT NULL,
     p_level_number INTEGER DEFAULT NULL,
@@ -236,6 +236,7 @@ DECLARE
     v_cat TEXT := LOWER(BTRIM(COALESCE(p_category_id, '')));
     v_vis TEXT := LOWER(BTRIM(COALESCE(p_visibility, 'all')));
     v_search TEXT := BTRIM(COALESCE(p_search, ''));
+    v_search_esc TEXT := '';
     v_page INTEGER := GREATEST(1, COALESCE(p_page, 1));
     v_size INTEGER := GREATEST(1, LEAST(50, COALESCE(p_page_size, 25)));
     v_offset INTEGER := (v_page - 1) * v_size;
@@ -250,6 +251,10 @@ BEGIN
 
     IF v_vis NOT IN ('all', 'visible', 'hidden') THEN
         v_vis := 'all';
+    END IF;
+
+    IF v_search <> '' THEN
+        v_search_esc := replace(replace(replace(v_search, '\', '\\'), '%', '\%'), '_', '\_');
     END IF;
 
     IF v_cat <> '' THEN
@@ -276,10 +281,10 @@ BEGIN
           OR (v_vis = 'hidden' AND qq.is_visible = FALSE)
       )
       AND (
-          v_search = ''
-          OR qq.question_text ILIKE '%' || v_search || '%'
-          OR qq.id ILIKE '%' || v_search || '%'
-          OR qq.explanation ILIKE '%' || v_search || '%'
+          v_search_esc = ''
+          OR qq.question_text ILIKE '%' || v_search_esc || '%' ESCAPE '\'
+          OR qq.id ILIKE '%' || v_search_esc || '%' ESCAPE '\'
+          OR qq.explanation ILIKE '%' || v_search_esc || '%' ESCAPE '\'
       );
 
     SELECT COALESCE(jsonb_agg(to_jsonb(sub)), '[]'::jsonb)
@@ -295,10 +300,10 @@ BEGIN
               OR (v_vis = 'hidden' AND qq.is_visible = FALSE)
           )
           AND (
-              v_search = ''
-              OR qq.question_text ILIKE '%' || v_search || '%'
-              OR qq.id ILIKE '%' || v_search || '%'
-              OR qq.explanation ILIKE '%' || v_search || '%'
+              v_search_esc = ''
+              OR qq.question_text ILIKE '%' || v_search_esc || '%' ESCAPE '\'
+              OR qq.id ILIKE '%' || v_search_esc || '%' ESCAPE '\'
+              OR qq.explanation ILIKE '%' || v_search_esc || '%' ESCAPE '\'
           )
         ORDER BY qq.category_id, qq.level_number, qq.sort_order, qq.id
         LIMIT v_size
@@ -318,8 +323,10 @@ $$;
 -- Effective permission history for public.admin_browse_quiz_questions:
 --   [024b_level_question_management_admin_rpcs.sql] REVOKE ALL ON FUNCTION public.admin_browse_quiz_questions(TEXT, INTEGER, TEXT, TEXT, INTEGER, INTEGER) FROM PUBLIC, anon;
 --   [024b_level_question_management_admin_rpcs.sql] GRANT EXECUTE ON FUNCTION public.admin_browse_quiz_questions(TEXT, INTEGER, TEXT, TEXT, INTEGER, INTEGER) TO authenticated, service_role;
+--   [024c_level_question_management_hardening.sql] REVOKE ALL ON FUNCTION public.admin_browse_quiz_questions(TEXT, INTEGER, TEXT, TEXT, INTEGER, INTEGER) FROM PUBLIC, anon;
+--   [024c_level_question_management_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_browse_quiz_questions(TEXT, INTEGER, TEXT, TEXT, INTEGER, INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_bulk_manage_questions | latest: 024b_level_question_management_admin_rpcs.sql | redefinitions: 1 | security_definer: True | search_path: True
+-- Function: public.admin_bulk_manage_questions | latest: 024c_level_question_management_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_bulk_manage_questions(
     p_category_id TEXT,
     p_action TEXT,
@@ -338,8 +345,9 @@ DECLARE
     v_uid UUID := auth.uid();
     v_cat TEXT := LOWER(BTRIM(COALESCE(p_category_id, '')));
     v_action TEXT := LOWER(BTRIM(COALESCE(p_action, '')));
-    v_has_ids BOOLEAN := (p_question_ids IS NOT NULL AND COALESCE(array_length(p_question_ids, 1), 0) > 0);
-    v_has_range BOOLEAN := (p_from_level IS NOT NULL AND p_to_level IS NOT NULL);
+    v_clean_ids TEXT[] := ARRAY[]::TEXT[];
+    v_has_ids BOOLEAN := FALSE;
+    v_has_range BOOLEAN := FALSE;
     v_affected INTEGER := 0;
     v_new_cms BIGINT;
     v_pack_dirty BOOLEAN := FALSE;
@@ -355,6 +363,25 @@ BEGIN
     IF v_action NOT IN ('show', 'hide', 'delete', 'move_level') THEN
         RAISE EXCEPTION 'Invalid bulk action: % (expected show|hide|delete|move_level)', v_action;
     END IF;
+
+    -- Reject half-specified level range
+    IF (p_from_level IS NULL) <> (p_to_level IS NULL) THEN
+        RAISE EXCEPTION 'Invalid level range: both p_from_level and p_to_level must be provided together';
+    END IF;
+
+    -- Filter blank/empty IDs before evaluating safety guard
+    IF p_question_ids IS NOT NULL THEN
+        SELECT COALESCE(ARRAY_AGG(DISTINCT trimmed_id), ARRAY[]::TEXT[])
+        INTO v_clean_ids
+        FROM (
+            SELECT BTRIM(COALESCE(raw_id, '')) AS trimmed_id
+            FROM UNNEST(p_question_ids) AS raw_id
+        ) cleaned
+        WHERE trimmed_id <> '';
+    END IF;
+
+    v_has_ids := (COALESCE(array_length(v_clean_ids, 1), 0) > 0);
+    v_has_range := (p_from_level IS NOT NULL AND p_to_level IS NOT NULL);
 
     -- Safety Guard: reject unscoped calls to prevent accidental full-category wipe
     IF NOT v_has_ids AND NOT v_has_range THEN
@@ -374,7 +401,7 @@ BEGIN
     IF v_action = 'delete' THEN
         DELETE FROM public.quiz_questions qq
         WHERE qq.category_id = v_cat
-          AND (NOT v_has_ids OR qq.id = ANY(p_question_ids))
+          AND (NOT v_has_ids OR qq.id = ANY(v_clean_ids))
           AND (NOT v_has_range OR qq.level_number BETWEEN p_from_level AND p_to_level);
         GET DIAGNOSTICS v_affected = ROW_COUNT;
     ELSIF v_action IN ('show', 'hide') THEN
@@ -383,7 +410,7 @@ BEGIN
             cms_revision = v_new_cms,
             updated_at = NOW()
         WHERE qq.category_id = v_cat
-          AND (NOT v_has_ids OR qq.id = ANY(p_question_ids))
+          AND (NOT v_has_ids OR qq.id = ANY(v_clean_ids))
           AND (NOT v_has_range OR qq.level_number BETWEEN p_from_level AND p_to_level);
         GET DIAGNOSTICS v_affected = ROW_COUNT;
     ELSIF v_action = 'move_level' THEN
@@ -392,14 +419,15 @@ BEGIN
             cms_revision = v_new_cms,
             updated_at = NOW()
         WHERE qq.category_id = v_cat
-          AND (NOT v_has_ids OR qq.id = ANY(p_question_ids))
+          AND (NOT v_has_ids OR qq.id = ANY(v_clean_ids))
           AND (NOT v_has_range OR qq.level_number BETWEEN p_from_level AND p_to_level);
         GET DIAGNOSTICS v_affected = ROW_COUNT;
     END IF;
 
     UPDATE public.quiz_categories qc
     SET total_levels = CASE
-            WHEN v_action = 'move_level' AND v_affected > 0 THEN GREATEST(qc.total_levels, p_target_level)
+            WHEN v_action = 'move_level' AND v_affected > 0
+                THEN GREATEST(qc.total_levels, p_target_level)
             ELSE qc.total_levels
         END,
         cms_revision = v_new_cms,
@@ -415,22 +443,22 @@ BEGIN
         'bulk_manage_quiz_questions',
         'quiz_category',
         v_cat,
-        'إجراء جماعي على الأسئلة: ' || v_action,
+        'إجراء جماعي على أسئلة القسم: ' || v_action,
         jsonb_build_object(
             'action', v_action,
             'affected_count', v_affected,
             'from_level', p_from_level,
             'to_level', p_to_level,
             'target_level', p_target_level,
-            'ids_count', COALESCE(array_length(p_question_ids, 1), 0),
+            'ids_count', COALESCE(array_length(v_clean_ids, 1), 0),
             'cms_revision', v_new_cms
         )
     );
 
     RETURN jsonb_build_object(
         'ok', TRUE,
-        'action', v_action,
         'category_id', v_cat,
+        'action', v_action,
         'affected_count', v_affected,
         'pack_needs_republish', COALESCE(v_pack_dirty, FALSE),
         'cms_version', v_new_cms
@@ -440,6 +468,8 @@ $$;
 -- Effective permission history for public.admin_bulk_manage_questions:
 --   [024b_level_question_management_admin_rpcs.sql] REVOKE ALL ON FUNCTION public.admin_bulk_manage_questions(TEXT, TEXT, TEXT[], INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon;
 --   [024b_level_question_management_admin_rpcs.sql] GRANT EXECUTE ON FUNCTION public.admin_bulk_manage_questions(TEXT, TEXT, TEXT[], INTEGER, INTEGER, INTEGER) TO authenticated, service_role;
+--   [024c_level_question_management_hardening.sql] REVOKE ALL ON FUNCTION public.admin_bulk_manage_questions(TEXT, TEXT, TEXT[], INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon;
+--   [024c_level_question_management_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_bulk_manage_questions(TEXT, TEXT, TEXT[], INTEGER, INTEGER, INTEGER) TO authenticated, service_role;
 
 -- Function: public.admin_bulk_set_level_overrides | latest: 024b_level_question_management_admin_rpcs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_bulk_set_level_overrides(
@@ -1084,7 +1114,7 @@ $$;
 --   [024a_level_question_management_schema_and_security.sql] GRANT EXECUTE ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) TO authenticated, service_role;
 --   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_publish_category_pack FROM PUBLIC, anon; -- via DO block
 
--- Function: public.admin_set_content_visibility | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
+-- Function: public.admin_set_content_visibility | latest: 024c_level_question_management_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_set_content_visibility(
     p_entity_type TEXT,
     p_id TEXT,
@@ -1131,7 +1161,11 @@ BEGIN
         WHERE li.id = v_id;
     ELSIF v_type = 'quiz_category' THEN
         UPDATE public.quiz_categories qc
-        SET is_visible = v_visible, cms_revision = v_new_cms, updated_at = NOW()
+        SET is_visible = v_visible,
+            availability_status = CASE WHEN v_visible THEN 'open' ELSE 'hidden' END,
+            is_locked = CASE WHEN v_visible THEN FALSE ELSE qc.is_locked END,
+            cms_revision = v_new_cms,
+            updated_at = NOW()
         WHERE qc.id = v_id;
     ELSIF v_type = 'quiz_question' THEN
         UPDATE public.quiz_questions qq
@@ -1144,15 +1178,14 @@ BEGIN
     END IF;
 
     PERFORM public._write_admin_audit_log(
-        CASE WHEN v_visible THEN 'show_content' ELSE 'hide_content' END,
+        CASE WHEN v_visible THEN 'cms_show_entity' ELSE 'cms_hide_entity' END,
         v_type,
         v_id,
-        'تبديل حالة الظهور والإخفاء',
+        CASE WHEN v_visible THEN 'إظهار عنصر في المنصة' ELSE 'إخفاء عنصر من المنصة' END,
         jsonb_build_object('is_visible', v_visible, 'cms_revision', v_new_cms)
     );
 
     RETURN jsonb_build_object(
-        'ok', TRUE,
         'entity_type', v_type,
         'id', v_id,
         'is_visible', v_visible,
@@ -1164,6 +1197,8 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) TO authenticated, service_role;
 --   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_set_content_visibility FROM PUBLIC, anon; -- via DO block
+--   [024c_level_question_management_hardening.sql] REVOKE ALL ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) FROM PUBLIC, anon;
+--   [024c_level_question_management_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) TO authenticated, service_role;
 
 -- Function: public.admin_toggle_hidden_local_question | latest: 024b_level_question_management_admin_rpcs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_toggle_hidden_local_question(
@@ -1941,7 +1976,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.get_cms_bundle(BIGINT, TEXT[]) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle(BIGINT, TEXT[]) TO anon, authenticated, service_role;
 
--- Function: public.get_cms_bundle_v2 | latest: 024a_level_question_management_schema_and_security.sql | redefinitions: 2 | security_definer: True | search_path: True
+-- Function: public.get_cms_bundle_v2 | latest: 024c_level_question_management_hardening.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_cms_bundle_v2(
     p_client_cms_version BIGINT DEFAULT 0,
     p_owned_item_ids TEXT[] DEFAULT ARRAY[]::TEXT[]
@@ -2015,17 +2050,19 @@ BEGIN
     WHERE (v_is_incremental AND li.cms_revision > v_client_ver)
        OR (NOT v_is_incremental AND li.is_visible = TRUE);
 
-    -- Enriched category payload:
-    --  * Backward-safe: `is_locked = TRUE` when availability_status = 'coming_soon'
-    --    and `is_visible = FALSE` when availability_status = 'hidden' for 1.2.x clients.
-    --  * Zero-lag Delta: includes `level_overrides` and `hidden_question_ids`
-    --    (union of hidden_local_question_ids + hidden quiz_questions rows).
+    -- Return ALL categories on full sync (including hidden ones with explicit
+    -- is_visible=false & availability_status='hidden') so built-in defaults
+    -- hidden by admin stay hidden on fresh installs & schema upgrades.
     SELECT COALESCE(
         jsonb_agg(
             (
                 to_jsonb(qc)
                 || jsonb_build_object(
                     'is_visible', (qc.is_visible AND qc.availability_status <> 'hidden'),
+                    'availability_status', CASE
+                        WHEN NOT qc.is_visible THEN 'hidden'
+                        ELSE qc.availability_status
+                    END,
                     'is_locked', (qc.is_locked OR qc.availability_status = 'coming_soon'),
                     'pack_needs_republish', (
                         COALESCE(qc.pack_version, 0) > 0
@@ -2058,17 +2095,28 @@ BEGIN
     )
     INTO v_quiz_cats
     FROM public.quiz_categories qc
-    WHERE (v_is_incremental AND qc.cms_revision > v_client_ver)
-       OR (NOT v_is_incremental AND qc.is_visible = TRUE AND qc.availability_status <> 'hidden');
+    WHERE (NOT v_is_incremental)
+       OR (v_is_incremental AND qc.cms_revision > v_client_ver);
 
+    -- For non-Gzip categories (`pack_version = 0`):
+    --  * Full sync: return all visible questions.
+    --  * Incremental sync: return delta questions PLUS all currently visible
+    --    questions of any changed non-Gzip category (`qc.cms_revision > v_client_ver`)
+    --    so hard-deleted questions are cleanly purged on client mergeBundle().
     SELECT COALESCE(jsonb_agg(to_jsonb(qq) ORDER BY qq.category_id, qq.level_number, qq.sort_order, qq.id), '[]'::jsonb)
     INTO v_quiz_questions
     FROM public.quiz_questions qq
     LEFT JOIN public.quiz_categories qc ON qc.id = qq.category_id
     WHERE COALESCE(qc.pack_version, 0) = 0
       AND (
-          (v_is_incremental AND qq.cms_revision > v_client_ver)
-          OR (NOT v_is_incremental AND qq.is_visible = TRUE)
+          (NOT v_is_incremental AND qq.is_visible = TRUE)
+          OR (
+              v_is_incremental
+              AND (
+                  qq.cms_revision > v_client_ver
+                  OR (qq.is_visible = TRUE AND qc.cms_revision > v_client_ver)
+              )
+          )
       );
 
     RETURN jsonb_build_object(
@@ -2089,6 +2137,8 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) TO anon, authenticated, service_role;
 --   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) FROM PUBLIC;
 --   [024a_level_question_management_schema_and_security.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) TO anon, authenticated, service_role;
+--   [024c_level_question_management_hardening.sql] REVOKE ALL ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) FROM PUBLIC;
+--   [024c_level_question_management_hardening.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) TO anon, authenticated, service_role;
 
 -- Function: public.trg_fn_cms_auto_revision | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_cms_auto_revision()
@@ -2139,7 +2189,7 @@ BEGIN
 END;
 $$;
 
--- Function: public.trg_fn_quiz_questions_touch_updated_at | latest: 024a_level_question_management_schema_and_security.sql | redefinitions: 1 | security_definer: True | search_path: True
+-- Function: public.trg_fn_quiz_questions_touch_updated_at | latest: 024c_level_question_management_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_quiz_questions_touch_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -2151,18 +2201,21 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         UPDATE public.quiz_categories qc
         SET questions_updated_at = NOW()
-        WHERE qc.id = OLD.category_id;
+        WHERE qc.id = OLD.category_id
+          AND qc.questions_updated_at IS DISTINCT FROM NOW();
         RETURN OLD;
     END IF;
 
     UPDATE public.quiz_categories qc
     SET questions_updated_at = NOW()
-    WHERE qc.id = NEW.category_id;
+    WHERE qc.id = NEW.category_id
+      AND qc.questions_updated_at IS DISTINCT FROM NOW();
 
     IF TG_OP = 'UPDATE' AND OLD.category_id IS DISTINCT FROM NEW.category_id THEN
         UPDATE public.quiz_categories qc
         SET questions_updated_at = NOW()
-        WHERE qc.id = OLD.category_id;
+        WHERE qc.id = OLD.category_id
+          AND qc.questions_updated_at IS DISTINCT FROM NOW();
     END IF;
 
     RETURN NEW;
@@ -2171,3 +2224,5 @@ $$;
 -- Effective permission history for public.trg_fn_quiz_questions_touch_updated_at:
 --   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.trg_fn_quiz_questions_touch_updated_at() FROM PUBLIC, anon, authenticated;
 --   [024a_level_question_management_schema_and_security.sql] GRANT EXECUTE ON FUNCTION public.trg_fn_quiz_questions_touch_updated_at() TO service_role;
+--   [024c_level_question_management_hardening.sql] REVOKE ALL ON FUNCTION public.trg_fn_quiz_questions_touch_updated_at() FROM PUBLIC, anon, authenticated;
+--   [024c_level_question_management_hardening.sql] GRANT EXECUTE ON FUNCTION public.trg_fn_quiz_questions_touch_updated_at() TO service_role;

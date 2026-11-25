@@ -37,7 +37,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
   String _catStatus = 'open';
   String _rangeStatus = 'coming_soon';
   bool _isBusy = false;
-  String? _hydratedCatId;
+  String? _hydratedFingerprint;
 
   DynamicQuizCategoryData? get _selectedCategory {
     if (widget.categories.isEmpty) return null;
@@ -67,8 +67,10 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
   void _hydrateFromCategory({bool force = false}) {
     final cat = _selectedCategory;
     if (cat == null) return;
-    if (!force && _hydratedCatId == cat.id) return;
-    _hydratedCatId = cat.id;
+    final fp =
+        '${cat.id}|${cat.availabilityStatus}|${cat.comingSoonMessage}|${cat.totalLevels}';
+    if (!force && _hydratedFingerprint == fp) return;
+    _hydratedFingerprint = fp;
     _catStatus = cat.availabilityStatus;
     _catMsgCtrl.text = cat.comingSoonMessage;
     _toCtrl.text = '${cat.totalLevels}';
@@ -88,12 +90,20 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
     if (cat == null || _isBusy) return;
     setState(() => _isBusy = true);
     try {
-      await AdminService().upsertCategoryAvailability(
+      final updated = await AdminService().upsertCategoryAvailability(
         categoryId: cat.id,
         availabilityStatus: _catStatus,
         comingSoonMessage: _catMsgCtrl.text.trim(),
       );
       if (!mounted) return;
+      if (updated == null) {
+        showAdminFeedback(
+          context,
+          'تعذر حفظ حالة القسم؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
+        return;
+      }
       showAdminFeedback(context, 'تم تحديث حالة قسم «${cat.name}» بنجاح ✅');
       await widget.onMutated();
     } catch (e) {
@@ -112,17 +122,17 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
   }) async {
     final cat = _selectedCategory;
     if (cat == null || _isBusy) return;
-    if (fromLevel < 1 || toLevel < fromLevel || toLevel > cat.totalLevels) {
+    if (fromLevel < 1 || toLevel < fromLevel || toLevel > 100) {
       showAdminFeedback(
         context,
-        'أدخل نطاقاً صحيحاً بين 1 و ${cat.totalLevels}',
+        'أدخل نطاقاً صحيحاً بين 1 و 100 (من <= إلى)',
         isError: true,
       );
       return;
     }
     setState(() => _isBusy = true);
     try {
-      await AdminService().bulkSetLevelOverrides(
+      final updated = await AdminService().bulkSetLevelOverrides(
         categoryId: cat.id,
         fromLevel: fromLevel,
         toLevel: toLevel,
@@ -130,6 +140,14 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
         message: message,
       );
       if (!mounted) return;
+      if (updated == null) {
+        showAdminFeedback(
+          context,
+          'تعذر تحديث المستويات؛ تحقق من الاتصال وصلاحيات المشرف.',
+          isError: true,
+        );
+        return;
+      }
       showAdminFeedback(
         context,
         'تم تحديث المستويات $fromLevel..$toLevel ← ($status) ✅',
@@ -159,6 +177,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
         DropdownButtonFormField<String>(
+          key: ValueKey('lvl_cat_${cat.id}'),
           value: cat.id,
           isExpanded: true,
           dropdownColor: const Color(0xFF17202E),
@@ -190,6 +209,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DropdownButtonFormField<String>(
+                key: ValueKey('lvl_cat_status_${cat.id}_$_catStatus'),
                 value: _catStatus,
                 isExpanded: true,
                 dropdownColor: const Color(0xFF17202E),
@@ -223,6 +243,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
               const SizedBox(height: 10),
               TextField(
                 controller: _catMsgCtrl,
+                maxLength: 180,
                 style:
                     const TextStyle(fontFamily: 'Cairo', color: Colors.white),
                 decoration: cmsAdminInputDecoration(
@@ -241,7 +262,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
         ),
         const SizedBox(height: 12),
         AdminSectionCard(
-          title: 'تحديث نطاق مستويات (1..${cat.totalLevels})',
+          title: 'تحديث نطاق مستويات (1..100)',
           icon: Icons.tune_rounded,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,6 +296,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
+                key: ValueKey('lvl_range_status_$_rangeStatus'),
                 value: _rangeStatus,
                 isExpanded: true,
                 dropdownColor: const Color(0xFF17202E),
@@ -302,6 +324,7 @@ class _CmsLevelManagerTabState extends State<CmsLevelManagerTab> {
               const SizedBox(height: 10),
               TextField(
                 controller: _rangeMsgCtrl,
+                maxLength: 160,
                 style:
                     const TextStyle(fontFamily: 'Cairo', color: Colors.white),
                 decoration: cmsAdminInputDecoration(

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 04_app_control_events_and_inbox.sql (التحكم السحابي، الإصدارات، الأحداث، الإعلانات، والبريد الملكي)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 4 tables | 0 RLS policies | 6 indexes | 0 triggers | 14 functions
 -- ============================================================================

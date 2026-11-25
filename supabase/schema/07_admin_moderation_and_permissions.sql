@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 07_admin_moderation_and_permissions.sql (الإشراف، حظر وصلاحيات اللاعبين، طاقم الإدارة، وسجل التدقيق)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 5 tables | 5 RLS policies | 3 indexes | 0 triggers | 20 functions
 -- ============================================================================

@@ -222,6 +222,26 @@ class DynamicQuizCategoryData {
   LevelOverrideConfig? overrideForLevel(int levelNumber) =>
       levelOverrides[levelNumber];
 
+  /// Highest level number referenced by any non-open override (e.g. future `coming_soon`).
+  int get maxOverrideLevel {
+    var maxLv = 0;
+    for (final lv in levelOverrides.keys) {
+      if (lv > maxLv) maxLv = lv;
+    }
+    return maxLv;
+  }
+
+  /// Highest `coming_soon` level number configured in [levelOverrides].
+  int get maxComingSoonOverrideLevel {
+    var maxLv = 0;
+    for (final entry in levelOverrides.entries) {
+      if (entry.value.isComingSoon && entry.key > maxLv) {
+        maxLv = entry.key;
+      }
+    }
+    return maxLv;
+  }
+
   static Map<int, LevelOverrideConfig> _parseLevelOverrides(dynamic raw) {
     if (raw is! Map) return const {};
     final parsed = <int, LevelOverrideConfig>{};
@@ -672,9 +692,20 @@ class CmsCacheSnapshot {
     final mergedCats =
         Map<String, DynamicQuizCategoryData>.from(quizCategories)
           ..addAll(incoming.quizCategories);
+    // For non-Gzip categories (`packVersion == 0`) that changed in this delta,
+    // `get_cms_bundle_v2` (024c) sends all currently visible questions for that
+    // category — purge stale cached rows first so hard-deleted questions never linger.
+    final changedUnpackedCatIds = <String>{
+      for (final entry in incoming.quizCategories.entries)
+        if (entry.value.packVersion == 0) entry.key,
+    };
     final mergedQuestions =
-        Map<String, DynamicQuizQuestionData>.from(quizQuestions)
-          ..addAll(incoming.quizQuestions);
+        Map<String, DynamicQuizQuestionData>.from(quizQuestions);
+    if (changedUnpackedCatIds.isNotEmpty) {
+      mergedQuestions
+          .removeWhere((_, q) => changedUnpackedCatIds.contains(q.categoryId));
+    }
+    mergedQuestions.addAll(incoming.quizQuestions);
     final prunedQuestions = _prunePackedCategoryQuestions(
       mergedQuestions,
       mergedCats,

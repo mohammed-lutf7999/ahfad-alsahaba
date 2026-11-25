@@ -61,7 +61,7 @@ mixin AdminCmsLevelMgmtMixin on AdminServiceBase {
       'p_search':
           (cleanSearch == null || cleanSearch.isEmpty) ? null : cleanSearch,
       'p_page': page.clamp(1, 100000),
-      'p_page_size': pageSize.clamp(1, 100),
+      'p_page_size': pageSize.clamp(1, 50),
     };
     if (questionBrowserFetcherOverride != null) {
       return questionBrowserFetcherOverride!(params);
@@ -77,6 +77,10 @@ mixin AdminCmsLevelMgmtMixin on AdminServiceBase {
     return const AdminQuestionBrowserPage();
   }
 
+  @visibleForTesting
+  static bool isDeleteOkResponse(dynamic res) =>
+      res is Map && res['ok'] == true;
+
   Future<bool> deleteQuizQuestion(String questionId) async {
     final cleanId = questionId.trim();
     if (cleanId.isEmpty) {
@@ -91,7 +95,7 @@ mixin AdminCmsLevelMgmtMixin on AdminServiceBase {
       'admin_delete_quiz_question',
       params: {'p_question_id': cleanId},
     ).timeout(const Duration(seconds: 8));
-    final deleted = res is Map ? (res['deleted'] as bool? ?? true) : true;
+    final deleted = isDeleteOkResponse(res);
     if (deleted) {
       syncAndBroadcastAll();
     }
@@ -107,28 +111,38 @@ mixin AdminCmsLevelMgmtMixin on AdminServiceBase {
     int? targetLevel,
   }) async {
     final cleanCat = categoryId.trim().toLowerCase();
+    final cleanAction = action.trim().toLowerCase();
     if (cleanCat.isEmpty) {
       throw ArgumentError('معرّف القسم مطلوب للإجراء الجماعي');
+    }
+    if ((fromLevel == null) != (toLevel == null)) {
+      throw ArgumentError('يجب إدخال «من مستوى» و«إلى مستوى» معاً.');
     }
     final cleanIds = questionIds
             ?.map((e) => e.trim())
             .where((e) => e.isNotEmpty)
             .toList() ??
         const <String>[];
-    final hasValidRange =
-        fromLevel != null && toLevel != null && fromLevel >= 1 && toLevel >= fromLevel;
-    if (cleanIds.isEmpty && !hasValidRange) {
+    final hasRange = fromLevel != null && toLevel != null;
+    if (hasRange && (fromLevel < 1 || toLevel > 100 || fromLevel > toLevel)) {
+      throw ArgumentError('نطاق المستويات غير صالح (1..100 و من <= إلى)');
+    }
+    if (cleanIds.isEmpty && !hasRange) {
       throw ArgumentError(
-        'يجب تحديد سؤال واحد على الأقل أو نطاق مستويات صالح (من <= إلى)',
+        'يجب تحديد سؤال واحد على الأقل أو نطاق مستويات صالح (1..100)',
       );
+    }
+    if (cleanAction == 'move_level' &&
+        (targetLevel == null || targetLevel < 1 || targetLevel > 100)) {
+      throw ArgumentError('المستوى الهدف للنقل يجب أن يكون بين 1 و 100');
     }
     final params = <String, dynamic>{
       'p_category_id': cleanCat,
-      'p_action': action.trim().toLowerCase(),
+      'p_action': cleanAction,
       'p_question_ids': cleanIds.isNotEmpty ? cleanIds : null,
       'p_from_level': cleanIds.isEmpty ? fromLevel : null,
       'p_to_level': cleanIds.isEmpty ? toLevel : null,
-      'p_target_level': action == 'move_level' ? targetLevel : null,
+      'p_target_level': cleanAction == 'move_level' ? targetLevel : null,
     };
     if (bulkManageQuestionsOverride != null) {
       return bulkManageQuestionsOverride!(params);

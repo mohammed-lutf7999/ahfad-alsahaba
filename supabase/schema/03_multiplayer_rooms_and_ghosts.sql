@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 03_multiplayer_rooms_and_ghosts.sql (المطابقة التنافسية، المباريات، الغرف الخاصة، وأشباح الصحابة)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 4 tables | 6 RLS policies | 8 indexes | 0 triggers | 11 functions
 -- ============================================================================

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/models/question_model.dart';
 import '../data/models/category_model.dart';
+import '../data/models/cms_models.dart';
 import '../data/models/level_model.dart';
 import '../data/services/question_service.dart';
 import '../data/services/cms_cache_service.dart';
@@ -187,7 +188,7 @@ class GameController extends ChangeNotifier {
         questionsPerLevel: cloudCat.questionsPerLevel,
         levelDrawMode: cloudCat.levelDrawMode,
         unlockedLevels: _getCategoryUnlockedLevels(cloudCat.id),
-        isLocked: cloudCat.isLocked,
+        isLocked: cloudCat.isLocked || cloudCat.isComingSoon,
         color: CmsIconRegistry.parseHexColor(
           cloudCat.colorHex,
           fallback: base?.color ?? const Color(0xFF1B5E20),
@@ -228,10 +229,11 @@ class GameController extends ChangeNotifier {
     final profile = ProfileService.instance.activeProfile;
     final cms = CmsCacheService.instance;
     final questionsCount = category.questionsPerLevel;
+    final displayTotalLevels = cms.getDisplayTotalLevelsForCategory(categoryId);
     final visibleLevels = <Level>[];
     int? prevVisibleLevelNumber;
 
-    for (var levelNumber = 1; levelNumber <= category.totalLevels; levelNumber++) {
+    for (var levelNumber = 1; levelNumber <= displayTotalLevels; levelNumber++) {
       if (cms.isLevelHidden(categoryId, levelNumber)) {
         continue;
       }
@@ -293,7 +295,41 @@ class GameController extends ChangeNotifier {
     _hasUsedTimeFreeze = false;
     _hiddenOptionIndices = [];
     _userAnswers.clear();
-    
+
+    // Guard: reject loading categories or levels marked `coming_soon` or `hidden`
+    final cms = CmsCacheService.instance;
+    final catAvail = cms.getCategoryAvailability(categoryId);
+    if (catAvail == CategoryAvailabilityStatus.comingSoon) {
+      final msg = cms.getCategoryComingSoonMessage(categoryId).trim();
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = msg.isNotEmpty ? msg : 'هذا القسم قادم قريباً بإذن الله ⏳';
+      notifyListeners();
+      return;
+    }
+    if (catAvail == CategoryAvailabilityStatus.hidden) {
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = 'هذا القسم غير متاح حالياً.';
+      notifyListeners();
+      return;
+    }
+    if (cms.isLevelComingSoon(categoryId, levelNumber)) {
+      final msg = cms.getLevelComingSoonMessage(categoryId, levelNumber).trim();
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = msg.isNotEmpty ? msg : 'هذا المستوى قادم قريباً بإذن الله ⏳';
+      notifyListeners();
+      return;
+    }
+    if (cms.isLevelHidden(categoryId, levelNumber)) {
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = 'هذا المستوى غير متاح حالياً.';
+      notifyListeners();
+      return;
+    }
+
     notifyListeners();
 
     try {

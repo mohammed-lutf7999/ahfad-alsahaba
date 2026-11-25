@@ -37,6 +37,8 @@ class ResultActionButtons extends StatelessWidget {
     final isNextPlayableUnlocked = nextRes.isPlayable &&
         nextLevelNumber != null &&
         (isPassed ||
+            (profile?.isLevelCompleted(categoryId, currentLevelNumber) ??
+                false) ||
             (profile?.isLevelUnlocked(categoryId, nextLevelNumber) ?? false));
     final showNextComingSoon =
         isPassed && nextRes.hasNext && nextRes.isComingSoon;
@@ -44,31 +46,11 @@ class ResultActionButtons extends StatelessWidget {
     return Column(
       children: [
         if (showNextComingSoon) ...[
-          InkWell(
-            onTap: () {
-              SoundService().playClick();
-              final msg = nextRes.message.trim().isNotEmpty
-                  ? nextRes.message.trim()
-                  : 'المستوى ${nextRes.levelNumber} قادم قريباً بإذن الله ⏳';
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      msg,
-                      style: const TextStyle(fontFamily: 'Cairo'),
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-            },
+          Material(
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            child: Container(
+            child: Ink(
               width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: isSmall ? 8 : 10,
-              ),
               decoration: BoxDecoration(
                 color: AppTheme.accentColor.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(12),
@@ -77,29 +59,55 @@ class ResultActionButtons extends StatelessWidget {
                   width: 1.4,
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.hourglass_top_rounded,
-                    size: isSmall ? 17 : 19,
-                    color: AppTheme.accentDark,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'المستوى القادم قريباً ⏳',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: isSmall ? 12.5 : 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.accentDark,
-                        height: 1.2,
+              child: InkWell(
+                onTap: () {
+                  SoundService().playClick();
+                  final msg = nextRes.message.trim().isNotEmpty
+                      ? nextRes.message.trim()
+                      : 'المستوى ${nextRes.levelNumber} قادم قريباً بإذن الله ⏳';
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          msg,
+                          style: const TextStyle(fontFamily: 'Cairo'),
+                        ),
+                        behavior: SnackBarBehavior.floating,
                       ),
-                    ),
+                    );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: isSmall ? 8 : 10,
                   ),
-                ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.hourglass_top_rounded,
+                        size: isSmall ? 17 : 19,
+                        color: AppTheme.accentDark,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'المستوى القادم قريباً ⏳',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: isSmall ? 12.5 : 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentDark,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

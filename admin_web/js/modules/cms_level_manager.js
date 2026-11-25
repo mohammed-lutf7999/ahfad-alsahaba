@@ -54,22 +54,23 @@ function renderSelectedCategory() {
 
   document.getElementById('lvl-mgr-cat-status').value = status;
   document.getElementById('lvl-mgr-cat-msg').value = cat.coming_soon_message || '';
-  document.getElementById('lvl-mgr-from').max = String(total);
-  document.getElementById('lvl-mgr-to').max = String(total);
-  if (Number(document.getElementById('lvl-mgr-to').value) > total) {
-    document.getElementById('lvl-mgr-to').value = String(total);
-  }
-  if (hintEl) hintEl.textContent = `1..${total}`;
+  document.getElementById('lvl-mgr-from').max = '100';
+  document.getElementById('lvl-mgr-to').max = '100';
+  if (hintEl) hintEl.textContent = `1..100 (الحالي ${total})`;
 
   const overrides = cat.level_overrides && typeof cat.level_overrides === 'object' ? cat.level_overrides : {};
   let csCount = 0;
   let hidCount = 0;
-  Object.values(overrides).forEach((ov) => {
+  let maxOv = 0;
+  Object.entries(overrides).forEach(([k, ov]) => {
+    const lv = Number.parseInt(k, 10);
+    if (Number.isFinite(lv) && lv > maxOv) maxOv = lv;
     if (ov?.status === 'coming_soon') csCount += 1;
     else if (ov?.status === 'hidden') hidCount += 1;
   });
+  const displayMax = Math.max(total, Math.min(100, maxOv));
   if (summaryEl) {
-    summaryEl.textContent = `${total} مستوى • ⏳ ${csCount} • 🚫 ${hidCount}`;
+    summaryEl.textContent = `${displayMax} مستوى • ⏳ ${csCount} • 🚫 ${hidCount}`;
   }
 
   bannerEl?.classList.toggle('hidden', !computeNeedsRepublish(cat));
@@ -161,8 +162,8 @@ async function handleApplyRange(e) {
   const toLv = Number.parseInt(document.getElementById('lvl-mgr-to').value || '1', 10);
   const status = document.getElementById('lvl-mgr-range-status').value;
   const message = document.getElementById('lvl-mgr-range-msg').value.trim();
-  if (!Number.isFinite(fromLv) || !Number.isFinite(toLv) || fromLv < 1 || toLv < fromLv) {
-    return showToast('يرجى إدخال نطاق مستويات صحيح (من <= إلى).', true);
+  if (!Number.isFinite(fromLv) || !Number.isFinite(toLv) || fromLv < 1 || toLv > 100 || toLv < fromLv) {
+    return showToast('يرجى إدخال نطاق مستويات صحيح (1..100 و من <= إلى).', true);
   }
   await applyLevelRangeOverride(cat.id, fromLv, toLv, status, message);
 }

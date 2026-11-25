@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 06_diwan_guilds_and_live_arenas.sql (ديوان الأحفاد، فلتر الأخلاق، الكتائب، والبطولات الجماعية الحية)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 5 tables | 5 RLS policies | 6 indexes | 0 triggers | 13 functions
 -- ============================================================================

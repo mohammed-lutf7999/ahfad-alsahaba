@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 08_push_tokens_and_maintenance.sql (رموز الإشعارات FCM، مراقبة صحة الموارد، والتنظيف الآلي)
--- Source: supabase/migrations/001..024 (25 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 1 tables | 1 RLS policies | 2 indexes | 0 triggers | 6 functions
 -- ============================================================================

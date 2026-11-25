@@ -10,6 +10,7 @@ import '../local/shared_prefs_service.dart';
 import '../models/cms_models.dart';
 import '../models/store_item_model.dart';
 import 'profile_service.dart';
+import 'question/question_cms_merger.dart';
 
 typedef CmsBundleFetcher = Future<Map<String, dynamic>?> Function({
   required int clientCmsVersion,
@@ -355,31 +356,32 @@ class CmsCacheService extends ChangeNotifier {
     return getCategoryComingSoonMessage(categoryId);
   }
 
-  /// Collects all hidden question IDs for [categoryId] (bundled local hidden IDs +
-  /// hidden cloud rows synced in `hidden_question_ids` or `quizQuestions`).
-  Set<String> getHiddenQuestionIds(String categoryId) {
-    final ids = <String>{};
+  /// Resolves displayable total levels for [categoryId], including any future
+  /// `coming_soon` level overrides configured above `totalLevels`.
+  int getDisplayTotalLevelsForCategory(String categoryId) {
+    final baseTotal = getTotalLevelsForCategory(categoryId);
     final cat = _snapshot.quizCategories[categoryId];
-    if (cat != null) {
-      ids.addAll(cat.hiddenQuestionIds);
-      ids.addAll(cat.hiddenLocalQuestionIds);
-    }
-    for (final q in _snapshot.quizQuestions.values) {
-      if (q.categoryId == categoryId && !q.isVisible && q.id.isNotEmpty) {
-        ids.add(q.id);
-      }
-    }
-    return ids;
+    if (cat == null) return baseTotal;
+    final maxCs = cat.maxComingSoonOverrideLevel;
+    return (maxCs > baseTotal ? maxCs : baseTotal).clamp(1, 100);
   }
 
-  /// Scans forward from `afterLevel + 1` up to `totalLevels`, skipping `hidden`
-  /// levels, and returns the first non-hidden level along with whether it is
-  /// `coming_soon` (unplayable) or `open` (playable).
+  /// Collects all hidden question IDs for [categoryId] via [QuestionCmsMerger].
+  Set<String> getHiddenQuestionIds(String categoryId) {
+    return QuestionCmsMerger.collectHiddenQuestionIds(
+      categoryId,
+      snapshot: _snapshot,
+    );
+  }
+
+  /// Scans forward from `afterLevel + 1` up to display total levels, skipping
+  /// `hidden` levels, and returns the first non-hidden level along with whether
+  /// it is `coming_soon` (unplayable) or `open` (playable).
   NextLevelResolution resolveNextVisibleLevel(
     String categoryId,
     int afterLevel,
   ) {
-    final total = getTotalLevelsForCategory(categoryId);
+    final total = getDisplayTotalLevelsForCategory(categoryId);
     for (var lv = afterLevel + 1; lv <= total; lv++) {
       if (isLevelHidden(categoryId, lv)) continue;
       if (isLevelComingSoon(categoryId, lv)) {
