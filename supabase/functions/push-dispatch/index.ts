@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.0.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import {
+  errorMessage,
+  handleCorsPreflight,
+  jsonResponse,
+  requireVerifiedAdmin,
+} from "../_shared/cors_and_auth.ts";
 
 function base64UrlEncode(input: Uint8Array | string): string {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
@@ -74,62 +75,25 @@ async function fetchGoogleAccessToken(sa: {
  * Requires `FCM_SERVICE_ACCOUNT_JSON` secret in Supabase Edge Secrets and
  * `google-services.json` + `firebase_messaging` in the Android client build.
  */
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+serve(async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    const auth = await requireVerifiedAdmin(req);
+    if (!auth.ok) return auth.response;
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const jwt = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
-    if (userErr || !user) {
-      return new Response(JSON.stringify({ error: "Invalid JWT" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const adminEmail = (user.email ?? "").trim().toLowerCase();
-    const { data: adminRow } = adminEmail
-      ? await supabase
-          .from("app_admins")
-          .select("email")
-          .eq("email", adminEmail)
-          .maybeSingle()
-      : { data: null };
-
-    if (!adminRow) {
-      return new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { supabase } = auth;
 
     const saRaw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
     if (!saRaw) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           ok: false,
           code: "FCM_NOT_CONFIGURED",
           message: "FCM_SERVICE_ACCOUNT_JSON secret is not configured in Supabase Edge Secrets yet.",
-        }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
+        503,
       );
     }
 
@@ -186,25 +150,13 @@ serve(async (req) => {
         .in("device_token", staleTokens);
     }
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        sent,
-        deactivated_stale: staleTokens.length,
-        targets_total: (targets ?? []).length,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return jsonResponse({
+      ok: true,
+      sent,
+      deactivated_stale: staleTokens.length,
+      targets_total: (targets ?? []).length,
+    });
+  } catch (err: unknown) {
+    return jsonResponse({ error: errorMessage(err) }, 400);
   }
 });

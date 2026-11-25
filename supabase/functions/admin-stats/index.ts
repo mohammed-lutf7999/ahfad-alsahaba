@@ -1,69 +1,41 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.0.0"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import {
+  errorMessage,
+  handleCorsPreflight,
+  jsonResponse,
+  requireVerifiedAdmin,
+} from "../_shared/cors_and_auth.ts";
 
-serve(async (req) => {
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
-    }
+serve(async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
 
-    try {
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
+  try {
+    const auth = await requireVerifiedAdmin(req);
+    if (!auth.ok) return auth.response;
 
-        // Get the authorization header from the request
-        const authHeader = req.headers.get('Authorization')
-        if (!authHeader) {
-            throw new Error('Missing Authorization header')
-        }
+    const { supabase } = auth;
 
-        // Verify the user
-        const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
+    // Total registered leaderboard users
+    const { count: totalUsers, error: dbError } = await supabase
+      .from("leaderboard")
+      .select("*", { count: "exact", head: true });
+    if (dbError) throw dbError;
 
-        if (userError || !user) {
-            throw new Error('Invalid user token')
-        }
+    // Active users updated in last 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { count: onlineUsers, error: onlineError } = await supabase
+      .from("leaderboard")
+      .select("*", { count: "exact", head: true })
+      .gt("updated_at", fifteenMinutesAgo);
+    if (onlineError) throw onlineError;
 
-        // Check if admin
-        if (user.email !== 'dia666111@gmail.com') {
-            throw new Error('Unauthorized: Admin access required')
-        }
-
-        // Get Total Users
-        const { count: totalUsers, error: dbError } = await supabase
-            .from('leaderboard')
-            .select('*', { count: 'exact', head: true })
-
-        if (dbError) throw dbError
-
-        // Get "Online" Users (users updated in last 15 minutes)
-        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
-        const { count: onlineUsers, error: onlineError } = await supabase
-            .from('leaderboard')
-            .select('*', { count: 'exact', head: true })
-            .gt('updated_at', fifteenMinutesAgo)
-
-        if (onlineError) throw onlineError
-
-        return new Response(
-            JSON.stringify({
-                totalUsers: totalUsers ?? 0,
-                onlineUsers: onlineUsers ?? 0,
-            }),
-            {
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-            },
-        )
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        })
-    }
-})
+    return jsonResponse({
+      totalUsers: totalUsers ?? 0,
+      onlineUsers: onlineUsers ?? 0,
+    });
+  } catch (error: unknown) {
+    return jsonResponse({ error: errorMessage(error) }, 400);
+  }
+});
