@@ -1,23 +1,23 @@
-# 📚 الفهرس المرجعي الحي لجميع دوال وجداول Supabase (`FUNCTIONS_INDEX.md`)
+# 📚 الفهرس المرجعي الحي لجميع دوال وجداول وسياسات Supabase (`FUNCTIONS_INDEX.md`)
 
 > **توليد آلي حتمي عبر:** `python tools/export_supabase_schema.py` (لا تعدّل هذا الملف يدوياً!)
 > **مصدر الحقيقة:** `supabase/migrations/001` ← `023_dynamic_levels_and_gzip_question_packs.sql` (**`23` ترحيلاً محصّناً غير قابل للتعديل**)
-> **الإجمالي الموثّق:** **`28` جدولاً** • **`8` مشغّلاً (Triggers)** • **`87` دالة/RPC** موزّعة على **`8` ملفات مرجعية**.
+> **الإجمالي الموثّق:** **`28` جدولاً** • **`34` سياسة RLS** • **`39` فهرساً** • **`8` مشغّلاً** • **`87` دالة/RPC** • **`0` توقيعات مكررة (`PGRST203`)**.
 
 ---
 
 ## 1️⃣ خريطة الملفات الثمانية المرجعية (`supabase/schema/`)
 
-| الملف المرجعي | المجال | الجداول | المشغّلات | الدوال |
-| :--- | :--- | :---: | :---: | :---: |
-| [`01_profiles_and_leaderboard.sql`](./01_profiles_and_leaderboard.sql) | ملفات اللاعبين، لوحة الشرف، ودليل اللاعبين | 3 | 2 | 3 |
-| [`02_glory_and_knights_store.sql`](./02_glory_and_knights_store.sql) | منظومة المجد الـ 100، متجر الفرسان، والمقتنيات | 2 | 2 | 3 |
-| [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | المطابقة التنافسية، المباريات، الغرف الخاصة، وأشباح الصحابة | 4 | 0 | 11 |
-| [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | التحكم السحابي، الإصدارات، الأحداث، الإعلانات، والبريد الملكي | 4 | 0 | 14 |
-| [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | المحتوى الديناميكي CMS، المكتبة، بنك الأسئلة، وحزم Gzip CDN | 4 | 4 | 17 |
-| [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | ديوان الأحفاد، فلتر الأخلاق، الكتائب، والبطولات الجماعية الحية | 5 | 0 | 13 |
-| [`07_admin_moderation_and_permissions.sql`](./07_admin_moderation_and_permissions.sql) | الإشراف، حظر وصلاحيات اللاعبين، طاقم الإدارة، وسجل التدقيق | 5 | 0 | 20 |
-| [`08_push_tokens_and_maintenance.sql`](./08_push_tokens_and_maintenance.sql) | رموز الإشعارات FCM، مراقبة صحة الموارد، والتنظيف الآلي | 1 | 0 | 6 |
+| الملف المرجعي | المجال | الجداول | سياسات RLS | الفهارس | المشغّلات | الدوال |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| [`01_profiles_and_leaderboard.sql`](./01_profiles_and_leaderboard.sql) | ملفات اللاعبين، لوحة الشرف، ودليل اللاعبين | 3 | 8 | 9 | 2 | 3 |
+| [`02_glory_and_knights_store.sql`](./02_glory_and_knights_store.sql) | منظومة المجد الـ 100، متجر الفرسان، والمقتنيات | 2 | 4 | 1 | 2 | 3 |
+| [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | المطابقة التنافسية، المباريات، الغرف الخاصة، وأشباح الصحابة | 4 | 7 | 8 | 0 | 11 |
+| [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | التحكم السحابي، الإصدارات، الأحداث، الإعلانات، والبريد الملكي | 4 | 0 | 6 | 0 | 14 |
+| [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | المحتوى الديناميكي CMS، المكتبة، بنك الأسئلة، وحزم Gzip CDN | 4 | 4 | 4 | 4 | 17 |
+| [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | ديوان الأحفاد، فلتر الأخلاق، الكتائب، والبطولات الجماعية الحية | 5 | 5 | 6 | 0 | 13 |
+| [`07_admin_moderation_and_permissions.sql`](./07_admin_moderation_and_permissions.sql) | الإشراف، حظر وصلاحيات اللاعبين، طاقم الإدارة، وسجل التدقيق | 5 | 5 | 3 | 0 | 20 |
+| [`08_push_tokens_and_maintenance.sql`](./08_push_tokens_and_maintenance.sql) | رموز الإشعارات FCM، مراقبة صحة الموارد، والتنظيف الآلي | 1 | 1 | 2 | 0 | 6 |
 
 ---
 
@@ -73,20 +73,20 @@
 | 46 | `admin_upsert_quiz_question` | [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | `016_dynamic_cms_store_and_hardening.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 47 | `admin_upsert_release_config` | [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | `015_app_control_and_messages.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 48 | `admin_upsert_store_item` | [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | `016_dynamic_cms_store_and_hardening.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
-| 49 | `calculate_level_and_title` | [`02_glory_and_knights_store.sql`](./02_glory_and_knights_store.sql) | `009_glory_and_store.sql` | 1 | `#vc` | GRANT: `anon, authenticated, service_role` | `TABLE ( out_level INT, out_title ...` |
-| 50 | `cancel_private_room` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `011_private_rooms_system.sql` | 1 | `DEFINER` `#vc` | PostgreSQL default (`PUBLIC` / RLS-scoped) | `BOOLEAN` |
+| 49 | `calculate_level_and_title` | [`02_glory_and_knights_store.sql`](./02_glory_and_knights_store.sql) | `009_glory_and_store.sql` | 1 | `#vc` | GRANT: `anon, authenticated, service_role` | `TABLE(out_level INT, out_title TE...` |
+| 50 | `cancel_private_room` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `011_private_rooms_system.sql` | 1 | `DEFINER` `search_path` `#vc` | PostgreSQL default (`PUBLIC` / RLS-scoped) | `BOOLEAN` |
 | 51 | `check_is_admin` | [`07_admin_moderation_and_permissions.sql`](./07_admin_moderation_and_permissions.sql) | `015_app_control_and_messages.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `BOOLEAN` |
 | 52 | `cleanup_stale_matches` | [`08_push_tokens_and_maintenance.sql`](./08_push_tokens_and_maintenance.sql) | `005_maintenance_functions.sql` | 1 | `DEFINER` | GRANT: `authenticated, service_role` | `void` |
 | 53 | `cleanup_stale_queue` | [`08_push_tokens_and_maintenance.sql`](./08_push_tokens_and_maintenance.sql) | `005_maintenance_functions.sql` | 1 | `DEFINER` | GRANT: `authenticated, service_role` | `void` |
-| 54 | `confirm_ready` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `008_multiplayer_rock_solid_fix.sql` | 2 | `DEFINER` `#vc` | GRANT: `authenticated` | `TABLE ( both_ready BOOLEAN, match...` |
+| 54 | `confirm_ready` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `008_multiplayer_rock_solid_fix.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated` | `TABLE(both_ready BOOLEAN, match_s...` |
 | 55 | `contribute_guild_score` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `019_guilds_and_live_arenas.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 56 | `create_guild` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 57 | `create_instant_rematch` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE(match_id UUID, player1_id U...` |
 | 58 | `create_live_quiz_session` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 59 | `create_private_room` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE(match_id UUID, room_code VA...` |
-| 60 | `find_or_create_ghost_match` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE( match_id UUID, ghost_user_...` |
+| 60 | `find_or_create_ghost_match` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE(match_id UUID, ghost_user_i...` |
 | 61 | `find_or_create_match` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 8 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE(match_id UUID, player1_id U...` |
-| 62 | `finish_match` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 5 | `DEFINER` `#vc` | GRANT: `anon, authenticated, service_role` | `TABLE(winner_user_id UUID, my_fin...` |
+| 62 | `finish_match` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 5 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` | `TABLE(winner_user_id UUID, my_fin...` |
 | 63 | `generate_match_question_ids` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 1 | `INVOKER` | GRANT: `anon, authenticated` | `TEXT[]` |
 | 64 | `get_app_control_state` | [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | `021_admin_moderation_permissions_and_guards.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 65 | `get_cms_bundle` | [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | `016_dynamic_cms_store_and_hardening.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `JSONB` |
@@ -96,15 +96,15 @@
 | 69 | `get_player_inbox` | [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 70 | `join_guild` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 71 | `join_live_quiz_session` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
-| 72 | `join_private_room` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE ( match_id UUID, host_id UU...` |
+| 72 | `join_private_room` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `TABLE(match_id UUID, host_id UUID...` |
 | 73 | `leave_guild` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `019_guilds_and_live_arenas.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 74 | `mark_all_inbox_read` | [`04_app_control_events_and_inbox.sql`](./04_app_control_events_and_inbox.sql) | `017_inbox_and_resource_health.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `INTEGER` |
 | 75 | `purchase_store_item` | [`02_glory_and_knights_store.sql`](./02_glory_and_knights_store.sql) | `016_dynamic_cms_store_and_hardening.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 76 | `register_player_push_token` | [`08_push_tokens_and_maintenance.sql`](./08_push_tokens_and_maintenance.sql) | `020_push_tokens_and_inbox_routing.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 77 | `report_diwan_message` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `018_diwan_live_chat.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
-| 78 | `save_ghost_timeline` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 2 | `DEFINER` `#vc` | GRANT: `anon, authenticated` | `BOOLEAN` |
+| 78 | `save_ghost_timeline` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated` | `BOOLEAN` |
 | 79 | `send_diwan_message` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `021_admin_moderation_permissions_and_guards.sql` | 2 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
-| 80 | `submit_answer` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 3 | `DEFINER` `#vc` | GRANT: `anon, authenticated` | `TABLE(new_score INT, opponent_sco...` |
+| 80 | `submit_answer` | [`03_multiplayer_rooms_and_ghosts.sql`](./03_multiplayer_rooms_and_ghosts.sql) | `014_ghost_world_class_hardening.sql` | 3 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated` | `TABLE(new_score INT, opponent_sco...` |
 | 81 | `submit_live_quiz_answer` | [`06_diwan_guilds_and_live_arenas.sql`](./06_diwan_guilds_and_live_arenas.sql) | `019_guilds_and_live_arenas.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 82 | `sync_player_directory` | [`01_profiles_and_leaderboard.sql`](./01_profiles_and_leaderboard.sql) | `015_app_control_and_messages.sql` | 1 | `DEFINER` `search_path` `#vc` | GRANT: `anon, authenticated, service_role` • REVOKE: `public` | `JSONB` |
 | 83 | `trg_fn_cms_auto_revision` | [`05_dynamic_cms_library_and_quiz.sql`](./05_dynamic_cms_library_and_quiz.sql) | `016_dynamic_cms_store_and_hardening.sql` | 1 | `DEFINER` `search_path` `#vc` | PostgreSQL default (`PUBLIC` / RLS-scoped) | `TRIGGER` |
@@ -118,4 +118,4 @@
 ## 3️⃣ ميثاق الترحيلات المستقبلية (`024+` فما فوق)
 1. تبقى جميع الملفات `supabase/migrations/001..023` **محصّنة بلا تعديل أو حذف**.
 2. يُحدّ أي ترحيل جديد بحد أقصى `~400` سطر للملف الواحد مع `#variable_conflict use_column` و`SET search_path = public, auth` وسحب `PUBLIC, anon` عن أي دالة إدارية أو داخلية.
-3. بعد تطبيق واختبار أي ترحيل جديد حياً على Supabase، يُشغّل فوراً `python tools/export_supabase_schema.py` لتحديث `supabase/schema/` و`FUNCTIONS_INDEX.md` في نفس الكوميت.
+3. بعد تطبيق واختبار أي ترحيل جديد حياً على Supabase، يُشغّل فوراً `python tools/export_supabase_schema.py` لتحديث `supabase/schema/` و`FUNCTIONS_INDEX.md` في نفس الكوميت (ويمكن التحقق الحي للقراءة فقط عبر `SUPABASE_ACCESS_TOKEN=... python tools/export_supabase_schema.py --verify-live`).

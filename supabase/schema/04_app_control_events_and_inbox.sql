@@ -3,7 +3,7 @@
 -- Domain: 04_app_control_events_and_inbox.sql (التحكم السحابي، الإصدارات، الأحداث، الإعلانات، والبريد الملكي)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 4 tables | 0 triggers | 14 functions
+-- Summary: 4 tables | 0 RLS policies | 6 indexes | 0 triggers | 14 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS public.admin_announcements (
 ALTER TABLE public.admin_announcements ADD COLUMN IF NOT EXISTS min_version_code INTEGER;
 --   [015_app_control_and_messages.sql]
 ALTER TABLE public.admin_announcements ADD COLUMN IF NOT EXISTS max_version_code INTEGER;
+--   [015_app_control_and_messages.sql]
+ALTER TABLE public.admin_announcements
+            ADD CONSTRAINT chk_announcement_version_bounds
+            CHECK (min_version_code IS NULL OR max_version_code IS NULL OR min_version_code <= max_version_code);
 --   [015_app_control_and_messages.sql]
 ALTER TABLE public.admin_announcements ENABLE ROW LEVEL SECURITY;
 
@@ -112,10 +116,44 @@ CREATE TABLE IF NOT EXISTS public.user_announcement_receipts (
 ALTER TABLE public.user_announcement_receipts ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 3. ACTIVE INDEXES
 -- ----------------------------------------------------------------------------
 
--- Function: public._bump_app_config_version | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Index: idx_admin_announcements_active_scope ON public.admin_announcements (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_admin_announcements_active_scope
+    ON public.admin_announcements (is_active, target_scope, created_at DESC)
+    WHERE is_active = TRUE;
+
+-- Index: idx_admin_announcements_target_code ON public.admin_announcements (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_admin_announcements_target_code
+    ON public.admin_announcements (target_player_code)
+    WHERE target_player_code IS NOT NULL;
+
+-- Index: idx_admin_announcements_target_uid ON public.admin_announcements (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_admin_announcements_target_uid
+    ON public.admin_announcements (target_user_id)
+    WHERE target_user_id IS NOT NULL;
+
+-- Index: idx_app_dynamic_events_active ON public.app_dynamic_events (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_app_dynamic_events_active
+    ON public.app_dynamic_events (is_active, priority DESC, updated_at DESC)
+    WHERE is_active = TRUE;
+
+-- Index: idx_user_announcement_receipts_code ON public.user_announcement_receipts (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_user_announcement_receipts_code
+    ON public.user_announcement_receipts (player_code, announcement_id)
+    WHERE player_code IS NOT NULL;
+
+-- Index: idx_user_announcement_receipts_uid ON public.user_announcement_receipts (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_user_announcement_receipts_uid
+    ON public.user_announcement_receipts (user_id, announcement_id)
+    WHERE user_id IS NOT NULL;
+
+-- ----------------------------------------------------------------------------
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- ----------------------------------------------------------------------------
+
+-- Function: public._bump_app_config_version | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._bump_app_config_version(
     p_platform TEXT DEFAULT 'android',
     p_admin_id UUID DEFAULT NULL
@@ -148,7 +186,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public._bump_app_config_version(TEXT, UUID) FROM PUBLIC, anon, authenticated;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public._bump_app_config_version(TEXT, UUID) TO service_role;
 
--- Function: public.acknowledge_announcement | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.acknowledge_announcement | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.acknowledge_announcement(
     p_announcement_id UUID,
     p_player_code TEXT DEFAULT NULL
@@ -215,7 +253,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.acknowledge_announcement(UUID, TEXT) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.acknowledge_announcement(UUID, TEXT) TO anon, authenticated, service_role;
 
--- Function: public.admin_create_announcement | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_create_announcement | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_create_announcement(
     p_title TEXT,
     p_body TEXT,
@@ -334,7 +372,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_create_announcement(TEXT, TEXT, TEXT, TEXT, UUID, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, INTEGER, INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_create_announcement(TEXT, TEXT, TEXT, TEXT, UUID, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, INTEGER, INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_delete_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_delete_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_delete_dynamic_event(p_event_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -364,7 +402,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_delete_dynamic_event(UUID) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_delete_dynamic_event(UUID) TO authenticated, service_role;
 
--- Function: public.admin_get_overview | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True
+-- Function: public.admin_get_overview | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_get_overview()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -466,7 +504,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_get_overview() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_get_overview() TO authenticated, service_role;
 
--- Function: public.admin_list_announcements | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_announcements | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_announcements(
     p_limit INTEGER DEFAULT 50
 )
@@ -508,7 +546,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_list_announcements(INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_list_announcements(INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_list_dynamic_events | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_dynamic_events | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_dynamic_events()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -538,7 +576,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_list_dynamic_events() FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_list_dynamic_events() TO authenticated, service_role;
 
--- Function: public.admin_set_announcement_active | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_set_announcement_active | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_set_announcement_active(
     p_announcement_id UUID,
     p_is_active BOOLEAN
@@ -578,7 +616,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_set_announcement_active(UUID, BOOLEAN) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_set_announcement_active(UUID, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_toggle_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_toggle_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_toggle_dynamic_event(
     p_event_id UUID,
     p_is_active BOOLEAN
@@ -615,7 +653,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_toggle_dynamic_event(UUID, BOOLEAN) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_toggle_dynamic_event(UUID, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_dynamic_event(
     p_id UUID DEFAULT NULL,
     p_badge_text TEXT DEFAULT 'حدث نشط',
@@ -711,7 +749,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_upsert_dynamic_event(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_dynamic_event(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated, service_role;
 
--- Function: public.admin_upsert_release_config | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_release_config | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_release_config(
     p_platform TEXT DEFAULT 'android',
     p_min_version_code INTEGER DEFAULT 1,
@@ -797,7 +835,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_upsert_release_config(TEXT, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT, JSONB) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_release_config(TEXT, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT, JSONB) TO authenticated, service_role;
 
--- Function: public.get_app_control_state | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True
+-- Function: public.get_app_control_state | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_app_control_state(
     p_platform TEXT DEFAULT 'android',
     p_version_code INTEGER DEFAULT 0,
@@ -1084,7 +1122,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.get_app_control_state(TEXT, INTEGER, BIGINT, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.get_app_control_state(TEXT, INTEGER, BIGINT, TEXT) TO anon, authenticated, service_role;
 
--- Function: public.get_player_inbox | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.get_player_inbox | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_player_inbox(
     p_player_code TEXT DEFAULT NULL,
     p_limit INTEGER DEFAULT 25
@@ -1186,7 +1224,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.get_player_inbox(TEXT, INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.get_player_inbox(TEXT, INTEGER) TO anon, authenticated, service_role;
 
--- Function: public.mark_all_inbox_read | latest: 017_inbox_and_resource_health.sql | redefinitions: 1 | security_definer: True
+-- Function: public.mark_all_inbox_read | latest: 017_inbox_and_resource_health.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.mark_all_inbox_read(
     p_player_code TEXT DEFAULT NULL
 )

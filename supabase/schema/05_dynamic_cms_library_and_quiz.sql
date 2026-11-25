@@ -3,7 +3,7 @@
 -- Domain: 05_dynamic_cms_library_and_quiz.sql (المحتوى الديناميكي CMS، المكتبة، بنك الأسئلة، وحزم Gzip CDN)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 4 tables | 4 triggers | 17 functions
+-- Summary: 4 tables | 4 RLS policies | 4 indexes | 4 triggers | 17 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -93,7 +93,51 @@ CREATE TABLE IF NOT EXISTS public.quiz_questions (
 ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 2. ACTIVE TRIGGERS
+-- 2. ACTIVE RLS POLICIES
+-- ----------------------------------------------------------------------------
+
+-- Policy: "Read visible library items" ON public.library_items (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Read visible library items"
+ON public.library_items
+FOR SELECT
+USING (is_visible = TRUE OR public.check_is_admin());
+
+-- Policy: "Read visible library sections" ON public.library_sections (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Read visible library sections"
+ON public.library_sections
+FOR SELECT
+USING (is_visible = TRUE OR public.check_is_admin());
+
+-- Policy: "Read visible quiz categories" ON public.quiz_categories (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Read visible quiz categories"
+ON public.quiz_categories
+FOR SELECT
+USING (is_visible = TRUE OR public.check_is_admin());
+
+-- Policy: "Read visible quiz questions" ON public.quiz_questions (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Read visible quiz questions"
+ON public.quiz_questions
+FOR SELECT
+USING (is_visible = TRUE OR public.check_is_admin());
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_library_items_section ON public.library_items (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_library_items_section ON public.library_items (section_id, sort_order, cms_revision);
+
+-- Index: idx_library_sections_cms ON public.library_sections (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_library_sections_cms ON public.library_sections (cms_revision, sort_order);
+
+-- Index: idx_quiz_categories_cms ON public.quiz_categories (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_quiz_categories_cms ON public.quiz_categories (cms_revision, sort_order);
+
+-- Index: idx_quiz_questions_cat_lvl ON public.quiz_questions (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_quiz_questions_cat_lvl ON public.quiz_questions (category_id, level_number, sort_order, cms_revision);
+
+-- ----------------------------------------------------------------------------
+-- 4. ACTIVE TRIGGERS
 -- ----------------------------------------------------------------------------
 
 -- Trigger: trg_library_items_cms_rev ON public.library_items (latest: 016_dynamic_cms_store_and_hardening.sql)
@@ -117,10 +161,10 @@ BEFORE INSERT OR UPDATE ON public.quiz_questions
 FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
 -- ----------------------------------------------------------------------------
 
--- Function: public._bump_cms_version | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public._bump_cms_version | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._bump_cms_version(
     p_platform TEXT DEFAULT 'android',
     p_admin_id UUID DEFAULT NULL
@@ -153,7 +197,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public._bump_cms_version(TEXT, UUID) FROM PUBLIC, anon, authenticated;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public._bump_cms_version(TEXT, UUID) TO service_role;
 
--- Function: public.admin_bulk_upsert_quiz_questions | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_bulk_upsert_quiz_questions | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_bulk_upsert_quiz_questions(
     p_category_id TEXT,
     p_questions JSONB
@@ -311,7 +355,7 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] REVOKE ALL ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) FROM PUBLIC, anon;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.admin_bulk_upsert_quiz_questions(TEXT, JSONB) TO authenticated, service_role;
 
--- Function: public.admin_export_category_pack_payload | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_export_category_pack_payload | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_export_category_pack_payload(
     p_category_id TEXT
 )
@@ -389,7 +433,7 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] REVOKE ALL ON FUNCTION public.admin_export_category_pack_payload(TEXT) FROM PUBLIC, anon;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.admin_export_category_pack_payload(TEXT) TO authenticated, service_role;
 
--- Function: public.admin_list_library_content | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_library_content | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_library_content(
     p_section_id TEXT DEFAULT NULL
 )
@@ -439,7 +483,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_library_content(TEXT) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_library_content(TEXT) TO authenticated, service_role;
 
--- Function: public.admin_list_quiz_content | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_quiz_content | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_quiz_content(
     p_category_id TEXT DEFAULT NULL,
     p_level_number INTEGER DEFAULT NULL,
@@ -495,7 +539,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_quiz_content(TEXT, INTEGER, INTEGER) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_quiz_content(TEXT, INTEGER, INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_list_store_items | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_store_items | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_store_items()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -532,7 +576,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_store_items() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_store_items() TO authenticated, service_role;
 
--- Function: public.admin_publish_category_pack | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_publish_category_pack | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_publish_category_pack(
     p_category_id TEXT,
     p_pack_storage_path TEXT,
@@ -599,7 +643,7 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] REVOKE ALL ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) FROM PUBLIC, anon;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.admin_publish_category_pack(TEXT, TEXT, INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_set_content_visibility | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_set_content_visibility | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_set_content_visibility(
     p_entity_type TEXT,
     p_id TEXT,
@@ -679,7 +723,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_set_content_visibility(TEXT, TEXT, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_update_quiz_category_config | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_update_quiz_category_config | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_update_quiz_category_config(
     p_category_id TEXT,
     p_total_levels INTEGER DEFAULT NULL,
@@ -755,7 +799,7 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] REVOKE ALL ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) FROM PUBLIC, anon;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.admin_update_quiz_category_config(TEXT, INTEGER, INTEGER, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_upsert_library_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_library_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_library_item(
     p_id TEXT DEFAULT NULL,
     p_section_id TEXT DEFAULT 'stories',
@@ -835,7 +879,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_upsert_library_item(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_library_item(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_library_section | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_library_section | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_library_section(
     p_id TEXT,
     p_title TEXT,
@@ -902,7 +946,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_upsert_library_section(TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_library_section(TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_quiz_category | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_quiz_category | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_quiz_category(
     p_id TEXT,
     p_name TEXT,
@@ -980,7 +1024,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_upsert_quiz_category(TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, BOOLEAN, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_quiz_category(TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, BOOLEAN, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_quiz_question | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_quiz_question | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_quiz_question(
     p_id TEXT DEFAULT NULL,
     p_category_id TEXT DEFAULT 'quran',
@@ -1099,7 +1143,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_upsert_quiz_question(TEXT, TEXT, INTEGER, TEXT, JSONB, INTEGER, TEXT, TEXT, INTEGER, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_quiz_question(TEXT, TEXT, INTEGER, TEXT, JSONB, INTEGER, TEXT, TEXT, INTEGER, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_store_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_store_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_store_item(
     p_id TEXT,
     p_title TEXT,
@@ -1195,7 +1239,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_upsert_store_item(TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, BOOLEAN, INTEGER, JSONB) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_store_item(TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, BOOLEAN, INTEGER, JSONB) TO authenticated, service_role;
 
--- Function: public.get_cms_bundle | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.get_cms_bundle | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_cms_bundle(
     p_client_cms_version BIGINT DEFAULT 0,
     p_owned_item_ids TEXT[] DEFAULT ARRAY[]::TEXT[]
@@ -1298,7 +1342,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.get_cms_bundle(BIGINT, TEXT[]) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle(BIGINT, TEXT[]) TO anon, authenticated, service_role;
 
--- Function: public.get_cms_bundle_v2 | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True
+-- Function: public.get_cms_bundle_v2 | latest: 023_dynamic_levels_and_gzip_question_packs.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_cms_bundle_v2(
     p_client_cms_version BIGINT DEFAULT 0,
     p_owned_item_ids TEXT[] DEFAULT ARRAY[]::TEXT[]
@@ -1408,7 +1452,7 @@ $$;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] REVOKE ALL ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) FROM PUBLIC;
 --   [023_dynamic_levels_and_gzip_question_packs.sql] GRANT EXECUTE ON FUNCTION public.get_cms_bundle_v2(BIGINT, TEXT[]) TO anon, authenticated, service_role;
 
--- Function: public.trg_fn_cms_auto_revision | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.trg_fn_cms_auto_revision | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_cms_auto_revision()
 RETURNS TRIGGER
 LANGUAGE plpgsql

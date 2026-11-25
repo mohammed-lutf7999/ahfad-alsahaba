@@ -3,7 +3,7 @@
 -- Domain: 03_multiplayer_rooms_and_ghosts.sql (المطابقة التنافسية، المباريات، الغرف الخاصة، وأشباح الصحابة)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 4 tables | 0 triggers | 11 functions
+-- Summary: 4 tables | 7 RLS policies | 8 indexes | 0 triggers | 11 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -28,6 +28,8 @@ alter table match_participants enable row level security;
 ALTER TABLE match_participants ADD COLUMN IF NOT EXISTS is_ready BOOLEAN DEFAULT FALSE;
 --   [004_multiplayer_fix.sql]
 ALTER TABLE match_participants ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
+--   [008_multiplayer_rock_solid_fix.sql]
+ALTER TABLE public.match_participants REPLICA IDENTITY FULL;
 
 -- Table: public.matches (origin: 003_multiplayer_schema.sql)
 create table matches (
@@ -59,6 +61,8 @@ ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS seed INT DEFAULT FLOOR(RANDO
 ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS questions JSONB;
 --   [007_reset_queue_and_fix.sql]
 ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS questions JSONB DEFAULT '[]'::jsonb;
+--   [008_multiplayer_rock_solid_fix.sql]
+ALTER TABLE public.matches REPLICA IDENTITY FULL;
 --   [010_instant_rematch_system.sql]
 ALTER TABLE public.matches 
 ADD COLUMN IF NOT EXISTS parent_match_id UUID REFERENCES public.matches(id),
@@ -90,6 +94,8 @@ create table matchmaking_queue (
 alter table matchmaking_queue enable row level security;
 --   [006_add_seed_column.sql]
 ALTER TABLE public.matchmaking_queue ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+--   [008_multiplayer_rock_solid_fix.sql]
+ALTER TABLE public.matchmaking_queue REPLICA IDENTITY FULL;
 --   [012_dynamic_trophy_matchmaking.sql]
 ALTER TABLE public.matchmaking_queue 
 ADD COLUMN IF NOT EXISTS trophies INTEGER DEFAULT 1000;
@@ -119,10 +125,80 @@ ALTER TABLE public.ghost_recordings
   ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 2. ACTIVE RLS POLICIES
 -- ----------------------------------------------------------------------------
 
--- Function: public.cancel_private_room | latest: 011_private_rooms_system.sql | redefinitions: 1 | security_definer: True
+-- Policy: "System creates participants" ON public.match_participants (latest: 004_multiplayer_fix.sql)
+CREATE POLICY "System creates participants" ON match_participants FOR INSERT WITH CHECK (true);
+
+-- Policy: "Users can see participants in their match" ON public.match_participants (latest: 003_multiplayer_schema.sql)
+create policy "Users can see participants in their match" on match_participants for select using (
+  exists (
+    select 1 from matches m 
+    where m.id = match_participants.match_id 
+    and (m.player1_id = auth.uid() or m.player2_id = auth.uid())
+  )
+);
+
+-- Policy: "Users can update their own progress" ON public.match_participants (latest: 003_multiplayer_schema.sql)
+create policy "Users can update their own progress" on match_participants for update using (auth.uid() = user_id);
+
+-- Policy: "System creates matches" ON public.matches (latest: 003_multiplayer_schema.sql)
+create policy "System creates matches" on matches for insert with check (true);
+
+-- Policy: "Users can see their matches" ON public.matches (latest: 003_multiplayer_schema.sql)
+create policy "Users can see their matches" on matches for select using (auth.uid() = player1_id or auth.uid() = player2_id);
+
+-- Policy: "Users can delete themselves" ON public.matchmaking_queue (latest: 003_multiplayer_schema.sql)
+create policy "Users can delete themselves" on matchmaking_queue for delete using (auth.uid() = user_id);
+
+-- Policy: "Users can insert themselves" ON public.matchmaking_queue (latest: 003_multiplayer_schema.sql)
+create policy "Users can insert themselves" on matchmaking_queue for insert with check (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_matches_ghost ON public.matches (origin: 013_ghost_replay_engine.sql)
+CREATE INDEX IF NOT EXISTS idx_matches_ghost 
+ON public.matches(is_ghost_match) 
+WHERE is_ghost_match = TRUE;
+
+-- Index: idx_matches_parent_rematch ON public.matches (origin: 010_instant_rematch_system.sql)
+CREATE INDEX IF NOT EXISTS idx_matches_parent_rematch 
+ON public.matches(parent_match_id);
+
+-- Index: idx_matches_room_code ON public.matches (origin: 011_private_rooms_system.sql)
+CREATE INDEX IF NOT EXISTS idx_matches_room_code 
+ON public.matches(room_code) 
+WHERE room_code IS NOT NULL;
+
+-- Index: idx_queue_trophies_created ON public.matchmaking_queue (origin: 012_dynamic_trophy_matchmaking.sql)
+CREATE INDEX IF NOT EXISTS idx_queue_trophies_created 
+ON public.matchmaking_queue(trophies, created_at);
+
+-- Index: idx_ghost_active_trophies ON public.ghost_recordings (origin: 014_ghost_world_class_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_ghost_active_trophies
+  ON public.ghost_recordings (is_active, trophies, created_at DESC);
+
+-- Index: idx_ghost_trophies ON public.ghost_recordings (origin: 013_ghost_replay_engine.sql)
+CREATE INDEX IF NOT EXISTS idx_ghost_trophies 
+ON public.ghost_recordings(trophies, created_at);
+
+-- Index: idx_ghost_unique_match_user ON public.ghost_recordings (origin: 013_ghost_replay_engine.sql)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ghost_unique_match_user 
+ON public.ghost_recordings(source_match_id, user_id) 
+WHERE source_match_id IS NOT NULL AND user_id IS NOT NULL;
+
+-- Index: idx_ghost_user ON public.ghost_recordings (origin: 013_ghost_replay_engine.sql)
+CREATE INDEX IF NOT EXISTS idx_ghost_user 
+ON public.ghost_recordings(user_id);
+
+-- ----------------------------------------------------------------------------
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- ----------------------------------------------------------------------------
+
+-- Function: public.cancel_private_room | latest: 011_private_rooms_system.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.cancel_private_room(
   p_match_id UUID,
   p_user_id UUID
@@ -142,8 +218,10 @@ BEGIN
   RETURN TRUE;
 END;
 $$;
+-- Effective ALTER FUNCTION notes for public.cancel_private_room:
+--   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.cancel_private_room SET search_path = public, auth; -- via DO block
 
--- Function: public.confirm_ready | latest: 008_multiplayer_rock_solid_fix.sql | redefinitions: 2 | security_definer: True
+-- Function: public.confirm_ready | latest: 008_multiplayer_rock_solid_fix.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.confirm_ready(
   p_match_id UUID, 
   p_user_id UUID
@@ -196,11 +274,12 @@ BEGIN
   END IF;
 END;
 $$;
+-- Effective ALTER FUNCTION notes for public.confirm_ready:
+--   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.confirm_ready SET search_path = public, auth; -- via DO block
 -- Effective permission history for public.confirm_ready:
---   [004_multiplayer_fix.sql] GRANT EXECUTE ON FUNCTION confirm_ready(uuid, uuid) TO authenticated;
 --   [008_multiplayer_rock_solid_fix.sql] GRANT EXECUTE ON FUNCTION public.confirm_ready(UUID, UUID) TO authenticated;
 
--- Function: public.create_instant_rematch | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True
+-- Function: public.create_instant_rematch | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.create_instant_rematch(
     p_parent_match_id UUID,
     p_user_id UUID
@@ -293,7 +372,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.create_instant_rematch(UUID, UUID) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.create_instant_rematch(UUID, UUID) TO authenticated, anon, service_role;
 
--- Function: public.create_private_room | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True
+-- Function: public.create_private_room | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.create_private_room(p_host_id UUID)
 RETURNS TABLE(match_id UUID, room_code VARCHAR, expires_at TIMESTAMPTZ, seed BIGINT, question_ids TEXT[])
 LANGUAGE plpgsql
@@ -355,7 +434,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.create_private_room(UUID) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.create_private_room(UUID) TO authenticated, anon, service_role;
 
--- Function: public.find_or_create_ghost_match | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True
+-- Function: public.find_or_create_ghost_match | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.find_or_create_ghost_match(
     p_user_id UUID,
     p_trophies INT DEFAULT 1000
@@ -536,7 +615,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.find_or_create_ghost_match(UUID, INT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.find_or_create_ghost_match(UUID, INT) TO authenticated, anon, service_role;
 
--- Function: public.find_or_create_match | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 8 | security_definer: True
+-- Function: public.find_or_create_match | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 8 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.find_or_create_match(
     p_user_id UUID,
     p_app_version TEXT DEFAULT '1.0.13',
@@ -646,12 +725,11 @@ BEGIN
 END;
 $$;
 -- Effective permission history for public.find_or_create_match:
---   [008_multiplayer_rock_solid_fix.sql] GRANT EXECUTE ON FUNCTION public.find_or_create_match(UUID, TEXT) TO authenticated;
 --   [014_ghost_world_class_hardening.sql] GRANT EXECUTE ON FUNCTION public.find_or_create_match(UUID, TEXT, INT, UUID) TO authenticated, anon;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.find_or_create_match(UUID, TEXT, INT, UUID) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.find_or_create_match(UUID, TEXT, INT, UUID) TO authenticated, anon, service_role;
 
--- Function: public.finish_match | latest: 014_ghost_world_class_hardening.sql | redefinitions: 5 | security_definer: True
+-- Function: public.finish_match | latest: 014_ghost_world_class_hardening.sql | redefinitions: 5 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.finish_match(p_match_id UUID, p_user_id UUID)
 RETURNS TABLE(winner_user_id UUID, my_final_score INT, opponent_final_score INT, trophies_delta INT, my_total_trophies INT)
 LANGUAGE plpgsql
@@ -852,13 +930,14 @@ BEGIN
     COALESCE(v_my_new_trophies, 1000);
 END;
 $$;
+-- Effective ALTER FUNCTION notes for public.finish_match:
+--   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.finish_match SET search_path = public, auth; -- via DO block
 -- Effective permission history for public.finish_match:
---   [004_multiplayer_fix.sql] GRANT EXECUTE ON FUNCTION finish_match(uuid, uuid) TO authenticated;
 --   [008_multiplayer_rock_solid_fix.sql] GRANT EXECUTE ON FUNCTION public.finish_match(UUID, UUID) TO authenticated;
 --   [009_glory_and_store.sql] GRANT EXECUTE ON FUNCTION public.finish_match(UUID, UUID) TO authenticated, service_role;
 --   [014_ghost_world_class_hardening.sql] GRANT EXECUTE ON FUNCTION public.finish_match(UUID, UUID) TO authenticated, anon;
 
--- Function: public.generate_match_question_ids | latest: 014_ghost_world_class_hardening.sql | redefinitions: 1 | security_definer: False
+-- Function: public.generate_match_question_ids | latest: 014_ghost_world_class_hardening.sql | redefinitions: 1 | security_definer: False | search_path: False
 CREATE OR REPLACE FUNCTION public.generate_match_question_ids()
 RETURNS TEXT[]
 LANGUAGE sql
@@ -877,7 +956,7 @@ $$;
 -- Effective permission history for public.generate_match_question_ids:
 --   [014_ghost_world_class_hardening.sql] GRANT EXECUTE ON FUNCTION public.generate_match_question_ids() TO authenticated, anon;
 
--- Function: public.join_private_room | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.join_private_room | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.join_private_room(
     p_room_code VARCHAR(6),
     p_guest_id UUID
@@ -937,7 +1016,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.join_private_room(VARCHAR, UUID) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.join_private_room(VARCHAR, UUID) TO authenticated, anon, service_role;
 
--- Function: public.save_ghost_timeline | latest: 014_ghost_world_class_hardening.sql | redefinitions: 2 | security_definer: True
+-- Function: public.save_ghost_timeline | latest: 014_ghost_world_class_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.save_ghost_timeline(
   p_match_id UUID,
   p_user_id UUID,
@@ -1072,10 +1151,12 @@ BEGIN
   RETURN TRUE;
 END;
 $$;
+-- Effective ALTER FUNCTION notes for public.save_ghost_timeline:
+--   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.save_ghost_timeline SET search_path = public, auth; -- via DO block
 -- Effective permission history for public.save_ghost_timeline:
 --   [014_ghost_world_class_hardening.sql] GRANT EXECUTE ON FUNCTION public.save_ghost_timeline(UUID, UUID, JSONB) TO authenticated, anon;
 
--- Function: public.submit_answer | latest: 014_ghost_world_class_hardening.sql | redefinitions: 3 | security_definer: True
+-- Function: public.submit_answer | latest: 014_ghost_world_class_hardening.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.submit_answer(
   p_match_id UUID,
   p_user_id UUID,
@@ -1131,7 +1212,8 @@ BEGIN
   RETURN QUERY SELECT COALESCE(v_my_new_score, 0), COALESCE(v_opp_score, 0);
 END;
 $$;
+-- Effective ALTER FUNCTION notes for public.submit_answer:
+--   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.submit_answer SET search_path = public, auth; -- via DO block
 -- Effective permission history for public.submit_answer:
---   [004_multiplayer_fix.sql] GRANT EXECUTE ON FUNCTION submit_answer(uuid, uuid, int, boolean, int) TO authenticated;
 --   [008_multiplayer_rock_solid_fix.sql] GRANT EXECUTE ON FUNCTION public.submit_answer(UUID, UUID, INT, BOOLEAN, INT) TO authenticated;
 --   [014_ghost_world_class_hardening.sql] GRANT EXECUTE ON FUNCTION public.submit_answer(UUID, UUID, INT, BOOLEAN, INT) TO authenticated, anon;

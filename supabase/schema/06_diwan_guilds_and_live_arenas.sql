@@ -3,7 +3,7 @@
 -- Domain: 06_diwan_guilds_and_live_arenas.sql (ديوان الأحفاد، فلتر الأخلاق، الكتائب، والبطولات الجماعية الحية)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 5 tables | 0 triggers | 13 functions
+-- Summary: 5 tables | 5 RLS policies | 6 indexes | 0 triggers | 13 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -92,10 +92,72 @@ CREATE TABLE IF NOT EXISTS public.live_quiz_sessions (
 ALTER TABLE public.live_quiz_sessions ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 2. ACTIVE RLS POLICIES
 -- ----------------------------------------------------------------------------
 
--- Function: public._diwan_contains_profanity | latest: 022_hotfix_diwan_profanity_filter.sql | redefinitions: 2 | security_definer: False
+-- Policy: "Read diwan messages last 24h" ON public.chat_messages (latest: 018_diwan_live_chat.sql)
+CREATE POLICY "Read diwan messages last 24h"
+    ON public.chat_messages FOR SELECT
+    TO anon, authenticated
+    USING (created_at >= NOW() - INTERVAL '24 hours');
+
+-- Policy: "Public view guild members" ON public.guild_members (latest: 019_guilds_and_live_arenas.sql)
+CREATE POLICY "Public view guild members"
+    ON public.guild_members FOR SELECT
+    TO anon, authenticated
+    USING (TRUE);
+
+-- Policy: "Public view guilds" ON public.guilds (latest: 019_guilds_and_live_arenas.sql)
+CREATE POLICY "Public view guilds"
+    ON public.guilds FOR SELECT
+    TO anon, authenticated
+    USING (TRUE);
+
+-- Policy: "Authenticated view live participants" ON public.live_quiz_participants (latest: 019_guilds_and_live_arenas.sql)
+CREATE POLICY "Authenticated view live participants"
+    ON public.live_quiz_participants FOR SELECT
+    TO authenticated
+    USING (TRUE);
+
+-- Policy: "Authenticated view live sessions" ON public.live_quiz_sessions (latest: 019_guilds_and_live_arenas.sql)
+CREATE POLICY "Authenticated view live sessions"
+    ON public.live_quiz_sessions FOR SELECT
+    TO authenticated
+    USING (TRUE);
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_chat_channel_created ON public.chat_messages (origin: 018_diwan_live_chat.sql)
+CREATE INDEX IF NOT EXISTS idx_chat_channel_created
+    ON public.chat_messages (channel, created_at DESC);
+
+-- Index: idx_chat_user_created ON public.chat_messages (origin: 018_diwan_live_chat.sql)
+CREATE INDEX IF NOT EXISTS idx_chat_user_created
+    ON public.chat_messages (user_id, created_at DESC);
+
+-- Index: idx_guild_members_guild_id ON public.guild_members (origin: 019_guilds_and_live_arenas.sql)
+CREATE INDEX IF NOT EXISTS idx_guild_members_guild_id
+    ON public.guild_members (guild_id, weekly_contribution DESC);
+
+-- Index: idx_guilds_weekly_score ON public.guilds (origin: 019_guilds_and_live_arenas.sql)
+CREATE INDEX IF NOT EXISTS idx_guilds_weekly_score
+    ON public.guilds (weekly_score DESC, total_score DESC);
+
+-- Index: idx_live_participants_score ON public.live_quiz_participants (origin: 019_guilds_and_live_arenas.sql)
+CREATE INDEX IF NOT EXISTS idx_live_participants_score
+    ON public.live_quiz_participants (session_id, score DESC);
+
+-- Index: idx_live_sessions_pin ON public.live_quiz_sessions (origin: 019_guilds_and_live_arenas.sql)
+CREATE INDEX IF NOT EXISTS idx_live_sessions_pin
+    ON public.live_quiz_sessions (pin_code);
+
+-- ----------------------------------------------------------------------------
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- ----------------------------------------------------------------------------
+
+-- Function: public._diwan_contains_profanity | latest: 022_hotfix_diwan_profanity_filter.sql | redefinitions: 2 | security_definer: False | search_path: True
 CREATE OR REPLACE FUNCTION public._diwan_contains_profanity(p_text TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -173,7 +235,7 @@ $$;
 --   [022_hotfix_diwan_profanity_filter.sql] REVOKE ALL ON FUNCTION public._diwan_contains_profanity(TEXT) FROM PUBLIC, anon, authenticated;
 --   [022_hotfix_diwan_profanity_filter.sql] GRANT EXECUTE ON FUNCTION public._diwan_contains_profanity(TEXT) TO service_role;
 
--- Function: public.contribute_guild_score | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True
+-- Function: public.contribute_guild_score | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.contribute_guild_score(
     p_points INTEGER
 )
@@ -211,7 +273,7 @@ $$;
 --   [019_guilds_and_live_arenas.sql] REVOKE ALL ON FUNCTION public.contribute_guild_score(INTEGER) FROM PUBLIC;
 --   [019_guilds_and_live_arenas.sql] GRANT EXECUTE ON FUNCTION public.contribute_guild_score(INTEGER) TO authenticated, service_role;
 
--- Function: public.create_guild | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.create_guild | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.create_guild(
     p_name TEXT,
     p_description TEXT DEFAULT '',
@@ -268,7 +330,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.create_guild(TEXT, TEXT, INTEGER, TEXT, INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.create_guild(TEXT, TEXT, INTEGER, TEXT, INTEGER) TO authenticated, service_role;
 
--- Function: public.create_live_quiz_session | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.create_live_quiz_session | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.create_live_quiz_session(
     p_title TEXT,
     p_category_id TEXT DEFAULT 'quran',
@@ -324,7 +386,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.create_live_quiz_session(TEXT, TEXT, JSONB) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.create_live_quiz_session(TEXT, TEXT, JSONB) TO authenticated, service_role;
 
--- Function: public.get_diwan_messages | latest: 018_diwan_live_chat.sql | redefinitions: 1 | security_definer: True
+-- Function: public.get_diwan_messages | latest: 018_diwan_live_chat.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_diwan_messages(
     p_channel TEXT DEFAULT 'global',
     p_limit INTEGER DEFAULT 40
@@ -377,7 +439,7 @@ $$;
 --   [018_diwan_live_chat.sql] REVOKE ALL ON FUNCTION public.get_diwan_messages(TEXT, INTEGER) FROM PUBLIC;
 --   [018_diwan_live_chat.sql] GRANT EXECUTE ON FUNCTION public.get_diwan_messages(TEXT, INTEGER) TO anon, authenticated, service_role;
 
--- Function: public.get_guilds_overview | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True
+-- Function: public.get_guilds_overview | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_guilds_overview(
     p_limit INTEGER DEFAULT 25
 )
@@ -475,7 +537,7 @@ $$;
 --   [019_guilds_and_live_arenas.sql] REVOKE ALL ON FUNCTION public.get_guilds_overview(INTEGER) FROM PUBLIC;
 --   [019_guilds_and_live_arenas.sql] GRANT EXECUTE ON FUNCTION public.get_guilds_overview(INTEGER) TO anon, authenticated, service_role;
 
--- Function: public.join_guild | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.join_guild | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.join_guild(
     p_guild_id UUID,
     p_display_name TEXT DEFAULT 'فارس',
@@ -533,7 +595,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.join_guild(UUID, TEXT, INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.join_guild(UUID, TEXT, INTEGER) TO authenticated, service_role;
 
--- Function: public.join_live_quiz_session | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.join_live_quiz_session | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.join_live_quiz_session(
     p_pin_code TEXT,
     p_display_name TEXT DEFAULT 'متسابق',
@@ -627,7 +689,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.join_live_quiz_session(TEXT, TEXT, INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.join_live_quiz_session(TEXT, TEXT, INTEGER) TO authenticated, service_role;
 
--- Function: public.leave_guild | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True
+-- Function: public.leave_guild | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.leave_guild()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -682,7 +744,7 @@ $$;
 --   [019_guilds_and_live_arenas.sql] REVOKE ALL ON FUNCTION public.leave_guild() FROM PUBLIC;
 --   [019_guilds_and_live_arenas.sql] GRANT EXECUTE ON FUNCTION public.leave_guild() TO authenticated, service_role;
 
--- Function: public.report_diwan_message | latest: 018_diwan_live_chat.sql | redefinitions: 1 | security_definer: True
+-- Function: public.report_diwan_message | latest: 018_diwan_live_chat.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.report_diwan_message(
     p_message_id UUID,
     p_reason TEXT DEFAULT 'مخالفة آداب الديوان'
@@ -712,7 +774,7 @@ $$;
 --   [018_diwan_live_chat.sql] REVOKE ALL ON FUNCTION public.report_diwan_message(UUID, TEXT) FROM PUBLIC;
 --   [018_diwan_live_chat.sql] GRANT EXECUTE ON FUNCTION public.report_diwan_message(UUID, TEXT) TO authenticated, service_role;
 
--- Function: public.send_diwan_message | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.send_diwan_message | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.send_diwan_message(
     p_content TEXT,
     p_channel TEXT DEFAULT 'global',
@@ -809,7 +871,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.send_diwan_message(TEXT, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.send_diwan_message(TEXT, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT) TO authenticated, service_role;
 
--- Function: public.submit_live_quiz_answer | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True
+-- Function: public.submit_live_quiz_answer | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.submit_live_quiz_answer(
     p_session_id UUID,
     p_points_delta INTEGER,
@@ -845,7 +907,7 @@ $$;
 --   [019_guilds_and_live_arenas.sql] REVOKE ALL ON FUNCTION public.submit_live_quiz_answer(UUID, INTEGER, BOOLEAN) FROM PUBLIC;
 --   [019_guilds_and_live_arenas.sql] GRANT EXECUTE ON FUNCTION public.submit_live_quiz_answer(UUID, INTEGER, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.update_live_quiz_session_state | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True
+-- Function: public.update_live_quiz_session_state | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.update_live_quiz_session_state(
     p_session_id UUID,
     p_status TEXT,

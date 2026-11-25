@@ -3,7 +3,7 @@
 -- Domain: 02_glory_and_knights_store.sql (منظومة المجد الـ 100، متجر الفرسان، والمقتنيات)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 2 tables | 2 triggers | 3 functions
+-- Summary: 2 tables | 4 RLS policies | 1 indexes | 2 triggers | 3 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -45,7 +45,58 @@ CREATE TABLE IF NOT EXISTS public.user_inventory (
 ALTER TABLE public.user_inventory ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 2. ACTIVE TRIGGERS
+-- 2. ACTIVE RLS POLICIES
+-- ----------------------------------------------------------------------------
+
+-- Policy: "Visible or owned read store_items" ON public.store_items (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Visible or owned read store_items"
+ON public.store_items
+FOR SELECT
+USING (
+    is_visible = TRUE
+    OR public.check_is_admin()
+    OR (
+        auth.uid() IS NOT NULL
+        AND EXISTS (
+            SELECT 1
+            FROM public.user_inventory ui
+            WHERE ui.user_id = auth.uid()
+              AND ui.item_id = store_items.id
+        )
+    )
+);
+
+-- Policy: "Owner delete user_inventory" ON public.user_inventory (latest: 009_glory_and_store.sql)
+CREATE POLICY "Owner delete user_inventory"
+ON public.user_inventory
+FOR DELETE
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- Policy: "Owner insert user_inventory" ON public.user_inventory (latest: 009_glory_and_store.sql)
+CREATE POLICY "Owner insert user_inventory"
+ON public.user_inventory
+FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy: "Owner read user_inventory" ON public.user_inventory (latest: 009_glory_and_store.sql)
+CREATE POLICY "Owner read user_inventory"
+ON public.user_inventory
+FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_store_items_visible_sort ON public.store_items (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_store_items_visible_sort
+    ON public.store_items (is_visible, category, sort_order, min_level, id);
+
+-- ----------------------------------------------------------------------------
+-- 4. ACTIVE TRIGGERS
 -- ----------------------------------------------------------------------------
 
 -- Trigger: trg_guard_store_item_delete ON public.store_items (latest: 016_dynamic_cms_store_and_hardening.sql)
@@ -60,10 +111,10 @@ BEFORE INSERT OR UPDATE ON public.store_items
 FOR EACH ROW EXECUTE FUNCTION public.trg_fn_cms_auto_revision();
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
 -- ----------------------------------------------------------------------------
 
--- Function: public.calculate_level_and_title | latest: 009_glory_and_store.sql | redefinitions: 1 | security_definer: False
+-- Function: public.calculate_level_and_title | latest: 009_glory_and_store.sql | redefinitions: 1 | security_definer: False | search_path: False
 CREATE OR REPLACE FUNCTION public.calculate_level_and_title(p_total_score INT)
 RETURNS TABLE (
     out_level INT,
@@ -111,7 +162,7 @@ $$;
 -- Effective permission history for public.calculate_level_and_title:
 --   [009_glory_and_store.sql] GRANT EXECUTE ON FUNCTION public.calculate_level_and_title(INT) TO anon, authenticated, service_role;
 
--- Function: public.purchase_store_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True
+-- Function: public.purchase_store_item | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.purchase_store_item(p_user_id UUID, p_item_id TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -187,7 +238,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.purchase_store_item(UUID, TEXT) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.purchase_store_item(UUID, TEXT) TO authenticated, service_role;
 
--- Function: public.trg_fn_guard_store_item_delete | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.trg_fn_guard_store_item_delete | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_guard_store_item_delete()
 RETURNS TRIGGER
 LANGUAGE plpgsql

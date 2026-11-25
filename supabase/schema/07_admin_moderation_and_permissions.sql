@@ -3,7 +3,7 @@
 -- Domain: 07_admin_moderation_and_permissions.sql (الإشراف، حظر وصلاحيات اللاعبين، طاقم الإدارة، وسجل التدقيق)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 5 tables | 0 triggers | 20 functions
+-- Summary: 5 tables | 5 RLS policies | 3 indexes | 0 triggers | 20 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -81,10 +81,64 @@ CREATE TABLE IF NOT EXISTS public.player_permissions (
 ALTER TABLE public.player_permissions ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 2. ACTIVE RLS POLICIES
 -- ----------------------------------------------------------------------------
 
--- Function: public._assert_player_allowed | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Policy: "Admins read audit logs" ON public.admin_audit_logs (latest: 016_dynamic_cms_store_and_hardening.sql)
+CREATE POLICY "Admins read audit logs"
+ON public.admin_audit_logs
+FOR SELECT
+TO authenticated
+USING (public.check_is_admin());
+
+-- Policy: "Admins manage diwan moderation" ON public.diwan_moderation (latest: 018_diwan_live_chat.sql)
+CREATE POLICY "Admins manage diwan moderation"
+    ON public.diwan_moderation FOR ALL
+    TO authenticated
+    USING (public.check_is_admin())
+    WITH CHECK (public.check_is_admin());
+
+-- Policy: "Reporters see own reports" ON public.diwan_reports (latest: 018_diwan_live_chat.sql)
+CREATE POLICY "Reporters see own reports"
+    ON public.diwan_reports FOR SELECT
+    TO authenticated
+    USING (auth.uid() = reporter_id OR public.check_is_admin());
+
+-- Policy: "Admins manage player permissions" ON public.player_permissions (latest: 021_admin_moderation_permissions_and_guards.sql)
+CREATE POLICY "Admins manage player permissions"
+    ON public.player_permissions FOR ALL
+    TO authenticated
+    USING (public.check_is_admin())
+    WITH CHECK (public.check_is_admin());
+
+-- Policy: "Players read own permissions" ON public.player_permissions (latest: 021_admin_moderation_permissions_and_guards.sql)
+CREATE POLICY "Players read own permissions"
+    ON public.player_permissions FOR SELECT
+    TO authenticated
+    USING (auth.uid() = user_id OR public.check_is_admin());
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_admin_audit_logs_created ON public.admin_audit_logs (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created
+    ON public.admin_audit_logs (created_at DESC);
+
+-- Index: idx_admin_audit_logs_target ON public.admin_audit_logs (origin: 016_dynamic_cms_store_and_hardening.sql)
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target
+    ON public.admin_audit_logs (target_type, target_id, created_at DESC);
+
+-- Index: idx_player_permissions_banned ON public.player_permissions (origin: 021_admin_moderation_permissions_and_guards.sql)
+CREATE INDEX IF NOT EXISTS idx_player_permissions_banned
+    ON public.player_permissions (is_banned)
+    WHERE is_banned = TRUE;
+
+-- ----------------------------------------------------------------------------
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- ----------------------------------------------------------------------------
+
+-- Function: public._assert_player_allowed | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._assert_player_allowed(
     p_uid UUID,
     p_scope TEXT
@@ -186,7 +240,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public._assert_player_allowed(UUID, TEXT) FROM PUBLIC, anon, authenticated;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public._assert_player_allowed(UUID, TEXT) TO service_role;
 
--- Function: public._check_is_owner | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public._check_is_owner | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._check_is_owner()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -214,7 +268,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public._check_is_owner() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public._check_is_owner() TO authenticated, service_role;
 
--- Function: public._current_actor_email | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public._current_actor_email | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._current_actor_email()
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -244,7 +298,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public._current_actor_email() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public._current_actor_email() TO authenticated, service_role;
 
--- Function: public._get_effective_player_permissions | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public._get_effective_player_permissions | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._get_effective_player_permissions(p_uid UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -366,7 +420,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public._get_effective_player_permissions(UUID) FROM PUBLIC, anon, authenticated;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public._get_effective_player_permissions(UUID) TO service_role;
 
--- Function: public._is_user_admin | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public._is_user_admin | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._is_user_admin(p_uid UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -393,7 +447,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public._is_user_admin(UUID) FROM PUBLIC, anon, authenticated;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public._is_user_admin(UUID) TO service_role;
 
--- Function: public._write_admin_audit_log | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public._write_admin_audit_log | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public._write_admin_audit_log(
     p_action TEXT,
     p_target_type TEXT DEFAULT '',
@@ -432,7 +486,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public._write_admin_audit_log(TEXT, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public._write_admin_audit_log(TEXT, TEXT, TEXT, TEXT, JSONB) TO service_role;
 
--- Function: public.admin_get_player_detail | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.admin_get_player_detail | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_get_player_detail(
     p_user_id UUID DEFAULT NULL,
     p_player_code TEXT DEFAULT NULL
@@ -561,7 +615,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_get_player_detail(UUID, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_get_player_detail(UUID, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_grant_player_compensation | latest: 017_inbox_and_resource_health.sql | redefinitions: 2 | security_definer: True
+-- Function: public.admin_grant_player_compensation | latest: 017_inbox_and_resource_health.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_grant_player_compensation(
     p_user_id UUID,
     p_coins_delta INTEGER DEFAULT 0,
@@ -717,7 +771,7 @@ $$;
 --   [017_inbox_and_resource_health.sql] REVOKE ALL ON FUNCTION public.admin_grant_player_compensation(UUID, INTEGER, INTEGER, INTEGER, TEXT) FROM PUBLIC;
 --   [017_inbox_and_resource_health.sql] GRANT EXECUTE ON FUNCTION public.admin_grant_player_compensation(UUID, INTEGER, INTEGER, INTEGER, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_list_admins | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_admins | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_admins()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -747,7 +801,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_admins() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_admins() TO authenticated, service_role;
 
--- Function: public.admin_list_audit_logs | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_audit_logs | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_audit_logs(
     p_limit INTEGER DEFAULT 50
 )
@@ -790,7 +844,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_audit_logs(INTEGER) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_audit_logs(INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_list_diwan_moderation_queue | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_diwan_moderation_queue | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_diwan_moderation_queue(
     p_limit INTEGER DEFAULT 50
 )
@@ -888,7 +942,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_list_diwan_moderation_queue(INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_list_diwan_moderation_queue(INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_list_ghosts | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_ghosts | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_ghosts(
     p_limit INTEGER DEFAULT 30
 )
@@ -933,7 +987,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_list_ghosts(INTEGER) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_list_ghosts(INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_list_guilds_and_arenas | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_list_guilds_and_arenas | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_guilds_and_arenas(
     p_limit INTEGER DEFAULT 50
 )
@@ -1030,7 +1084,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_list_guilds_and_arenas(INTEGER) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_list_guilds_and_arenas(INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_manage_admin | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_manage_admin | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_manage_admin(
     p_action TEXT,
     p_email TEXT,
@@ -1103,7 +1157,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_manage_admin(TEXT, TEXT, TEXT) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_manage_admin(TEXT, TEXT, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_moderate_diwan | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True
+-- Function: public.admin_moderate_diwan | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_moderate_diwan(
     p_action TEXT,
     p_message_id UUID DEFAULT NULL,
@@ -1204,7 +1258,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_moderate_diwan(TEXT, UUID, UUID, INTEGER, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_moderate_diwan(TEXT, UUID, UUID, INTEGER, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_moderate_guild_or_arena | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_moderate_guild_or_arena | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_moderate_guild_or_arena(
     p_action TEXT,
     p_target_id UUID,
@@ -1292,7 +1346,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_moderate_guild_or_arena(TEXT, UUID, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_moderate_guild_or_arena(TEXT, UUID, TEXT) TO authenticated, service_role;
 
--- Function: public.admin_search_users | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_search_users | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_search_users(
     p_query TEXT DEFAULT '',
     p_limit INTEGER DEFAULT 20
@@ -1374,7 +1428,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_search_users(TEXT, INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_search_users(TEXT, INTEGER) TO authenticated, service_role;
 
--- Function: public.admin_toggle_ghost | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_toggle_ghost | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_toggle_ghost(
     p_ghost_id UUID,
     p_is_active BOOLEAN
@@ -1415,7 +1469,7 @@ $$;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_toggle_ghost(UUID, BOOLEAN) FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_toggle_ghost(UUID, BOOLEAN) TO authenticated, service_role;
 
--- Function: public.admin_upsert_player_permissions | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True
+-- Function: public.admin_upsert_player_permissions | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_player_permissions(
     p_user_id UUID,
     p_is_banned BOOLEAN DEFAULT FALSE,
@@ -1544,7 +1598,7 @@ $$;
 --   [021_admin_moderation_permissions_and_guards.sql] REVOKE ALL ON FUNCTION public.admin_upsert_player_permissions(UUID, BOOLEAN, INTEGER, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT) FROM PUBLIC;
 --   [021_admin_moderation_permissions_and_guards.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_player_permissions(UUID, BOOLEAN, INTEGER, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT) TO authenticated, service_role;
 
--- Function: public.check_is_admin | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.check_is_admin | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.check_is_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql

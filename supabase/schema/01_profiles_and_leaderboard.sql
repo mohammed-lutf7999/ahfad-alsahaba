@@ -3,7 +3,7 @@
 -- Domain: 01_profiles_and_leaderboard.sql (ملفات اللاعبين، لوحة الشرف، ودليل اللاعبين)
 -- Source: supabase/migrations/001..023 (23 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 3 tables | 2 triggers | 3 functions
+-- Summary: 3 tables | 8 RLS policies | 9 indexes | 2 triggers | 3 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -93,7 +93,77 @@ CREATE TABLE IF NOT EXISTS public.player_directory (
 ALTER TABLE public.player_directory ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
--- 2. ACTIVE TRIGGERS
+-- 2. ACTIVE RLS POLICIES
+-- ----------------------------------------------------------------------------
+
+-- Policy: "Anyone can view leaderboard" ON public.leaderboard (latest: 001_create_leaderboard.sql)
+CREATE POLICY "Anyone can view leaderboard" ON public.leaderboard
+    FOR SELECT USING (true);
+
+-- Policy: "Users can delete own score" ON public.leaderboard (latest: 001_create_leaderboard.sql)
+CREATE POLICY "Users can delete own score" ON public.leaderboard
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Policy: "Users can insert own score" ON public.leaderboard (latest: 001_create_leaderboard.sql)
+CREATE POLICY "Users can insert own score" ON public.leaderboard
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Policy: "Users can update own score" ON public.leaderboard (latest: 001_create_leaderboard.sql)
+CREATE POLICY "Users can update own score" ON public.leaderboard
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Policy: "Anyone can view user progress" ON public.user_progress (latest: 006_add_seed_column.sql)
+CREATE POLICY "Anyone can view user progress" ON public.user_progress FOR SELECT USING (true);
+
+-- Policy: "Users can delete own progress" ON public.user_progress (latest: 002_create_user_progress.sql)
+CREATE POLICY "Users can delete own progress" ON public.user_progress
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Policy: "Users can insert own progress" ON public.user_progress (latest: 002_create_user_progress.sql)
+CREATE POLICY "Users can insert own progress" ON public.user_progress
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Policy: "Users can update own progress" ON public.user_progress (latest: 002_create_user_progress.sql)
+CREATE POLICY "Users can update own progress" ON public.user_progress
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- 3. ACTIVE INDEXES
+-- ----------------------------------------------------------------------------
+
+-- Index: idx_leaderboard_arena_id ON public.leaderboard (origin: 009_glory_and_store.sql)
+CREATE INDEX IF NOT EXISTS idx_leaderboard_arena_id ON public.leaderboard(arena_id DESC, trophies DESC);
+
+-- Index: idx_leaderboard_player_level ON public.leaderboard (origin: 009_glory_and_store.sql)
+CREATE INDEX IF NOT EXISTS idx_leaderboard_player_level ON public.leaderboard(player_level DESC);
+
+-- Index: idx_leaderboard_score ON public.leaderboard (origin: 001_create_leaderboard.sql)
+CREATE INDEX IF NOT EXISTS idx_leaderboard_score ON public.leaderboard(score DESC);
+
+-- Index: idx_leaderboard_trophies ON public.leaderboard (origin: 008_multiplayer_rock_solid_fix.sql)
+CREATE INDEX IF NOT EXISTS idx_leaderboard_trophies ON public.leaderboard(trophies DESC);
+
+-- Index: idx_leaderboard_user_id ON public.leaderboard (origin: 001_create_leaderboard.sql)
+CREATE INDEX IF NOT EXISTS idx_leaderboard_user_id ON public.leaderboard(user_id);
+
+-- Index: idx_user_progress_user_id ON public.user_progress (origin: 002_create_user_progress.sql)
+CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON public.user_progress(user_id);
+
+-- Index: idx_player_directory_email_lower ON public.player_directory (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_player_directory_email_lower
+    ON public.player_directory (LOWER(email))
+    WHERE email IS NOT NULL;
+
+-- Index: idx_player_directory_last_seen ON public.player_directory (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_player_directory_last_seen
+    ON public.player_directory (last_seen_at DESC);
+
+-- Index: idx_player_directory_name_lower ON public.player_directory (origin: 015_app_control_and_messages.sql)
+CREATE INDEX IF NOT EXISTS idx_player_directory_name_lower
+    ON public.player_directory (LOWER(display_name));
+
+-- ----------------------------------------------------------------------------
+-- 4. ACTIVE TRIGGERS
 -- ----------------------------------------------------------------------------
 
 -- Trigger: trg_sync_leaderboard_glory ON public.leaderboard (latest: 009_glory_and_store.sql)
@@ -109,10 +179,10 @@ FOR EACH ROW
 EXECUTE FUNCTION public.trg_fn_sync_user_progress_level();
 
 -- ----------------------------------------------------------------------------
--- 3. LATEST EFFECTIVE FUNCTIONS & RPCs
+-- 5. LATEST EFFECTIVE FUNCTIONS & RPCs
 -- ----------------------------------------------------------------------------
 
--- Function: public.sync_player_directory | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True
+-- Function: public.sync_player_directory | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.sync_player_directory(
     p_player_code TEXT,
     p_display_name TEXT DEFAULT 'لاعب',
@@ -277,7 +347,7 @@ $$;
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.sync_player_directory(TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, TEXT, INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.sync_player_directory(TEXT, TEXT, INTEGER, INTEGER, INTEGER, TEXT, TEXT, INTEGER) TO anon, authenticated, service_role;
 
--- Function: public.trg_fn_sync_leaderboard_glory | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True
+-- Function: public.trg_fn_sync_leaderboard_glory | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_sync_leaderboard_glory()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -317,7 +387,7 @@ BEGIN
 END;
 $$;
 
--- Function: public.trg_fn_sync_user_progress_level | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True
+-- Function: public.trg_fn_sync_user_progress_level | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.trg_fn_sync_user_progress_level()
 RETURNS TRIGGER
 LANGUAGE plpgsql
