@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 02_glory_and_knights_store.sql (منظومة المجد الـ 100، متجر الفرسان، والمقتنيات)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (25 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 2 tables | 4 RLS policies | 1 indexes | 2 triggers | 3 functions
 -- ============================================================================

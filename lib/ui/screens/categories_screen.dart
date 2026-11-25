@@ -168,6 +168,23 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                                 category: category,
                                 onTap: () async {
                                   SoundService().playClick();
+                                  if (category.isComingSoon) {
+                                    final msg = category.comingSoonMessage.trim().isNotEmpty
+                                        ? category.comingSoonMessage.trim()
+                                        : 'هذا القسم قادم قريباً بإذن الله ⏳';
+                                    ScaffoldMessenger.of(context)
+                                      ..hideCurrentSnackBar()
+                                      ..showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            msg,
+                                            style: const TextStyle(fontFamily: 'Cairo'),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    return;
+                                  }
                                   if (category.isLocked) {
                                     ScaffoldMessenger.of(context)
                                       ..hideCurrentSnackBar()

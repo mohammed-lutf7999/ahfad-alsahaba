@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 06_diwan_guilds_and_live_arenas.sql (ديوان الأحفاد، فلتر الأخلاق، الكتائب، والبطولات الجماعية الحية)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (25 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 5 tables | 5 RLS policies | 6 indexes | 0 triggers | 13 functions
 -- ============================================================================
@@ -234,6 +234,7 @@ $$;
 -- Effective permission history for public._diwan_contains_profanity:
 --   [022_hotfix_diwan_profanity_filter.sql] REVOKE ALL ON FUNCTION public._diwan_contains_profanity(TEXT) FROM PUBLIC, anon, authenticated;
 --   [022_hotfix_diwan_profanity_filter.sql] GRANT EXECUTE ON FUNCTION public._diwan_contains_profanity(TEXT) TO service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public._diwan_contains_profanity FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.contribute_guild_score | latest: 019_guilds_and_live_arenas.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.contribute_guild_score(

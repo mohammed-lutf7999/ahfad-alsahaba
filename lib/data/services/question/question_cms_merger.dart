@@ -74,6 +74,42 @@ class QuestionCmsMerger {
     return withOptionRandom(baseQuestion, optionRandom);
   }
 
+  /// Extracts `hiddenIds` / `hidden_ids` embedded in a Gzip CDN question pack.
+  static Set<String> extractPackHiddenIds(Map<String, dynamic>? packData) {
+    if (packData == null) return const {};
+    final raw = packData['hiddenIds'] ?? packData['hidden_ids'];
+    if (raw is! List) return const {};
+    final ids = <String>{};
+    for (final item in raw) {
+      final s = item.toString().trim();
+      if (s.isNotEmpty) ids.add(s);
+    }
+    return ids;
+  }
+
+  /// Collects the complete set of hidden question IDs for [categoryId] across
+  /// the CMS snapshot (`hiddenQuestionIds`, `hiddenLocalQuestionIds`, hidden
+  /// `quizQuestions`) and optional Gzip pack metadata (`hiddenIds`).
+  static Set<String> collectHiddenQuestionIds(
+    String categoryId, {
+    required CmsCacheSnapshot snapshot,
+    Map<String, dynamic>? packData,
+  }) {
+    final ids = <String>{};
+    final cat = snapshot.quizCategories[categoryId];
+    if (cat != null) {
+      ids.addAll(cat.hiddenQuestionIds);
+      ids.addAll(cat.hiddenLocalQuestionIds);
+    }
+    for (final q in snapshot.quizQuestions.values) {
+      if (q.categoryId == categoryId && !q.isVisible && q.id.isNotEmpty) {
+        ids.add(q.id);
+      }
+    }
+    ids.addAll(extractPackHiddenIds(packData));
+    return ids;
+  }
+
   static Question mapDynamicQuestion(
     DynamicQuizQuestionData q, {
     Random? optionRandom,

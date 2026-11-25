@@ -24,19 +24,87 @@ class ResultActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalLevelsForCat =
-        CmsCacheService.instance.getTotalLevelsForCategory(categoryId);
-    final hasNextLevel = currentLevelNumber < totalLevelsForCat;
-    final nextLevelNumber = currentLevelNumber + 1;
-    final nextLevelId = '${categoryId}_level_$nextLevelNumber';
+    final nextRes = CmsCacheService.instance.resolveNextVisibleLevel(
+      categoryId,
+      currentLevelNumber,
+    );
+    final nextLevelNumber = nextRes.levelNumber;
+    final nextLevelId = nextLevelNumber != null
+        ? '${categoryId}_level_$nextLevelNumber'
+        : null;
     final currentCanonicalLevelId = '${categoryId}_level_$currentLevelNumber';
     final profile = ProfileService.instance.activeProfile;
-    final isNextLevelUnlocked = hasNextLevel &&
+    final isNextPlayableUnlocked = nextRes.isPlayable &&
+        nextLevelNumber != null &&
         (isPassed ||
             (profile?.isLevelUnlocked(categoryId, nextLevelNumber) ?? false));
+    final showNextComingSoon =
+        isPassed && nextRes.hasNext && nextRes.isComingSoon;
 
     return Column(
       children: [
+        if (showNextComingSoon) ...[
+          InkWell(
+            onTap: () {
+              SoundService().playClick();
+              final msg = nextRes.message.trim().isNotEmpty
+                  ? nextRes.message.trim()
+                  : 'المستوى ${nextRes.levelNumber} قادم قريباً بإذن الله ⏳';
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      msg,
+                      style: const TextStyle(fontFamily: 'Cairo'),
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: isSmall ? 8 : 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.accentColor.withValues(alpha: 0.55),
+                  width: 1.4,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.hourglass_top_rounded,
+                    size: isSmall ? 17 : 19,
+                    color: AppTheme.accentDark,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'المستوى القادم قريباً ⏳',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isSmall ? 12.5 : 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accentDark,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: isSmall ? 10 : 12),
+        ],
         if (userAnswers != null && userAnswers!.isNotEmpty) ...[
           SizedBox(
             width: double.infinity,
@@ -144,17 +212,17 @@ class ResultActionButtons extends StatelessWidget {
                       AppRoutes.quiz,
                       arguments: {
                         'categoryId': categoryId,
-                        'levelId': isNextLevelUnlocked
-                            ? nextLevelId
+                        'levelId': isNextPlayableUnlocked
+                            ? nextLevelId!
                             : currentCanonicalLevelId,
-                        'levelNumber': isNextLevelUnlocked
+                        'levelNumber': isNextPlayableUnlocked
                             ? nextLevelNumber
                             : currentLevelNumber,
                       },
                     );
                   },
                   icon: Icon(
-                    isNextLevelUnlocked
+                    isNextPlayableUnlocked
                         ? Icons.arrow_forward_rounded
                         : Icons.refresh_rounded,
                     size: isSmall ? 16 : 18,
@@ -162,7 +230,7 @@ class ResultActionButtons extends StatelessWidget {
                   label: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      isNextLevelUnlocked
+                      isNextPlayableUnlocked
                           ? 'المستوى التالي'
                           : (isPassed ? 'إعادة المستوى' : 'حاول مرة أخرى'),
                       style: TextStyle(

@@ -108,6 +108,63 @@ class DynamicLibraryItemData {
       };
 }
 
+/// Availability status for a Quiz category or individual level (`024`).
+enum CategoryAvailabilityStatus {
+  open,
+  comingSoon,
+  hidden;
+
+  String get wireValue {
+    switch (this) {
+      case CategoryAvailabilityStatus.open:
+        return 'open';
+      case CategoryAvailabilityStatus.comingSoon:
+        return 'coming_soon';
+      case CategoryAvailabilityStatus.hidden:
+        return 'hidden';
+    }
+  }
+
+  static CategoryAvailabilityStatus fromWire(Object? raw) {
+    final normalized = (raw ?? '').toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'coming_soon':
+      case 'comingsoon':
+        return CategoryAvailabilityStatus.comingSoon;
+      case 'hidden':
+        return CategoryAvailabilityStatus.hidden;
+      default:
+        return CategoryAvailabilityStatus.open;
+    }
+  }
+}
+
+/// Per-level override (`coming_soon` / `hidden` + optional teasing message).
+class LevelOverrideConfig {
+  final CategoryAvailabilityStatus status;
+  final String message;
+
+  const LevelOverrideConfig({
+    this.status = CategoryAvailabilityStatus.open,
+    this.message = '',
+  });
+
+  bool get isComingSoon => status == CategoryAvailabilityStatus.comingSoon;
+  bool get isHidden => status == CategoryAvailabilityStatus.hidden;
+
+  factory LevelOverrideConfig.fromJson(Map<String, dynamic> json) {
+    return LevelOverrideConfig(
+      status: CategoryAvailabilityStatus.fromWire(json['status']),
+      message: (json['message'] ?? '').toString().trim(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'status': status.wireValue,
+        if (message.isNotEmpty) 'message': message,
+      };
+}
+
 /// Dynamic Quiz category record mirrored from `public.quiz_categories`.
 class DynamicQuizCategoryData {
   final String id;
@@ -123,6 +180,12 @@ class DynamicQuizCategoryData {
   final int sortOrder;
   final bool isVisible;
   final bool isLocked;
+  final String availabilityStatus;
+  final String comingSoonMessage;
+  final Map<int, LevelOverrideConfig> levelOverrides;
+  final List<String> hiddenQuestionIds;
+  final List<String> hiddenLocalQuestionIds;
+  final bool packNeedsRepublish;
   final int cmsRevision;
 
   const DynamicQuizCategoryData({
@@ -139,8 +202,57 @@ class DynamicQuizCategoryData {
     this.sortOrder = 100,
     this.isVisible = true,
     this.isLocked = false,
+    this.availabilityStatus = 'open',
+    this.comingSoonMessage = '',
+    this.levelOverrides = const {},
+    this.hiddenQuestionIds = const [],
+    this.hiddenLocalQuestionIds = const [],
+    this.packNeedsRepublish = false,
     this.cmsRevision = 1,
   });
+
+  CategoryAvailabilityStatus get availability =>
+      CategoryAvailabilityStatus.fromWire(availabilityStatus);
+
+  bool get isComingSoon => availability == CategoryAvailabilityStatus.comingSoon;
+
+  bool get isHiddenByAvailability =>
+      !isVisible || availability == CategoryAvailabilityStatus.hidden;
+
+  LevelOverrideConfig? overrideForLevel(int levelNumber) =>
+      levelOverrides[levelNumber];
+
+  static Map<int, LevelOverrideConfig> _parseLevelOverrides(dynamic raw) {
+    if (raw is! Map) return const {};
+    final parsed = <int, LevelOverrideConfig>{};
+    for (final entry in raw.entries) {
+      final lv = int.tryParse(entry.key.toString().trim());
+      if (lv == null || lv < 1 || lv > 100) continue;
+      if (entry.value is Map) {
+        final cfg = LevelOverrideConfig.fromJson(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+        if (cfg.status != CategoryAvailabilityStatus.open ||
+            cfg.message.isNotEmpty) {
+          parsed[lv] = cfg;
+        }
+      }
+    }
+    return parsed;
+  }
+
+  static List<String> _parseStringList(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <String>[];
+    final seen = <String>{};
+    for (final item in raw) {
+      final s = item.toString().trim();
+      if (s.isNotEmpty && seen.add(s)) {
+        out.add(s);
+      }
+    }
+    return out;
+  }
 
   factory DynamicQuizCategoryData.fromJson(Map<String, dynamic> json) {
     final rawMode =
@@ -149,6 +261,15 @@ class DynamicQuizCategoryData {
             .trim();
     final safeMode =
         rawMode == 'rotating_pool' ? 'rotating_pool' : 'fixed';
+    final isVisibleVal = (json['is_visible'] as bool?) ??
+        (json['isVisible'] as bool?) ??
+        true;
+    final rawStatus =
+        json['availability_status'] ?? json['availabilityStatus'];
+    final resolvedStatus = rawStatus != null
+        ? CategoryAvailabilityStatus.fromWire(rawStatus).wireValue
+        : (isVisibleVal ? 'open' : 'hidden');
+
     return DynamicQuizCategoryData(
       id: (json['id'] ?? '').toString().trim(),
       name: (json['name'] ?? '').toString(),
@@ -176,11 +297,27 @@ class DynamicQuizCategoryData {
       sortOrder: (json['sort_order'] as num?)?.toInt() ??
           (json['sortOrder'] as num?)?.toInt() ??
           100,
-      isVisible: (json['is_visible'] as bool?) ??
-          (json['isVisible'] as bool?) ??
-          true,
+      isVisible: isVisibleVal,
       isLocked: (json['is_locked'] as bool?) ??
           (json['isLocked'] as bool?) ??
+          false,
+      availabilityStatus: resolvedStatus,
+      comingSoonMessage: (json['coming_soon_message'] ??
+              json['comingSoonMessage'] ??
+              '')
+          .toString()
+          .trim(),
+      levelOverrides: _parseLevelOverrides(
+        json['level_overrides'] ?? json['levelOverrides'],
+      ),
+      hiddenQuestionIds: _parseStringList(
+        json['hidden_question_ids'] ?? json['hiddenQuestionIds'],
+      ),
+      hiddenLocalQuestionIds: _parseStringList(
+        json['hidden_local_question_ids'] ?? json['hiddenLocalQuestionIds'],
+      ),
+      packNeedsRepublish: (json['pack_needs_republish'] as bool?) ??
+          (json['packNeedsRepublish'] as bool?) ??
           false,
       cmsRevision: (json['cms_revision'] as num?)?.toInt() ??
           (json['cmsRevision'] as num?)?.toInt() ??
@@ -202,6 +339,14 @@ class DynamicQuizCategoryData {
         'sort_order': sortOrder,
         'is_visible': isVisible,
         'is_locked': isLocked,
+        'availability_status': availabilityStatus,
+        'coming_soon_message': comingSoonMessage,
+        'level_overrides': {
+          for (final e in levelOverrides.entries) '${e.key}': e.value.toJson(),
+        },
+        'hidden_question_ids': hiddenQuestionIds,
+        'hidden_local_question_ids': hiddenLocalQuestionIds,
+        'pack_needs_republish': packNeedsRepublish,
         'cms_revision': cmsRevision,
       };
 }
@@ -291,13 +436,78 @@ class DynamicQuizQuestionData {
       };
 }
 
+/// Paginated response from `admin_browse_quiz_questions` (`024b`).
+class AdminQuestionBrowserPage {
+  final int totalCount;
+  final int page;
+  final int pageSize;
+  final bool packNeedsRepublish;
+  final List<String> hiddenLocalQuestionIds;
+  final List<DynamicQuizQuestionData> questions;
+
+  const AdminQuestionBrowserPage({
+    this.totalCount = 0,
+    this.page = 1,
+    this.pageSize = 25,
+    this.packNeedsRepublish = false,
+    this.hiddenLocalQuestionIds = const [],
+    this.questions = const [],
+  });
+
+  int get totalPages => totalCount <= 0
+      ? 1
+      : ((totalCount + pageSize - 1) ~/ (pageSize <= 0 ? 25 : pageSize));
+
+  factory AdminQuestionBrowserPage.fromJson(Map<String, dynamic> json) {
+    final rawQs = json['questions'];
+    final qs = <DynamicQuizQuestionData>[];
+    if (rawQs is List) {
+      for (final item in rawQs) {
+        if (item is Map) {
+          qs.add(
+            DynamicQuizQuestionData.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          );
+        }
+      }
+    }
+    final rawHiddenLocal =
+        json['hidden_local_question_ids'] ?? json['hiddenLocalQuestionIds'];
+    final hiddenLocal = <String>[];
+    if (rawHiddenLocal is List) {
+      for (final item in rawHiddenLocal) {
+        final s = item.toString().trim();
+        if (s.isNotEmpty) hiddenLocal.add(s);
+      }
+    }
+    return AdminQuestionBrowserPage(
+      totalCount: (json['total_count'] as num?)?.toInt() ??
+          (json['totalCount'] as num?)?.toInt() ??
+          qs.length,
+      page: ((json['page'] as num?)?.toInt() ?? 1).clamp(1, 100000),
+      pageSize: ((json['page_size'] as num?)?.toInt() ??
+              (json['pageSize'] as num?)?.toInt() ??
+              25)
+          .clamp(1, 100),
+      packNeedsRepublish: (json['pack_needs_republish'] as bool?) ??
+          (json['packNeedsRepublish'] as bool?) ??
+          false,
+      hiddenLocalQuestionIds: hiddenLocal,
+      questions: qs,
+    );
+  }
+}
+
 /// Persisted snapshot of all CMS overrides & additions returned by `get_cms_bundle_v2`.
 class CmsCacheSnapshot {
   /// Schema version stored in SharedPreferences cache:
   /// - `1` (or absent): legacy 1.1.0+21 cache before Plan 20 pack metadata.
   /// - `2`: 1.2.0+22 cache with `questions_per_level`, `level_draw_mode`,
   ///        `pack_version`, `pack_storage_path`, and pack-pruned `quizQuestions`.
-  static const int currentCacheSchemaVersion = 2;
+  /// - `3`: 024 cache with `availability_status`, `coming_soon_message`,
+  ///        `level_overrides`, `hidden_question_ids`, and `pack_needs_republish`.
+  static const int currentCacheSchemaVersion = 3;
 
   final int cmsVersion;
   final int cacheSchemaVersion;

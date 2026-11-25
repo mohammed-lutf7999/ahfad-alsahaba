@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 08_push_tokens_and_maintenance.sql (رموز الإشعارات FCM، مراقبة صحة الموارد، والتنظيف الآلي)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (25 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 1 tables | 1 RLS policies | 2 indexes | 0 triggers | 6 functions
 -- ============================================================================
@@ -139,6 +139,7 @@ $$;
 --   [017_inbox_and_resource_health.sql] GRANT EXECUTE ON FUNCTION public.admin_cleanup_stale_resources(TEXT, INTEGER) TO authenticated, service_role;
 --   [019_guilds_and_live_arenas.sql] REVOKE ALL ON FUNCTION public.admin_cleanup_stale_resources(TEXT, INTEGER) FROM PUBLIC;
 --   [019_guilds_and_live_arenas.sql] GRANT EXECUTE ON FUNCTION public.admin_cleanup_stale_resources(TEXT, INTEGER) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_cleanup_stale_resources FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_get_push_targets | latest: 020_push_tokens_and_inbox_routing.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_get_push_targets(
@@ -191,6 +192,7 @@ $$;
 -- Effective permission history for public.admin_get_push_targets:
 --   [020_push_tokens_and_inbox_routing.sql] REVOKE ALL ON FUNCTION public.admin_get_push_targets(TEXT, UUID) FROM PUBLIC;
 --   [020_push_tokens_and_inbox_routing.sql] GRANT EXECUTE ON FUNCTION public.admin_get_push_targets(TEXT, UUID) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_get_push_targets FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_get_resource_health | latest: 017_inbox_and_resource_health.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_get_resource_health()
@@ -296,6 +298,7 @@ $$;
 -- Effective permission history for public.admin_get_resource_health:
 --   [017_inbox_and_resource_health.sql] REVOKE ALL ON FUNCTION public.admin_get_resource_health() FROM PUBLIC;
 --   [017_inbox_and_resource_health.sql] GRANT EXECUTE ON FUNCTION public.admin_get_resource_health() TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_get_resource_health FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.cleanup_stale_matches | latest: 005_maintenance_functions.sql | redefinitions: 1 | security_definer: True | search_path: False
 CREATE OR REPLACE FUNCTION cleanup_stale_matches()

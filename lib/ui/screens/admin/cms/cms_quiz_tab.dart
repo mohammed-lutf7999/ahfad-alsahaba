@@ -15,6 +15,7 @@ class CmsQuizTab extends StatelessWidget {
   final ValueChanged<DynamicQuizQuestionData> onEditQuestion;
   final void Function(String entityType, String id, bool nextVisible)
       onToggleVisibility;
+  final VoidCallback? onOpenLevelQuestionManager;
 
   const CmsQuizTab({
     super.key,
@@ -27,6 +28,7 @@ class CmsQuizTab extends StatelessWidget {
     required this.onEditCategory,
     required this.onEditQuestion,
     required this.onToggleVisibility,
+    this.onOpenLevelQuestionManager,
   });
 
   @override
@@ -57,6 +59,14 @@ class CmsQuizTab extends StatelessWidget {
             ),
           ],
         ),
+        if (onOpenLevelQuestionManager != null) ...[
+          const SizedBox(height: 10),
+          AdminPrimaryButton(
+            label: 'إدارة المستويات وقريباً ⏳ ومتصفح الأسئلة',
+            icon: Icons.tune_rounded,
+            onPressed: onOpenLevelQuestionManager,
+          ),
+        ],
         const SizedBox(height: 14),
         AdminSectionCard(
           title: 'أقسام المسابقات (${categories.length})',
@@ -67,8 +77,10 @@ class CmsQuizTab extends StatelessWidget {
                 CmsEntityTile(
                   title: cat.name,
                   subtitle:
-                      'ID: ${cat.id} • ${cat.totalLevels} مرحلة${cat.isLocked ? " • مقفل" : ""}',
-                  badgeText: cat.isVisible ? 'مرئي' : 'مخفي',
+                      'ID: ${cat.id} • ${cat.totalLevels} مرحلة${cat.isComingSoon ? " • قريباً ⏳" : (cat.isLocked ? " • مقفل" : "")}',
+                  badgeText: cat.isComingSoon
+                      ? 'قريباً ⏳'
+                      : (cat.isVisible ? 'مرئي' : 'مخفي'),
                   isVisible: cat.isVisible,
                   onToggleVisibility: (v) =>
                       onToggleVisibility('quiz_category', cat.id, v),

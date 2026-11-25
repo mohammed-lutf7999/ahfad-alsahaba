@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 01_profiles_and_leaderboard.sql (ملفات اللاعبين، لوحة الشرف، ودليل اللاعبين)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (25 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 3 tables | 8 RLS policies | 9 indexes | 2 triggers | 3 functions
 -- ============================================================================

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 04_app_control_events_and_inbox.sql (التحكم السحابي، الإصدارات، الأحداث، الإعلانات، والبريد الملكي)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (25 migrations)
 -- Generator: python tools/export_supabase_schema.py
 -- Summary: 4 tables | 0 RLS policies | 6 indexes | 0 triggers | 14 functions
 -- ============================================================================
@@ -185,6 +185,7 @@ $$;
 -- Effective permission history for public._bump_app_config_version:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public._bump_app_config_version(TEXT, UUID) FROM PUBLIC, anon, authenticated;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public._bump_app_config_version(TEXT, UUID) TO service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public._bump_app_config_version FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.acknowledge_announcement | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.acknowledge_announcement(
@@ -371,6 +372,7 @@ $$;
 -- Effective permission history for public.admin_create_announcement:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_create_announcement(TEXT, TEXT, TEXT, TEXT, UUID, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, INTEGER, INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_create_announcement(TEXT, TEXT, TEXT, TEXT, UUID, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, INTEGER, INTEGER) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_create_announcement FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_delete_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_delete_dynamic_event(p_event_id UUID)
@@ -401,6 +403,7 @@ $$;
 -- Effective permission history for public.admin_delete_dynamic_event:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_delete_dynamic_event(UUID) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_delete_dynamic_event(UUID) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_delete_dynamic_event FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_get_overview | latest: 016_dynamic_cms_store_and_hardening.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_get_overview()
@@ -503,6 +506,7 @@ $$;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_get_overview() TO authenticated, service_role;
 --   [016_dynamic_cms_store_and_hardening.sql] REVOKE ALL ON FUNCTION public.admin_get_overview() FROM PUBLIC;
 --   [016_dynamic_cms_store_and_hardening.sql] GRANT EXECUTE ON FUNCTION public.admin_get_overview() TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_get_overview FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_list_announcements | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_announcements(
@@ -545,6 +549,7 @@ $$;
 -- Effective permission history for public.admin_list_announcements:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_list_announcements(INTEGER) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_list_announcements(INTEGER) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_list_announcements FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_list_dynamic_events | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_list_dynamic_events()
@@ -575,6 +580,7 @@ $$;
 -- Effective permission history for public.admin_list_dynamic_events:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_list_dynamic_events() FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_list_dynamic_events() TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_list_dynamic_events FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_set_announcement_active | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_set_announcement_active(
@@ -615,6 +621,7 @@ $$;
 -- Effective permission history for public.admin_set_announcement_active:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_set_announcement_active(UUID, BOOLEAN) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_set_announcement_active(UUID, BOOLEAN) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_set_announcement_active FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_toggle_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_toggle_dynamic_event(
@@ -652,6 +659,7 @@ $$;
 -- Effective permission history for public.admin_toggle_dynamic_event:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_toggle_dynamic_event(UUID, BOOLEAN) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_toggle_dynamic_event(UUID, BOOLEAN) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_toggle_dynamic_event FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_upsert_dynamic_event | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_dynamic_event(
@@ -748,6 +756,7 @@ $$;
 -- Effective permission history for public.admin_upsert_dynamic_event:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_upsert_dynamic_event(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_dynamic_event(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_upsert_dynamic_event FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.admin_upsert_release_config | latest: 015_app_control_and_messages.sql | redefinitions: 1 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.admin_upsert_release_config(
@@ -834,6 +843,7 @@ $$;
 -- Effective permission history for public.admin_upsert_release_config:
 --   [015_app_control_and_messages.sql] REVOKE ALL ON FUNCTION public.admin_upsert_release_config(TEXT, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT, JSONB) FROM PUBLIC;
 --   [015_app_control_and_messages.sql] GRANT EXECUTE ON FUNCTION public.admin_upsert_release_config(TEXT, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT, JSONB) TO authenticated, service_role;
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.admin_upsert_release_config FROM PUBLIC, anon; -- via DO block
 
 -- Function: public.get_app_control_state | latest: 021_admin_moderation_permissions_and_guards.sql | redefinitions: 3 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.get_app_control_state(

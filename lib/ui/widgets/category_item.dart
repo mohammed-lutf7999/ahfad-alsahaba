@@ -31,10 +31,14 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final bool isLocked = widget.category.isLocked;
-    final int unlocked = widget.category.unlockedLevels.clamp(0, widget.category.totalLevels);
-    final int locked = (widget.category.totalLevels - unlocked).clamp(0, widget.category.totalLevels);
-    
+    final bool isComingSoon = widget.category.isComingSoon;
+    final bool isLocked = !isComingSoon && widget.category.isLocked;
+    final bool isRestricted = isComingSoon || isLocked;
+    final int unlocked =
+        widget.category.unlockedLevels.clamp(0, widget.category.totalLevels);
+    final int locked =
+        (widget.category.totalLevels - unlocked).clamp(0, widget.category.totalLevels);
+
     return GestureDetector(
       onTapDown: isLocked ? null : (_) => _animationController.forward(),
       onTapUp: (_) {
@@ -47,24 +51,28 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Opacity(
-          opacity: isLocked ? 0.68 : 1.0,
+          opacity: isLocked ? 0.68 : (isComingSoon ? 0.92 : 1.0),
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: isLocked
-                    ? [
-                        AppTheme.primaryLight.withValues(alpha: 0.72),
-                        AppTheme.primaryDark,
-                      ]
-                    : [AppTheme.primaryLight, AppTheme.primaryColor],
+                colors: isComingSoon
+                    ? const [Color(0xFF283549), Color(0xFF162032)]
+                    : (isLocked
+                        ? [
+                            AppTheme.primaryLight.withValues(alpha: 0.72),
+                            AppTheme.primaryDark,
+                          ]
+                        : [AppTheme.primaryLight, AppTheme.primaryColor]),
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isLocked
-                    ? Colors.white.withValues(alpha: 0.28)
-                    : AppTheme.accentColor.withAlpha(100),
+                color: isComingSoon
+                    ? AppTheme.accentColor.withValues(alpha: 0.72)
+                    : (isLocked
+                        ? Colors.white.withValues(alpha: 0.28)
+                        : AppTheme.accentColor.withAlpha(100)),
                 width: 1.5,
               ),
               boxShadow: [
@@ -79,7 +87,8 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
             child: Stack(
               children: [
                 Positioned(
-                  right: -20, top: -20,
+                  right: -20,
+                  top: -20,
                   child: Container(
                     width: 90,
                     height: 90,
@@ -98,10 +107,14 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          gradient: isLocked ? null : AppTheme.goldGradient,
-                          color: isLocked ? Colors.white.withValues(alpha: 0.14) : null,
+                          gradient: isRestricted ? null : AppTheme.goldGradient,
+                          color: isComingSoon
+                              ? AppTheme.accentColor.withValues(alpha: 0.2)
+                              : (isLocked
+                                  ? Colors.white.withValues(alpha: 0.14)
+                                  : null),
                           shape: BoxShape.circle,
-                          boxShadow: isLocked
+                          boxShadow: isRestricted
                               ? null
                               : [
                                   BoxShadow(
@@ -111,8 +124,16 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
                                 ],
                         ),
                         child: Icon(
-                          isLocked ? Icons.lock_rounded : widget.category.icon,
-                          color: isLocked ? Colors.white70 : AppTheme.primaryDark,
+                          isComingSoon
+                              ? Icons.hourglass_top_rounded
+                              : (isLocked
+                                  ? Icons.lock_rounded
+                                  : widget.category.icon),
+                          color: isComingSoon
+                              ? AppTheme.accentLight
+                              : (isLocked
+                                  ? Colors.white70
+                                  : AppTheme.primaryDark),
                           size: 26,
                         ),
                       ),
@@ -120,19 +141,43 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
                       Text(
                         widget.category.name,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Cairo',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
-                      if (isLocked)
-                        _buildStatusChip(Icons.lock_rounded, 'مقفل مؤقتاً', Colors.amberAccent)
+                      if (isComingSoon)
+                        _buildStatusChip(
+                          Icons.hourglass_top_rounded,
+                          'قريباً ⏳',
+                          AppTheme.accentLight,
+                        )
+                      else if (isLocked)
+                        _buildStatusChip(
+                          Icons.lock_rounded,
+                          'مقفل مؤقتاً',
+                          Colors.amberAccent,
+                        )
                       else ...[
                         // Progress Info
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildStatusChip(Icons.lock_open_rounded, '$unlocked', AppTheme.successColor),
-                            _buildStatusChip(Icons.lock_rounded, '$locked', Colors.white.withAlpha(150)),
+                            _buildStatusChip(
+                              Icons.lock_open_rounded,
+                              '$unlocked',
+                              AppTheme.successColor,
+                            ),
+                            _buildStatusChip(
+                              Icons.lock_rounded,
+                              '$locked',
+                              Colors.white.withAlpha(150),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -141,7 +186,9 @@ class _CategoryItemState extends State<CategoryItem> with SingleTickerProviderSt
                           child: LinearProgressIndicator(
                             value: widget.category.progressPercentage,
                             backgroundColor: Colors.white.withAlpha(30),
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppTheme.accentColor,
+                            ),
                             minHeight: 5,
                           ),
                         ),

@@ -13,6 +13,8 @@ class Category {
   final Color color;
   final int sortOrder;
   final bool isVisible;
+  final String availabilityStatus;
+  final String comingSoonMessage;
 
   Category({
     required this.id,
@@ -27,7 +29,11 @@ class Category {
     this.color = const Color(0xFF1B5E20),
     this.sortOrder = 100,
     this.isVisible = true,
+    this.availabilityStatus = 'open',
+    this.comingSoonMessage = '',
   });
+
+  bool get isComingSoon => availabilityStatus == 'coming_soon';
 
   Map<String, dynamic> toJson() {
     return {
@@ -43,6 +49,8 @@ class Category {
       'colorValue': color.toARGB32(),
       'sortOrder': sortOrder,
       'isVisible': isVisible,
+      'availabilityStatus': availabilityStatus,
+      'comingSoonMessage': comingSoonMessage,
     };
   }
 
@@ -64,6 +72,8 @@ class Category {
       color: Color(json['colorValue'] ?? 0xFF1B5E20),
       sortOrder: json['sortOrder'] ?? 100,
       isVisible: json['isVisible'] ?? true,
+      availabilityStatus: (json['availabilityStatus'] ?? 'open').toString(),
+      comingSoonMessage: (json['comingSoonMessage'] ?? '').toString(),
     );
   }
 
@@ -80,6 +90,8 @@ class Category {
     Color? color,
     int? sortOrder,
     bool? isVisible,
+    String? availabilityStatus,
+    String? comingSoonMessage,
   }) {
     return Category(
       id: id ?? this.id,
@@ -94,6 +106,8 @@ class Category {
       color: color ?? this.color,
       sortOrder: sortOrder ?? this.sortOrder,
       isVisible: isVisible ?? this.isVisible,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+      comingSoonMessage: comingSoonMessage ?? this.comingSoonMessage,
     );
   }
 

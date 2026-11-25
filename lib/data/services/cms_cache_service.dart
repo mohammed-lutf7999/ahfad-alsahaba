@@ -16,6 +16,23 @@ typedef CmsBundleFetcher = Future<Map<String, dynamic>?> Function({
   required List<String> ownedItemIds,
 });
 
+/// Resolution result for locating the next visible level after a completed level,
+/// automatically skipping `hidden` levels and distinguishing `coming_soon` levels.
+class NextLevelResolution {
+  final int? levelNumber;
+  final bool isComingSoon;
+  final String message;
+
+  const NextLevelResolution({
+    this.levelNumber,
+    this.isComingSoon = false,
+    this.message = '',
+  });
+
+  bool get hasNext => levelNumber != null;
+  bool get isPlayable => levelNumber != null && !isComingSoon;
+}
+
 /// Cache-first, version-gated dynamic CMS orchestrator for Store items,
 /// Library sections/articles, and Solo Quiz categories/questions.
 ///
@@ -301,5 +318,79 @@ class CmsCacheService extends ChangeNotifier {
       return dynamicCat.name;
     }
     return AppConstants.getCategoryName(categoryId);
+  }
+
+  /// Resolves availability status (`open` / `coming_soon` / `hidden`) for [categoryId].
+  CategoryAvailabilityStatus getCategoryAvailability(String categoryId) {
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat == null) return CategoryAvailabilityStatus.open;
+    if (!cat.isVisible) return CategoryAvailabilityStatus.hidden;
+    return cat.availability;
+  }
+
+  /// Returns optional teasing message configured for a `coming_soon` category.
+  String getCategoryComingSoonMessage(String categoryId) {
+    return _snapshot.quizCategories[categoryId]?.comingSoonMessage ?? '';
+  }
+
+  /// Returns per-level override (`coming_soon` / `hidden` + message) if configured.
+  LevelOverrideConfig? getLevelOverride(String categoryId, int levelNumber) {
+    return _snapshot.quizCategories[categoryId]?.overrideForLevel(levelNumber);
+  }
+
+  /// Whether [levelNumber] in [categoryId] is hidden from players.
+  bool isLevelHidden(String categoryId, int levelNumber) {
+    return getLevelOverride(categoryId, levelNumber)?.isHidden ?? false;
+  }
+
+  /// Whether [levelNumber] in [categoryId] is marked `coming_soon`.
+  bool isLevelComingSoon(String categoryId, int levelNumber) {
+    return getLevelOverride(categoryId, levelNumber)?.isComingSoon ?? false;
+  }
+
+  /// Returns teasing message for a `coming_soon` level (falls back to category message).
+  String getLevelComingSoonMessage(String categoryId, int levelNumber) {
+    final lvMsg = getLevelOverride(categoryId, levelNumber)?.message ?? '';
+    if (lvMsg.isNotEmpty) return lvMsg;
+    return getCategoryComingSoonMessage(categoryId);
+  }
+
+  /// Collects all hidden question IDs for [categoryId] (bundled local hidden IDs +
+  /// hidden cloud rows synced in `hidden_question_ids` or `quizQuestions`).
+  Set<String> getHiddenQuestionIds(String categoryId) {
+    final ids = <String>{};
+    final cat = _snapshot.quizCategories[categoryId];
+    if (cat != null) {
+      ids.addAll(cat.hiddenQuestionIds);
+      ids.addAll(cat.hiddenLocalQuestionIds);
+    }
+    for (final q in _snapshot.quizQuestions.values) {
+      if (q.categoryId == categoryId && !q.isVisible && q.id.isNotEmpty) {
+        ids.add(q.id);
+      }
+    }
+    return ids;
+  }
+
+  /// Scans forward from `afterLevel + 1` up to `totalLevels`, skipping `hidden`
+  /// levels, and returns the first non-hidden level along with whether it is
+  /// `coming_soon` (unplayable) or `open` (playable).
+  NextLevelResolution resolveNextVisibleLevel(
+    String categoryId,
+    int afterLevel,
+  ) {
+    final total = getTotalLevelsForCategory(categoryId);
+    for (var lv = afterLevel + 1; lv <= total; lv++) {
+      if (isLevelHidden(categoryId, lv)) continue;
+      if (isLevelComingSoon(categoryId, lv)) {
+        return NextLevelResolution(
+          levelNumber: lv,
+          isComingSoon: true,
+          message: getLevelComingSoonMessage(categoryId, lv),
+        );
+      }
+      return NextLevelResolution(levelNumber: lv);
+    }
+    return const NextLevelResolution();
   }
 }
