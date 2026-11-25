@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'admin/admin_cms_level_mgmt_mixin.dart';
 import 'admin/admin_cms_quiz_mixin.dart';
 import 'admin/admin_cms_store_library_mixin.dart';
 import 'admin/admin_events_announcements_mixin.dart';
@@ -10,7 +11,7 @@ import 'admin/admin_resources_audit_mixin.dart';
 import 'admin/admin_service_base.dart';
 
 /// Unified Admin Service Facade decomposed in Plan 21 (Wave 1) from a single
-/// 1,547-line God File into 8 focused domain modules under `lib/data/services/admin/`
+/// 1,547-line God File into focused domain modules under `lib/data/services/admin/`
 /// with 100% backward compatibility for UI screens and test overrides.
 class AdminService extends AdminServiceBase
     with
@@ -18,6 +19,7 @@ class AdminService extends AdminServiceBase
         AdminEventsAnnouncementsMixin,
         AdminCmsStoreLibraryMixin,
         AdminCmsQuizMixin,
+        AdminCmsLevelMgmtMixin,
         AdminPlayersMixin,
         AdminModerationMixin,
         AdminResourcesAuditMixin {
@@ -32,6 +34,7 @@ class AdminService extends AdminServiceBase
     resetEventsAnnouncementsForTesting();
     resetCmsStoreLibraryForTesting();
     resetCmsQuizForTesting();
+    resetCmsLevelMgmtForTesting();
     resetPlayersForTesting();
     resetModerationForTesting();
     resetResourcesAuditForTesting();

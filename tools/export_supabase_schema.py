@@ -127,6 +127,13 @@ FUNCTION_DOMAIN: dict[str, str] = {
     "admin_bulk_upsert_quiz_questions": "05_dynamic_cms_library_and_quiz.sql",
     "admin_export_category_pack_payload": "05_dynamic_cms_library_and_quiz.sql",
     "admin_publish_category_pack": "05_dynamic_cms_library_and_quiz.sql",
+    "trg_fn_quiz_questions_touch_updated_at": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_browse_quiz_questions": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_delete_quiz_question": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_bulk_manage_questions": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_upsert_category_availability": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_bulk_set_level_overrides": "05_dynamic_cms_library_and_quiz.sql",
+    "admin_toggle_hidden_local_question": "05_dynamic_cms_library_and_quiz.sql",
     "_diwan_contains_profanity": "06_diwan_guilds_and_live_arenas.sql",
     "get_diwan_messages": "06_diwan_guilds_and_live_arenas.sql",
     "send_diwan_message": "06_diwan_guilds_and_live_arenas.sql",
@@ -725,6 +732,26 @@ def _apply_do_block_effects(
                             f"ALTER FUNCTION public.{nm.lower()} SET search_path = public, auth; -- via DO block",
                         )
                     )
+
+    # A2) Dynamic REVOKE ALL ... FROM PUBLIC, anon on admin_* and _* (024a hardening)
+    if "REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon" in body and "admin\\_" in body:
+        for fname, fn in functions.items():
+            if fname.startswith("admin_") or fname.startswith("_"):
+                fn.revoked_roles.update({"public", "anon"})
+                fn.granted_roles.discard("public")
+                fn.granted_roles.discard("anon")
+                if fname.startswith("admin_") or fname in {"_check_is_owner", "_current_actor_email"}:
+                    fn.granted_roles.update({"authenticated", "service_role"})
+                    fn.revoked_roles.discard("authenticated")
+                    fn.revoked_roles.discard("service_role")
+                else:
+                    fn.revoked_roles.add("authenticated")
+                    fn.granted_roles.discard("authenticated")
+                    fn.granted_roles.add("service_role")
+                    fn.revoked_roles.discard("service_role")
+                fn.permission_stmts.append(
+                    (mig_name, f"REVOKE ALL ON FUNCTION public.{fname} FROM PUBLIC, anon; -- via DO block")
+                )
 
     # B) Direct DROP POLICY / CREATE POLICY / ALTER TABLE / GRANT / REVOKE inside DO $$
     for inner_stmt in split_sql_statements(body):

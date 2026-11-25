@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/models/question_model.dart';
 import '../data/models/category_model.dart';
+import '../data/models/cms_models.dart';
 import '../data/models/level_model.dart';
 import '../data/services/question_service.dart';
 import '../data/services/cms_cache_service.dart';
@@ -187,17 +188,21 @@ class GameController extends ChangeNotifier {
         questionsPerLevel: cloudCat.questionsPerLevel,
         levelDrawMode: cloudCat.levelDrawMode,
         unlockedLevels: _getCategoryUnlockedLevels(cloudCat.id),
-        isLocked: cloudCat.isLocked,
+        isLocked: cloudCat.isLocked || cloudCat.isComingSoon,
         color: CmsIconRegistry.parseHexColor(
           cloudCat.colorHex,
           fallback: base?.color ?? const Color(0xFF1B5E20),
         ),
         sortOrder: cloudCat.sortOrder,
-        isVisible: cloudCat.isVisible,
+        isVisible: cloudCat.isVisible && !cloudCat.isHiddenByAvailability,
+        availabilityStatus: cloudCat.availabilityStatus,
+        comingSoonMessage: cloudCat.comingSoonMessage,
       );
     }
 
-    _categories = mergedById.values.where((c) => c.isVisible).toList()
+    _categories = mergedById.values
+        .where((c) => c.isVisible && c.availabilityStatus != 'hidden')
+        .toList()
       ..sort((a, b) {
         final cmp = a.sortOrder.compareTo(b.sortOrder);
         return cmp != 0 ? cmp : a.id.compareTo(b.id);
@@ -205,7 +210,8 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Get levels for a category
+  // Get levels for a category (omits `hidden` levels, marks `coming_soon`, and
+  // keeps progression consistent by unlocking across skipped `hidden` levels).
   List<Level> getLevelsForCategory(String categoryId) {
     final category = _categories.firstWhere(
       (c) => c.id == categoryId,
@@ -221,27 +227,53 @@ class GameController extends ChangeNotifier {
       ),
     );
     final profile = ProfileService.instance.activeProfile;
+    final cms = CmsCacheService.instance;
     final questionsCount = category.questionsPerLevel;
-    
-    return List.generate(category.totalLevels, (index) {
-      final levelNumber = index + 1;
-      final isLevelUnlocked = profile?.isLevelUnlocked(categoryId, levelNumber) ?? (levelNumber == 1);
-      final isCompleted = profile?.isLevelCompleted(categoryId, levelNumber) ?? false;
+    final displayTotalLevels = cms.getDisplayTotalLevelsForCategory(categoryId);
+    final visibleLevels = <Level>[];
+    int? prevVisibleLevelNumber;
+
+    for (var levelNumber = 1; levelNumber <= displayTotalLevels; levelNumber++) {
+      if (cms.isLevelHidden(categoryId, levelNumber)) {
+        continue;
+      }
+
+      final isComingSoon = cms.isLevelComingSoon(categoryId, levelNumber);
+      final comingSoonMsg = isComingSoon
+          ? cms.getLevelComingSoonMessage(categoryId, levelNumber)
+          : '';
+      final isFirstVisible = prevVisibleLevelNumber == null;
+      final isPrevVisibleCompleted = prevVisibleLevelNumber != null &&
+          (profile?.isLevelCompleted(categoryId, prevVisibleLevelNumber) ??
+              false);
+      final isLevelUnlocked = !isComingSoon &&
+          (isFirstVisible ||
+              (profile?.isLevelUnlocked(categoryId, levelNumber) ?? false) ||
+              isPrevVisibleCompleted);
+      final isCompleted =
+          profile?.isLevelCompleted(categoryId, levelNumber) ?? false;
       final levelScore = profile?.getLevelScore(categoryId, levelNumber) ?? 0;
       final stars = profile?.getLevelStars(categoryId, levelNumber) ?? 0;
-      
-      return Level(
-        id: '${categoryId}_level_$levelNumber',
-        categoryId: categoryId,
-        levelNumber: levelNumber,
-        title: 'المستوى $levelNumber',
-        totalQuestions: questionsCount,
-        isLocked: !isLevelUnlocked,
-        isCompleted: isCompleted,
-        highScore: levelScore,
-        stars: stars,
+
+      visibleLevels.add(
+        Level(
+          id: '${categoryId}_level_$levelNumber',
+          categoryId: categoryId,
+          levelNumber: levelNumber,
+          title: 'المستوى $levelNumber',
+          totalQuestions: questionsCount,
+          isLocked: !isLevelUnlocked,
+          isCompleted: isCompleted,
+          highScore: levelScore,
+          stars: stars,
+          availabilityStatus: isComingSoon ? 'coming_soon' : 'open',
+          comingSoonMessage: comingSoonMsg,
+        ),
       );
-    });
+      prevVisibleLevelNumber = levelNumber;
+    }
+
+    return visibleLevels;
   }
 
   // Load questions for a specific level (async from JSON)
@@ -263,7 +295,41 @@ class GameController extends ChangeNotifier {
     _hasUsedTimeFreeze = false;
     _hiddenOptionIndices = [];
     _userAnswers.clear();
-    
+
+    // Guard: reject loading categories or levels marked `coming_soon` or `hidden`
+    final cms = CmsCacheService.instance;
+    final catAvail = cms.getCategoryAvailability(categoryId);
+    if (catAvail == CategoryAvailabilityStatus.comingSoon) {
+      final msg = cms.getCategoryComingSoonMessage(categoryId).trim();
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = msg.isNotEmpty ? msg : 'هذا القسم قادم قريباً بإذن الله ⏳';
+      notifyListeners();
+      return;
+    }
+    if (catAvail == CategoryAvailabilityStatus.hidden) {
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = 'هذا القسم غير متاح حالياً.';
+      notifyListeners();
+      return;
+    }
+    if (cms.isLevelComingSoon(categoryId, levelNumber)) {
+      final msg = cms.getLevelComingSoonMessage(categoryId, levelNumber).trim();
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = msg.isNotEmpty ? msg : 'هذا المستوى قادم قريباً بإذن الله ⏳';
+      notifyListeners();
+      return;
+    }
+    if (cms.isLevelHidden(categoryId, levelNumber)) {
+      _isLoading = false;
+      _currentQuestions = [];
+      _error = 'هذا المستوى غير متاح حالياً.';
+      notifyListeners();
+      return;
+    }
+
     notifyListeners();
 
     try {
@@ -402,11 +468,18 @@ class GameController extends ChangeNotifier {
     profile.setLevelStars(_currentCategoryId!, _currentLevelNumber!, stars);
     profile.setLevelScore(_currentCategoryId!, _currentLevelNumber!, _score);
 
-    // Unlock next level ONLY if passed (clamped cleanly to category's dynamic max levels)
+    // Unlock next playable level ONLY if passed (skipping any `hidden` levels
+    // and clamped cleanly to category's dynamic max levels).
     if (percentage >= AppConstants.passingScore) {
-      final currentUnlocked = profile.getCategoryUnlockedLevels(_currentCategoryId!);
+      final currentUnlocked =
+          profile.getCategoryUnlockedLevels(_currentCategoryId!);
       final maxLevels = CmsCategoryBounds.maxLevelsFor(_currentCategoryId!);
-      final targetUnlocked = (_currentLevelNumber! + 1).clamp(1, maxLevels);
+      final nextRes = CmsCacheService.instance.resolveNextVisibleLevel(
+        _currentCategoryId!,
+        _currentLevelNumber!,
+      );
+      final rawTarget = nextRes.levelNumber ?? (_currentLevelNumber! + 1);
+      final targetUnlocked = rawTarget.clamp(1, maxLevels);
       if (targetUnlocked >= currentUnlocked) {
         profile.setCategoryUnlockedLevels(_currentCategoryId!, targetUnlocked);
       }

@@ -169,6 +169,25 @@ class _LevelsScreenState extends State<LevelsScreen> with SingleTickerProviderSt
                                   level: level,
                                   onTap: () async {
                                     SoundService().playClick();
+                                    if (level.isComingSoon) {
+                                      final msg = level.comingSoonMessage.trim().isNotEmpty
+                                          ? level.comingSoonMessage.trim()
+                                          : 'هذا المستوى قادم قريباً بإذن الله ⏳';
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              msg,
+                                              style: const TextStyle(
+                                                fontFamily: 'Cairo',
+                                              ),
+                                            ),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      return;
+                                    }
                                     await Navigator.pushNamed(
                                       context,
                                       AppRoutes.quiz,

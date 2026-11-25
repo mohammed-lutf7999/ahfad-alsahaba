@@ -74,6 +74,46 @@ class QuestionCmsMerger {
     return withOptionRandom(baseQuestion, optionRandom);
   }
 
+  /// Extracts `hiddenIds` / `hidden_ids` embedded in a Gzip CDN question pack.
+  static Set<String> extractPackHiddenIds(Map<String, dynamic>? packData) {
+    if (packData == null) return const {};
+    final raw = packData['hiddenIds'] ?? packData['hidden_ids'];
+    if (raw is! List) return const {};
+    final ids = <String>{};
+    for (final item in raw) {
+      final s = item.toString().trim();
+      if (s.isNotEmpty) ids.add(s);
+    }
+    return ids;
+  }
+
+  /// Collects the authoritative set of hidden question IDs for [categoryId].
+  ///
+  /// When [snapshot.quizCategories] contains [categoryId], the CMS snapshot is
+  /// treated as the latest source of truth (so un-hiding a local question takes
+  /// effect at 0ms without waiting for a Gzip CDN republish). [packData]
+  /// `hiddenIds` is used strictly as fallback when no category snapshot exists.
+  static Set<String> collectHiddenQuestionIds(
+    String categoryId, {
+    required CmsCacheSnapshot snapshot,
+    Map<String, dynamic>? packData,
+  }) {
+    final ids = <String>{};
+    final cat = snapshot.quizCategories[categoryId];
+    if (cat != null) {
+      ids.addAll(cat.hiddenQuestionIds);
+      ids.addAll(cat.hiddenLocalQuestionIds);
+    } else {
+      ids.addAll(extractPackHiddenIds(packData));
+    }
+    for (final q in snapshot.quizQuestions.values) {
+      if (q.categoryId == categoryId && !q.isVisible && q.id.isNotEmpty) {
+        ids.add(q.id);
+      }
+    }
+    return ids;
+  }
+
   static Question mapDynamicQuestion(
     DynamicQuizQuestionData q, {
     Random? optionRandom,

@@ -45,8 +45,9 @@ class _LevelItemState extends State<LevelItem>
 
   @override
   Widget build(BuildContext context) {
-    final isLocked = widget.level.isLocked;
-    final isCompleted = widget.level.isCompleted;
+    final isComingSoon = widget.level.isComingSoon;
+    final isLocked = !isComingSoon && widget.level.isLocked;
+    final isCompleted = !isComingSoon && widget.level.isCompleted;
 
     return GestureDetector(
       onTapDown: isLocked ? null : (_) => _animationController.forward(),
@@ -62,13 +63,19 @@ class _LevelItemState extends State<LevelItem>
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
-            color: isLocked ? AppTheme.cardColor.withAlpha(200) : AppTheme.cardColor,
+            color: isComingSoon
+                ? AppTheme.cardColor.withAlpha(235)
+                : (isLocked ? AppTheme.cardColor.withAlpha(200) : AppTheme.cardColor),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isCompleted
-                  ? AppTheme.accentColor
-                  : (isLocked ? Colors.grey.shade300 : AppTheme.accentColor.withAlpha(80)),
-              width: isCompleted ? 1.5 : 1,
+              color: isComingSoon
+                  ? AppTheme.accentColor.withAlpha(170)
+                  : (isCompleted
+                      ? AppTheme.accentColor
+                      : (isLocked
+                          ? Colors.grey.shade300
+                          : AppTheme.accentColor.withAlpha(80))),
+              width: (isCompleted || isComingSoon) ? 1.5 : 1,
             ),
             boxShadow: isLocked
                 ? null
@@ -85,18 +92,18 @@ class _LevelItemState extends State<LevelItem>
             child: Row(
               textDirection: TextDirection.rtl,
               children: [
-                // Level Number Circle (Smaller)
+                // Level Number Circle
                 Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     gradient: isLocked
                         ? null
-                        : (isCompleted
+                        : (isComingSoon || isCompleted
                             ? AppTheme.goldGradient
-                            : LinearGradient(colors: [
+                            : const LinearGradient(colors: [
                                 AppTheme.primaryLight,
-                                AppTheme.primaryColor
+                                AppTheme.primaryColor,
                               ])),
                     color: isLocked ? Colors.grey.shade400 : null,
                     shape: BoxShape.circle,
@@ -104,7 +111,7 @@ class _LevelItemState extends State<LevelItem>
                         ? null
                         : [
                             BoxShadow(
-                              color: isCompleted
+                              color: (isComingSoon || isCompleted)
                                   ? AppTheme.accentColor.withAlpha(80)
                                   : AppTheme.primaryColor.withAlpha(60),
                               blurRadius: 6,
@@ -112,19 +119,22 @@ class _LevelItemState extends State<LevelItem>
                           ],
                   ),
                   child: Center(
-                    child: isLocked
-                        ? const Icon(Icons.lock_rounded,
-                            color: Colors.white, size: 20)
-                        : (isCompleted
-                            ? const Icon(Icons.check_rounded,
-                                color: AppTheme.primaryDark, size: 24)
-                            : Text(
-                                '${widget.level.levelNumber}',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold),
-                              )),
+                    child: isComingSoon
+                        ? const Icon(Icons.hourglass_top_rounded,
+                            color: AppTheme.primaryDark, size: 22)
+                        : (isLocked
+                            ? const Icon(Icons.lock_rounded,
+                                color: Colors.white, size: 20)
+                            : (isCompleted
+                                ? const Icon(Icons.check_rounded,
+                                    color: AppTheme.primaryDark, size: 24)
+                                : Text(
+                                    '${widget.level.levelNumber}',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
+                                  ))),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -132,7 +142,7 @@ class _LevelItemState extends State<LevelItem>
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,//محاذات العناصر في بطاقات المستويات 
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         widget.level.title,
@@ -146,33 +156,78 @@ class _LevelItemState extends State<LevelItem>
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          if (isCompleted) ...[
-                             Row(children: _buildStars()),
-                             const SizedBox(width: 8),
-                             Container(width: 1, height: 12, color: Colors.grey.shade300),
-                             const SizedBox(width: 8),
-                          ],
-                          Text(
-                            '${widget.level.totalQuestions} أسئلة',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isLocked
-                                  ? Colors.grey.shade400
-                                  : AppTheme.textSecondary,
-                            ),
+                      if (isComingSoon)
+                        Text(
+                          widget.level.comingSoonMessage.trim().isNotEmpty
+                              ? widget.level.comingSoonMessage.trim()
+                              : 'قادم قريباً بإذن الله',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.accentDark,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
-                      ),
+                        )
+                      else
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            if (isCompleted) ...[
+                              Row(children: _buildStars()),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 1,
+                                height: 12,
+                                color: Colors.grey.shade300,
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              '${widget.level.totalQuestions} أسئلة',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isLocked
+                                    ? Colors.grey.shade400
+                                    : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.arrow_back_ios_rounded,
-                    color: isLocked ? Colors.grey.shade300 : AppTheme.accentColor,
-                    size: 16),
+                if (isComingSoon)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withAlpha(35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.accentColor.withAlpha(140),
+                      ),
+                    ),
+                    child: const Text(
+                      'قريباً ⏳',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accentDark,
+                        height: 1.2,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.arrow_back_ios_rounded,
+                    color:
+                        isLocked ? Colors.grey.shade300 : AppTheme.accentColor,
+                    size: 16,
+                  ),
               ],
             ),
           ),

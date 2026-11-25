@@ -570,3 +570,90 @@ select.input option {
   gap: 2px;
   font-size: 0.78rem;
 }
+
+.badge-coming-soon {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(243, 198, 68, 0.22);
+  color: var(--gold);
+  border: 1px solid rgba(243, 198, 68, 0.55);
+}
+
+.warning-banner,
+.info-banner {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.warning-banner {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  color: #fde68a;
+}
+
+.info-banner {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  color: #bae6fd;
+}
+
+.level-pills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.level-pill {
+  padding: 8px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-light);
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.level-pill:hover {
+  transform: translateY(-1px);
+}
+
+.level-pill-num {
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.level-pill-state {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.level-pill-open {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.level-pill-coming_soon {
+  background: rgba(243, 198, 68, 0.18);
+  border-color: rgba(243, 198, 68, 0.65);
+  color: var(--gold);
+}
+
+.level-pill-hidden {
+  background: rgba(225, 29, 72, 0.16);
+  border-color: rgba(225, 29, 72, 0.55);
+  color: #fda4af;
+}

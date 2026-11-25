@@ -183,7 +183,7 @@ export function renderQuizCategoriesHtml(categories) {
               <span class="code-tag">${escapeHtml(cat.id)}</span>
               <span class="muted-text">• ${escapeHtml(cat.total_levels ?? 10)} مستوى</span>
               <span class="muted-text">• ${escapeHtml(cat.custom_questions_count ?? 0)} سؤال سحابي</span>
-              ${cat.is_locked ? '<span class="badge-hidden">مقفل</span>' : ''}
+              ${cat.availability_status === 'coming_soon' ? '<span class="badge-coming-soon">قريباً ⏳</span>' : (cat.is_locked ? '<span class="badge-hidden">مقفل</span>' : '')}
             </div>
             <div class="record-actions">
               <span class="${vis ? 'badge-visible' : 'badge-hidden'}">${vis ? 'مرئي' : 'مخفي'}</span>

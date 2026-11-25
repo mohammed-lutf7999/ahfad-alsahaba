@@ -7,6 +7,8 @@ import {
   refreshBulkActiveConfig,
   syncBulkCategories,
 } from './bulk_json_importer.js';
+import { syncLevelManagerCategories } from './cms_level_manager.js';
+import { syncQuestionBrowserCategories } from './cms_question_browser.js';
 import {
   buildQuizTemplate,
   renderQuizCategoriesHtml,
@@ -36,6 +38,8 @@ function populateSelects() {
   filterSel.value = prevFilter;
 
   syncBulkCategories(state.categories);
+  syncLevelManagerCategories(state.categories);
+  syncQuestionBrowserCategories(state.categories);
 }
 
 function renderCategories() {

@@ -1,9 +1,9 @@
 -- ============================================================================
 -- AUTO-GENERATED CANONICAL SCHEMA REFERENCE — DO NOT EDIT MANUALLY!
 -- Domain: 03_multiplayer_rooms_and_ghosts.sql (المطابقة التنافسية، المباريات، الغرف الخاصة، وأشباح الصحابة)
--- Source: supabase/migrations/001..023 (23 migrations)
+-- Source: supabase/migrations/001..024 (26 migrations)
 -- Generator: python tools/export_supabase_schema.py
--- Summary: 4 tables | 7 RLS policies | 8 indexes | 0 triggers | 11 functions
+-- Summary: 4 tables | 6 RLS policies | 8 indexes | 0 triggers | 11 functions
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -143,9 +143,6 @@ create policy "Users can see participants in their match" on match_participants 
 -- Policy: "Users can update their own progress" ON public.match_participants (latest: 003_multiplayer_schema.sql)
 create policy "Users can update their own progress" on match_participants for update using (auth.uid() = user_id);
 
--- Policy: "System creates matches" ON public.matches (latest: 003_multiplayer_schema.sql)
-create policy "System creates matches" on matches for insert with check (true);
-
 -- Policy: "Users can see their matches" ON public.matches (latest: 003_multiplayer_schema.sql)
 create policy "Users can see their matches" on matches for select using (auth.uid() = player1_id or auth.uid() = player2_id);
 
@@ -220,6 +217,9 @@ END;
 $$;
 -- Effective ALTER FUNCTION notes for public.cancel_private_room:
 --   [021_admin_moderation_permissions_and_guards.sql] ALTER FUNCTION public.cancel_private_room SET search_path = public, auth; -- via DO block
+-- Effective permission history for public.cancel_private_room:
+--   [024a_level_question_management_schema_and_security.sql] REVOKE ALL ON FUNCTION public.cancel_private_room(UUID, UUID) FROM PUBLIC;
+--   [024a_level_question_management_schema_and_security.sql] GRANT EXECUTE ON FUNCTION public.cancel_private_room(UUID, UUID) TO anon, authenticated, service_role;
 
 -- Function: public.confirm_ready | latest: 008_multiplayer_rock_solid_fix.sql | redefinitions: 2 | security_definer: True | search_path: True
 CREATE OR REPLACE FUNCTION public.confirm_ready(

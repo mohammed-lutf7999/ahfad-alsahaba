@@ -4,6 +4,7 @@ import '../../../core/theme/app_custom_theme.dart';
 import '../../../data/models/cms_models.dart';
 import '../../../data/models/store_item_model.dart';
 import '../../../data/services/admin_service.dart';
+import 'cms/admin_level_question_manager_screen.dart';
 import 'cms/cms_library_editor_sheets.dart';
 import 'cms/cms_library_tab.dart';
 import 'cms/cms_quiz_editor_sheets.dart';
@@ -278,6 +279,21 @@ class _AdminCmsManagerScreenState extends State<AdminCmsManagerScreen> {
                             scope: 'quiz',
                           ),
                           onToggleVisibility: _toggleVisibility,
+                          onOpenLevelQuestionManager: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    AdminLevelQuestionManagerScreen(
+                                  initialCategoryId: _quizCategoryFilter == 'all'
+                                      ? null
+                                      : _quizCategoryFilter,
+                                ),
+                              ),
+                            );
+                            if (mounted) {
+                              await _reloadScope('quiz');
+                            }
+                          },
                         ),
                       ],
                     ),

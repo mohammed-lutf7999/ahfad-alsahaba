@@ -248,10 +248,16 @@ class QuestionService {
     final baseData = _assetLoader.getCached(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
 
-    final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
+    final cmsSnapshot = CmsCacheService.instance.snapshot;
+    final hiddenIds = QuestionCmsMerger.collectHiddenQuestionIds(
+      categoryId,
+      snapshot: cmsSnapshot,
+    );
+    final cloudQuestions = cmsSnapshot.quizQuestions.values
         .where((q) =>
             q.categoryId == categoryId &&
             q.isVisible &&
+            !hiddenIds.contains(q.id) &&
             q.options.length == 4 &&
             (levelNumber == null || q.levelNumber == levelNumber))
         .toList();
@@ -268,7 +274,11 @@ class QuestionService {
         if (list == null) continue;
         for (var i = 0; i < list.length; i++) {
           final raw = list[i] as Map;
-          final rawId = (raw['id'] ?? '').toString();
+          final rawId = (raw['id'] ?? '').toString().trim();
+          if (rawId.isNotEmpty && hiddenIds.contains(rawId)) {
+            seenCloudIds.add(rawId);
+            continue;
+          }
           final override = rawId.isNotEmpty ? cloudById[rawId] : null;
           if (override != null) {
             seenCloudIds.add(rawId);
@@ -283,7 +293,7 @@ class QuestionService {
     }
 
     for (final q in cloudQuestions) {
-      if (seenCloudIds.contains(q.id)) continue;
+      if (seenCloudIds.contains(q.id) || hiddenIds.contains(q.id)) continue;
       specs.add('cms:${q.id}');
     }
 
@@ -304,8 +314,14 @@ class QuestionService {
     final levelKey = levelNumber.toString();
     final rawBaseList = levels?[levelKey] as List?;
 
-    // Track cloud overrides/additions for this category
-    final cloudQuestions = CmsCacheService.instance.snapshot.quizQuestions.values
+    // Track cloud overrides/additions & hidden question IDs for this category
+    final cmsSnapshot = CmsCacheService.instance.snapshot;
+    final hiddenIds = QuestionCmsMerger.collectHiddenQuestionIds(
+      categoryId,
+      snapshot: cmsSnapshot,
+      packData: baseData,
+    );
+    final cloudQuestions = cmsSnapshot.quizQuestions.values
         .where((q) => q.categoryId == categoryId)
         .toList();
     final cloudById = <String, DynamicQuizQuestionData>{
@@ -318,11 +334,13 @@ class QuestionService {
     if (rawBaseList != null) {
       for (var i = 0; i < rawBaseList.length; i++) {
         final rawMap = Map<String, dynamic>.from(rawBaseList[i] as Map);
-        final rawId = (rawMap['id'] ?? '').toString();
+        final rawId = (rawMap['id'] ?? '').toString().trim();
         final override = rawId.isNotEmpty ? cloudById[rawId] : null;
         if (override != null) {
           seenIds.add(rawId);
-          if (override.isVisible && override.levelNumber == levelNumber) {
+          if (override.isVisible &&
+              !hiddenIds.contains(rawId) &&
+              override.levelNumber == levelNumber) {
             merged.add((
               sortOrder: override.sortOrder,
               question: _mapDynamicQuestion(override, optionRandom: _random),
@@ -330,7 +348,10 @@ class QuestionService {
           }
           continue;
         }
-        if (rawId.isNotEmpty) seenIds.add(rawId);
+        if (rawId.isNotEmpty) {
+          seenIds.add(rawId);
+          if (hiddenIds.contains(rawId)) continue;
+        }
         merged.add((
           sortOrder: 100 + i,
           question: _mapQuestionEntry(
@@ -346,6 +367,7 @@ class QuestionService {
     // Add newly created cloud questions for this category & level
     for (final q in cloudQuestions) {
       if (seenIds.contains(q.id)) continue;
+      if (hiddenIds.contains(q.id)) continue;
       if (q.levelNumber == levelNumber && q.isVisible && q.options.length == 4) {
         merged.add((
           sortOrder: q.sortOrder,
@@ -398,6 +420,13 @@ class QuestionService {
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final effectiveOptionRng = shuffleOptions ? (optionRandom ?? _random) : null;
 
+    final hiddenIds = includeCloudSoloQuestions
+        ? QuestionCmsMerger.collectHiddenQuestionIds(
+            categoryId,
+            snapshot: CmsCacheService.instance.snapshot,
+            packData: baseData,
+          )
+        : const <String>{};
     final cloudQuestions = includeCloudSoloQuestions
         ? CmsCacheService.instance.snapshot.quizQuestions.values
             .where((q) => q.categoryId == categoryId)
@@ -414,18 +443,21 @@ class QuestionService {
         final levelQuestions = levels[levelKey] as List;
         for (final raw in levelQuestions) {
           final rawMap = Map<String, dynamic>.from(raw as Map);
-          final rawId = (rawMap['id'] ?? '').toString();
+          final rawId = (rawMap['id'] ?? '').toString().trim();
           final override = rawId.isNotEmpty ? cloudById[rawId] : null;
           if (override != null) {
             seenIds.add(rawId);
-            if (override.isVisible) {
+            if (override.isVisible && !hiddenIds.contains(rawId)) {
               allQuestions.add(
                 _mapDynamicQuestion(override, optionRandom: effectiveOptionRng),
               );
             }
             continue;
           }
-          if (rawId.isNotEmpty) seenIds.add(rawId);
+          if (rawId.isNotEmpty) {
+            seenIds.add(rawId);
+            if (hiddenIds.contains(rawId)) continue;
+          }
           allQuestions.add(
             _mapQuestionEntry(
               rawMap,
@@ -440,6 +472,7 @@ class QuestionService {
 
     for (final q in cloudQuestions) {
       if (seenIds.contains(q.id)) continue;
+      if (hiddenIds.contains(q.id)) continue;
       if (q.isVisible && q.options.length == 4) {
         allQuestions.add(
           _mapDynamicQuestion(q, optionRandom: effectiveOptionRng),
@@ -463,20 +496,34 @@ class QuestionService {
     return questions.length;
   }
 
-  /// Check if a specific level has visible questions in [categoryId].
+  /// Check if a specific level has visible (non-hidden) questions in [categoryId].
   Future<bool> levelExists(String categoryId, int levelNumber) async {
-    final hasCloudForLevel = CmsCacheService.instance.snapshot.quizQuestions.values
-        .any((q) =>
-            q.categoryId == categoryId &&
-            q.levelNumber == levelNumber &&
-            q.isVisible &&
-            q.options.length == 4);
+    final cmsSnapshot = CmsCacheService.instance.snapshot;
+    final baseData = await _resolveCategorySourceData(categoryId);
+    final hiddenIds = QuestionCmsMerger.collectHiddenQuestionIds(
+      categoryId,
+      snapshot: cmsSnapshot,
+      packData: baseData,
+    );
+
+    final hasCloudForLevel = cmsSnapshot.quizQuestions.values.any((q) =>
+        q.categoryId == categoryId &&
+        q.levelNumber == levelNumber &&
+        q.isVisible &&
+        !hiddenIds.contains(q.id) &&
+        q.options.length == 4);
     if (hasCloudForLevel) return true;
 
-    final baseData = await _resolveCategorySourceData(categoryId);
     final levels = baseData?['levels'] as Map<String, dynamic>?;
     final list = levels?[levelNumber.toString()] as List?;
-    return list != null && list.isNotEmpty;
+    if (list == null || list.isEmpty) return false;
+    for (final item in list) {
+      if (item is Map) {
+        final id = (item['id'] ?? '').toString().trim();
+        if (id.isEmpty || !hiddenIds.contains(id)) return true;
+      }
+    }
+    return false;
   }
 
   /// Clears cached JSON asset & Gzip pack memory data.

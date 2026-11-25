@@ -8,6 +8,8 @@ class Level {
   final bool isCompleted;
   final int highScore;
   final int stars; // 0-3 stars based on performance
+  final String availabilityStatus;
+  final String comingSoonMessage;
 
   Level({
     required this.id,
@@ -19,7 +21,12 @@ class Level {
     this.isCompleted = false,
     this.highScore = 0,
     this.stars = 0,
+    this.availabilityStatus = 'open',
+    this.comingSoonMessage = '',
   });
+
+  bool get isComingSoon => availabilityStatus == 'coming_soon';
+  bool get isHidden => availabilityStatus == 'hidden';
 
   Map<String, dynamic> toJson() {
     return {
@@ -32,6 +39,8 @@ class Level {
       'isCompleted': isCompleted,
       'highScore': highScore,
       'stars': stars,
+      'availabilityStatus': availabilityStatus,
+      'comingSoonMessage': comingSoonMessage,
     };
   }
 
@@ -46,6 +55,8 @@ class Level {
       isCompleted: json['isCompleted'] ?? false,
       highScore: json['highScore'] ?? 0,
       stars: json['stars'] ?? 0,
+      availabilityStatus: (json['availabilityStatus'] ?? 'open').toString(),
+      comingSoonMessage: (json['comingSoonMessage'] ?? '').toString(),
     );
   }
 
@@ -59,6 +70,8 @@ class Level {
     bool? isCompleted,
     int? highScore,
     int? stars,
+    String? availabilityStatus,
+    String? comingSoonMessage,
   }) {
     return Level(
       id: id ?? this.id,
@@ -70,6 +83,8 @@ class Level {
       isCompleted: isCompleted ?? this.isCompleted,
       highScore: highScore ?? this.highScore,
       stars: stars ?? this.stars,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+      comingSoonMessage: comingSoonMessage ?? this.comingSoonMessage,
     );
   }
 }
